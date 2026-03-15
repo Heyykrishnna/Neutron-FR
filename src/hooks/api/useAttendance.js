@@ -158,6 +158,28 @@ export function useVolunteerAttendanceProfile() {
 }
 
 /**
+ * Search participants filtered by competition
+ * GET /api/v1/volunteer/participants/search?query=...&competitionId=...
+ */
+export function useSearchParticipantsWithComp(query, competitionId = null) {
+  return useQuery({
+    queryKey: [...queryKeys.attendance.participants(query), competitionId],
+    queryFn: async () => {
+      const { data } = await apiClient.get("/volunteer/participants/search", {
+        params: { query, ...(competitionId ? { competitionId } : {}) },
+      });
+      return (
+        data?.data?.participants ||
+        data?.participants ||
+        (Array.isArray(data?.data) ? data.data : null) ||
+        (Array.isArray(data) ? data : [])
+      );
+    },
+    enabled: !!query && query.trim().length >= 2,
+  });
+}
+
+/**
  * SA: list registration desk (gate) volunteers
  * GET /api/v1/volunteer/registration-desk
  */

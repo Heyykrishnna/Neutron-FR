@@ -12,6 +12,20 @@ export function useIssues(filters = {}) {
   });
 }
 
+export function useCreateIssue() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ message }) => {
+      const { data } = await apiClient.post("/issues", { message });
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.issues.all });
+    },
+  });
+}
+
 export function useResolveIssue() {
   const queryClient = useQueryClient();
 

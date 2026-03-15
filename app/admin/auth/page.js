@@ -19,6 +19,7 @@ export default function AdminAuthPage() {
       if (user.role === "SA") router.replace("/admin/sa");
       else if (user.role === "DH") router.replace("/admin/dh");
       else if (user.role === "VH") router.replace("/admin/vh");
+      else if (user.role === "VOLUNTEER") router.replace("/admin/volunteer");
       else router.replace("/admin/dashboard");
     }
   }, [user, loading, router]);

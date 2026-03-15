@@ -13,6 +13,7 @@ import { CheckCircle, XCircle, AlertTriangle, Info, X } from "lucide-react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { QueryProvider } from "./QueryProvider";
 import { theme } from "@/src/theme";
+import EmotionRegistry from "./EmotionRegistry";
 
 const base = {
   fontFamily: "'Syne', sans-serif",
@@ -71,6 +72,7 @@ const iconProps = { size: 15, strokeWidth: 2 };
 export function AppProviders({ children }) {
   return (
     <QueryProvider>
+      <EmotionRegistry>
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <SnackbarProvider
@@ -119,6 +121,7 @@ export function AppProviders({ children }) {
           <AuthProvider>{children}</AuthProvider>
         </SnackbarProvider>
       </ThemeProvider>
+      </EmotionRegistry>
     </QueryProvider>
   );
 }

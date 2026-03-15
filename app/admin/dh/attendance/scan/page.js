@@ -87,13 +87,21 @@ export default function AttendanceQRScannerPage() {
 
   const { mutateAsync: verifyQRCode, isPending: verifying } = useVerifyQRCode();
   const { mutateAsync: markFestAttendance } = useMarkFestAttendance();
-  const { data: volunteerProfile } = useVolunteerAttendanceProfile();
+  const { data: volunteerProfile, isSuccess: profileLoaded } =
+    useVolunteerAttendanceProfile();
   const { data: participantDetails, isLoading: detailsLoading } =
     useParticipantDetails(scannedUserId || null);
 
   const isDH = user?.role === "DH";
   const canMarkFestAttendance =
     user?.role === "SA" || !!volunteerProfile?.isRegistrationDeskVolunteer;
+  const canAccessAttendanceWorkflow =
+    user?.role === "SA" ||
+    user?.role === "DH" ||
+    !!volunteerProfile?.isRegistrationDeskVolunteer ||
+    !!volunteerProfile?.assignedCompetitions?.some(
+      (ac) => ac.competition?.attendanceRequired,
+    );
 
   const bindStreamToVideo = async () => {
     const video = videoRef.current;
@@ -303,6 +311,16 @@ export default function AttendanceQRScannerPage() {
         </Button>
       </Box>
 
+      {profileLoaded && !canAccessAttendanceWorkflow && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2.5, fontFamily: "'Syne', sans-serif" }}
+        >
+          Access restricted — you must be assigned as a gate volunteer or
+          assigned to a competition with attendance tracking enabled.
+        </Alert>
+      )}
+
       <Grid container spacing={2.5}>
         <Grid item xs={12} md={5}>
           <Paper
@@ -322,6 +340,7 @@ export default function AttendanceQRScannerPage() {
               <Button
                 startIcon={<Camera size={14} />}
                 variant="outlined"
+                disabled={!canAccessAttendanceWorkflow}
                 onClick={cameraActive ? stopCamera : handleStartCamera}
                 sx={{
                   textTransform: "none",
@@ -333,7 +352,7 @@ export default function AttendanceQRScannerPage() {
               </Button>
               <Button
                 variant="contained"
-                disabled={verifying}
+                disabled={verifying || !canAccessAttendanceWorkflow}
                 onClick={handleScanSubmit}
                 sx={{
                   textTransform: "none",
@@ -386,6 +405,7 @@ export default function AttendanceQRScannerPage() {
               minRows={5}
               maxRows={9}
               fullWidth
+              disabled={!canAccessAttendanceWorkflow}
               value={qrPayload}
               onChange={(event) => setQrPayload(event.target.value)}
               placeholder='QR payload (JSON like {"t":"...","u":"...","v":1})'
