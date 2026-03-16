@@ -288,3 +288,143 @@ export function useCreateRound() {
     },
   });
 }
+
+/* ======================
+   JUDGE SCORING HOOKS
+====================== */
+
+/**
+ * Score details for a team by the current judge (pre-fills scoring form)
+ * GET /api/v1/judging/rounds/:roundId/teams/:teamId/score-details
+ */
+export function useTeamScoreDetails(roundId, teamId) {
+  return useQuery({
+    queryKey: queryKeys.judging.teamScoreDetails(roundId, teamId),
+    queryFn: async () => {
+      const { data } = await apiClient.get(
+        `/judging/rounds/${roundId}/teams/${teamId}/score-details`,
+      );
+      return data?.data || data || null;
+    },
+    enabled: !!roundId && !!teamId,
+  });
+}
+
+/**
+ * Submit a score for one criterion
+ * POST /api/v1/judging/rounds/:roundId/teams/:teamId/criteria/:criteriaId/score
+ */
+export function useSubmitCriteriaScore() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ roundId, teamId, criteriaId, score }) => {
+      const { data } = await apiClient.post(
+        `/judging/rounds/${roundId}/teams/${teamId}/criteria/${criteriaId}/score`,
+        { score },
+      );
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.judging.teamScoreDetails(
+          variables.roundId,
+          variables.teamId,
+        ),
+      });
+    },
+  });
+}
+
+/**
+ * Add evaluation notes for a team
+ * POST /api/v1/judging/rounds/:roundId/teams/:teamId/notes
+ */
+export function useAddEvaluationNotes() {
+  return useMutation({
+    mutationFn: async ({ roundId, teamId, notes }) => {
+      const { data } = await apiClient.post(
+        `/judging/rounds/${roundId}/teams/${teamId}/notes`,
+        { notes },
+      );
+      return data;
+    },
+  });
+}
+
+/**
+ * Submit final score (auto weighted total) for a team
+ * POST /api/v1/judging/rounds/:roundId/teams/:teamId/submit
+ */
+export function useSubmitFinalScore() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ roundId, teamId }) => {
+      const { data } = await apiClient.post(
+        `/judging/rounds/${roundId}/teams/${teamId}/submit`,
+      );
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.judging.participants(variables.roundId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.judging.leaderboard(variables.roundId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.judging.allScored(variables.roundId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.judging.teamScoreDetails(
+          variables.roundId,
+          variables.teamId,
+        ),
+      });
+    },
+  });
+}
+
+/* ======================
+   LOCK REQUEST APPROVAL (SA)
+====================== */
+
+/**
+ * Pending lock requests awaiting SA approval
+ * GET /api/v1/judging/lock-requests/pending
+ */
+export function usePendingLockRequests() {
+  return useQuery({
+    queryKey: queryKeys.judging.pendingLockRequests(),
+    queryFn: async () => {
+      const { data } = await apiClient.get("/judging/lock-requests/pending");
+      return (
+        data?.data?.requests ||
+        data?.requests ||
+        (Array.isArray(data?.data) ? data.data : null) ||
+        (Array.isArray(data) ? data : [])
+      );
+    },
+  });
+}
+
+/**
+ * Approve or reject a lock request (SA only)
+ * POST /api/v1/judging/lock-requests/:requestId/review
+ */
+export function useReviewLockRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ requestId, status, reviewNotes }) => {
+      const { data } = await apiClient.post(
+        `/judging/lock-requests/${requestId}/review`,
+        { status, reviewNotes },
+      );
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.judging.pendingLockRequests(),
+      });
+    },
+  });
+}

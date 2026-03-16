@@ -13,12 +13,28 @@ export function usePendingRegistrations(filters = {}) {
       const { data } = await apiClient.get("/registration/pending", {
         params: filters,
       });
-      return (
+      const rows =
         data?.data?.registrations ||
         data?.registrations ||
         (Array.isArray(data?.data) ? data.data : null) ||
-        (Array.isArray(data) ? data : [])
-      );
+        (Array.isArray(data) ? data : []);
+
+      return rows.map((row) => {
+        if (row?.registration && typeof row.registration === "object") {
+          return {
+            ...row.registration,
+            registrationId: row.registration.id,
+            user: row.user || null,
+            competition: row.competition || null,
+            team: row.team || null,
+          };
+        }
+
+        return {
+          ...row,
+          registrationId: row?.registrationId || row?.id || null,
+        };
+      });
     },
   });
 }

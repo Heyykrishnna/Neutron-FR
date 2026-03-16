@@ -58,6 +58,10 @@ const SHARED_NAVIGATION = [
   { name: "Forms", href: "/admin/dh/competitions/forms", icon: FileText },
 ];
 
+const JUDGE_NAVIGATION = [
+  { name: "My Competitions", href: "/admin/judge/competitions", icon: Trophy },
+];
+
 export const SIDEBAR_WIDTH = 272;
 
 export function getAdminNavigation(role) {
@@ -67,6 +71,10 @@ export function getAdminNavigation(role) {
 
   if (role === "DH") {
     return [...DH_NAVIGATION, ...SHARED_NAVIGATION];
+  }
+
+  if (role === "JUDGE") {
+    return JUDGE_NAVIGATION;
   }
 
   return [];
@@ -85,7 +93,7 @@ export function getAdminSettingsLink(role) {
 }
 
 export function getPersonalSettingsLink(role) {
-  if (role === "SA" || role === "DH") {
+  if (role === "SA" || role === "DH" || role === "JUDGE") {
     return {
       name: "Personal Settings",
       href: "/admin/settings",
@@ -119,7 +127,12 @@ export function Sidebar({ user, onLogout, mobileOpen, onMobileClose }) {
   const navigation = getAdminNavigation(user?.role);
   const settingsLink = getAdminSettingsLink(user?.role);
   const personalSettingsLink = getPersonalSettingsLink(user?.role);
-  const roleLabel = user?.role === "SA" ? "Super Admin" : "Department Head";
+  const roleLabel =
+    user?.role === "SA"
+      ? "Super Admin"
+      : user?.role === "JUDGE"
+        ? "Judge"
+        : "Department Head";
 
   const drawerContent = (
     <Box
@@ -127,6 +140,7 @@ export function Sidebar({ user, onLogout, mobileOpen, onMobileClose }) {
         display: "flex",
         flexDirection: "column",
         height: "100%",
+        overflow: "hidden",
         background: "#080808",
         position: "relative",
       }}
@@ -263,7 +277,16 @@ export function Sidebar({ user, onLogout, mobileOpen, onMobileClose }) {
       </Box>
 
       {/* ── Nav ── */}
-      <Box sx={{ flex: 1, px: 2 }}>
+      <Box
+        sx={{
+          flex: 1,
+          px: 2,
+          pb: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          overflowX: "hidden",
+        }}
+      >
         <List sx={{ p: 0, display: "flex", flexDirection: "column", gap: 0.5 }}>
           {navigation.map((item) => (
             <SidebarNavItem

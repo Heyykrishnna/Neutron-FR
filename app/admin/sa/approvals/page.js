@@ -7,6 +7,10 @@ import {
   useApproveRequest,
   useRejectRequest,
 } from "@/src/hooks/api/useApprovals";
+import {
+  usePendingLockRequests,
+  useReviewLockRequest,
+} from "@/src/hooks/api/useJudging";
 import { Box, Dialog, Typography } from "@mui/material";
 import {
   ShieldCheck,
@@ -16,6 +20,10 @@ import {
   Clock,
   CheckCheck,
   X,
+  Gavel,
+  AlertCircle,
+  Trophy,
+  Star,
 } from "lucide-react";
 import { useSnackbar } from "notistack";
 import { LoadingState } from "@/src/components/LoadingState";
@@ -121,9 +129,12 @@ export default function ApprovalsPage() {
 
   const { data: approvalsRes, isLoading } = useApprovals(filters);
   const { data: stats } = useApprovalStats();
+  const { data: lockRequests = [], isLoading: isLockRequestsLoading } =
+    usePendingLockRequests();
 
   const approveMutation = useApproveRequest();
   const rejectMutation = useRejectRequest();
+  const reviewLockRequestMutation = useReviewLockRequest();
   const { enqueueSnackbar } = useSnackbar();
 
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
@@ -131,6 +142,9 @@ export default function ApprovalsPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [detailApproval, setDetailApproval] = useState(null);
+  const [lockReviewDialogOpen, setLockReviewDialogOpen] = useState(false);
+  const [selectedLockRequest, setSelectedLockRequest] = useState(null);
+  const [lockReviewNotes, setLockReviewNotes] = useState("");
 
   const allApprovals = useMemo(
     () => approvalsRes?.data?.approvals || [],
@@ -199,6 +213,42 @@ export default function ApprovalsPage() {
   const openDetail = (approval) => {
     setDetailApproval(approval);
     setDetailDialogOpen(true);
+  };
+
+  const openLockReview = (request) => {
+    setSelectedLockRequest(request);
+    setLockReviewNotes("");
+    setLockReviewDialogOpen(true);
+  };
+
+  const handleReviewLockRequest = async (status) => {
+    if (!selectedLockRequest?.id) return;
+
+    try {
+      await reviewLockRequestMutation.mutateAsync({
+        requestId: selectedLockRequest.id,
+        status,
+        reviewNotes: lockReviewNotes.trim() || undefined,
+      });
+
+      enqueueSnackbar(
+        status === "APPROVED"
+          ? "Score lock approved"
+          : "Score lock request rejected",
+        { variant: status === "APPROVED" ? "success" : "info" },
+      );
+
+      setLockReviewDialogOpen(false);
+      setSelectedLockRequest(null);
+      setLockReviewNotes("");
+    } catch (err) {
+      enqueueSnackbar(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to review score lock request",
+        { variant: "error" },
+      );
+    }
   };
 
   const fmtDate = (d) =>
@@ -572,6 +622,239 @@ export default function ApprovalsPage() {
         )}
       </Box>
 
+      {/* Score lock approvals */}
+      <Box sx={{ mt: 4 }}>
+        <Box sx={{ mb: 2 }}>
+          <Box
+            sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 0.5 }}
+          >
+            <Box
+              sx={{
+                width: 32,
+                height: 32,
+                borderRadius: "9px",
+                background: "#111",
+                border: "1px solid rgba(255,255,255,0.1)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Gavel size={15} color="rgba(255,255,255,0.7)" />
+            </Box>
+            <Typography
+              sx={{
+                fontSize: 18,
+                fontWeight: 600,
+                color: "#f4f4f5",
+                fontFamily: "'Syne', sans-serif",
+                letterSpacing: "0.01em",
+              }}
+            >
+              Score Approvals
+            </Typography>
+            {lockRequests.length > 0 && (
+              <Box
+                sx={{
+                  px: 1,
+                  py: 0.25,
+                  borderRadius: "6px",
+                  background: "rgba(251,191,36,0.12)",
+                  border: "1px solid rgba(251,191,36,0.2)",
+                }}
+              >
+                <Typography
+                  sx={{
+                    color: "#fbbf24",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    fontFamily: "'DM Mono', monospace",
+                  }}
+                >
+                  {lockRequests.length}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+          <Typography
+            sx={{
+              fontSize: 12,
+              color: "rgba(255,255,255,0.3)",
+              fontFamily: "'Syne', sans-serif",
+              letterSpacing: "0.03em",
+              ml: 0.5,
+            }}
+          >
+            Review score-lock requests from head judges
+          </Typography>
+        </Box>
+
+        <Box
+          sx={{
+            borderRadius: "12px",
+            border: "1px solid rgba(255,255,255,0.06)",
+            overflow: "hidden",
+            background: "#0c0c0c",
+          }}
+        >
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "minmax(200px,1fr) 160px 140px 100px 200px",
+              px: 3,
+              py: 1.5,
+              background: "rgba(255,255,255,0.02)",
+            }}
+          >
+            {["Round", "Requested By", "Submitted", "Status", ""].map(
+              (h, i) => (
+                <Typography
+                  key={i}
+                  sx={{
+                    fontSize: 9.5,
+                    letterSpacing: "0.2em",
+                    textTransform: "uppercase",
+                    color: "rgba(255,255,255,0.2)",
+                    fontFamily: "'Syne', sans-serif",
+                  }}
+                >
+                  {h}
+                </Typography>
+              ),
+            )}
+          </Box>
+          <RowDivider />
+
+          {isLockRequestsLoading ? (
+            <Box sx={{ py: 4 }}>
+              <LoadingState message="Loading score lock requests..." />
+            </Box>
+          ) : lockRequests.length === 0 ? (
+            <Box sx={{ py: 6, textAlign: "center" }}>
+              <Typography
+                sx={{
+                  color: "rgba(255,255,255,0.22)",
+                  fontSize: 13,
+                  fontFamily: "'Syne', sans-serif",
+                }}
+              >
+                No pending score lock requests
+              </Typography>
+            </Box>
+          ) : (
+            lockRequests.map((request, idx) => (
+              <Box key={request.id}>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "minmax(200px,1fr) 160px 140px 100px 200px",
+                    alignItems: "center",
+                    px: 3,
+                    py: 2,
+                    transition: "background 0.12s",
+                    "&:hover": { background: "rgba(255,255,255,0.02)" },
+                  }}
+                >
+                  <Box sx={{ minWidth: 0, pr: 1 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Trophy size={13} color="#52525b" />
+                      <Typography
+                        sx={{
+                          fontSize: 13,
+                          fontWeight: 500,
+                          color: "#e4e4e7",
+                          fontFamily: "'Syne', sans-serif",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {request.competition?.title || "—"}
+                      </Typography>
+                    </Box>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        mt: 0.5,
+                      }}
+                    >
+                      <Star size={12} color="#71717a" />
+                      <Typography
+                        sx={{
+                          fontSize: 11,
+                          color: "rgba(255,255,255,0.35)",
+                          fontFamily: "'DM Mono', monospace",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {request.round?.name || "Round"}
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  <Box sx={{ minWidth: 0, pr: 1 }}>
+                    <Typography
+                      sx={{
+                        fontSize: 12,
+                        color: "#e4e4e7",
+                        fontFamily: "'Syne', sans-serif",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {request.requestedByUser?.name || "—"}
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: 11,
+                        color: "rgba(255,255,255,0.25)",
+                        fontFamily: "'DM Mono', monospace",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {request.requestedByUser?.email || ""}
+                    </Typography>
+                  </Box>
+
+                  <Typography
+                    sx={{
+                      fontSize: 11,
+                      color: "rgba(255,255,255,0.28)",
+                      fontFamily: "'DM Mono', monospace",
+                    }}
+                  >
+                    {request.createdAt ? fmtDate(request.createdAt) : "—"}
+                  </Typography>
+
+                  <StatusBadge status={request.status || "PENDING"} />
+
+                  <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                    <ActionBtn
+                      onClick={() => openLockReview(request)}
+                      color="#a78bfa"
+                      hoverBg="rgba(168,85,247,0.12)"
+                      disabled={reviewLockRequestMutation.isPending}
+                      icon={<Gavel size={13} />}
+                    >
+                      Review
+                    </ActionBtn>
+                  </Box>
+                </Box>
+                {idx < lockRequests.length - 1 && <RowDivider />}
+              </Box>
+            ))
+          )}
+        </Box>
+      </Box>
+
       {/* Reject dialog */}
       <DarkDialog
         open={rejectDialogOpen}
@@ -764,6 +1047,53 @@ export default function ApprovalsPage() {
             )}
           </Box>
         )}
+      </DarkDialog>
+
+      <DarkDialog
+        open={lockReviewDialogOpen}
+        onClose={() => setLockReviewDialogOpen(false)}
+        title="Review Score Lock Request"
+      >
+        <Typography
+          sx={{
+            fontSize: 12,
+            color: "rgba(255,255,255,0.3)",
+            fontFamily: "'DM Mono', monospace",
+            mb: 2,
+          }}
+        >
+          {selectedLockRequest
+            ? `${selectedLockRequest.competition?.title || "Competition"} • ${selectedLockRequest.round?.name || "Round"}`
+            : ""}
+        </Typography>
+
+        <DarkTextarea
+          rows={3}
+          value={lockReviewNotes}
+          onChange={(e) => setLockReviewNotes(e.target.value)}
+          placeholder="Optional review notes…"
+        />
+
+        <BtnRow>
+          <GhostBtn onClick={() => setLockReviewDialogOpen(false)}>
+            Cancel
+          </GhostBtn>
+          <DangerBtn
+            onClick={() => handleReviewLockRequest("REJECTED")}
+            disabled={reviewLockRequestMutation.isPending}
+          >
+            {reviewLockRequestMutation.isPending ? "Submitting…" : "Reject"}
+          </DangerBtn>
+          <ActionBtn
+            onClick={() => handleReviewLockRequest("APPROVED")}
+            color="#4ade80"
+            hoverBg="rgba(74,222,128,0.1)"
+            disabled={reviewLockRequestMutation.isPending}
+            icon={<CheckCheck size={13} />}
+          >
+            {reviewLockRequestMutation.isPending ? "Submitting…" : "Approve"}
+          </ActionBtn>
+        </BtnRow>
       </DarkDialog>
     </Box>
   );

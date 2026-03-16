@@ -52,6 +52,42 @@ const inputSx = {
 };
 
 const renderAnswer = (field) => {
+  if (field?.fieldType === "IMAGE" && field?.fileUrl) {
+    return (
+      <Box sx={{ mt: 0.6 }}>
+        <Box
+          component="img"
+          src={field.fileUrl}
+          alt={field.label || "Submitted image"}
+          sx={{
+            width: 180,
+            maxWidth: "100%",
+            height: 120,
+            objectFit: "cover",
+            borderRadius: "8px",
+            border: "1px solid rgba(255,255,255,0.12)",
+            background: "rgba(255,255,255,0.03)",
+          }}
+        />
+        <a
+          href={field.fileUrl}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            color: "#a78bfa",
+            fontSize: 12,
+            fontFamily: "'DM Mono', monospace",
+            display: "inline-block",
+            marginTop: 6,
+            textDecoration: "none",
+          }}
+        >
+          Open full image
+        </a>
+      </Box>
+    );
+  }
+
   if (field?.jsonValue !== null && field?.jsonValue !== undefined) {
     if (Array.isArray(field.jsonValue)) {
       return field.jsonValue.join(", ");
@@ -574,39 +610,48 @@ export default function AttendanceQRScannerPage() {
                           </Typography>
 
                           <Stack spacing={0.8}>
-                            {submission.fields?.map((field) => (
-                              <Box
-                                key={field.responseId}
-                                sx={{
-                                  border: "1px solid rgba(255,255,255,0.06)",
-                                  borderRadius: "8px",
-                                  p: 1,
-                                }}
-                              >
-                                <Typography
-                                  variant="body2"
-                                  sx={{ color: "#e4e4e7", fontWeight: 600 }}
-                                >
-                                  {field.label}
-                                </Typography>
-                                <Typography
-                                  variant="caption"
-                                  sx={{ color: "#71717a" }}
-                                >
-                                  {field.fieldType} • {field.scope}
-                                </Typography>
-                                <Typography
-                                  variant="body2"
+                            {submission.fields?.map((field) => {
+                              const answer = renderAnswer(field);
+                              const isTextAnswer = typeof answer === "string";
+
+                              return (
+                                <Box
+                                  key={field.responseId}
                                   sx={{
-                                    color: "#c4b5fd",
-                                    mt: 0.4,
-                                    wordBreak: "break-word",
+                                    border: "1px solid rgba(255,255,255,0.06)",
+                                    borderRadius: "8px",
+                                    p: 1,
                                   }}
                                 >
-                                  {renderAnswer(field)}
-                                </Typography>
-                              </Box>
-                            ))}
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ color: "#e4e4e7", fontWeight: 600 }}
+                                  >
+                                    {field.label}
+                                  </Typography>
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: "#71717a" }}
+                                  >
+                                    {field.fieldType} • {field.scope}
+                                  </Typography>
+                                  {isTextAnswer ? (
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        color: "#c4b5fd",
+                                        mt: 0.4,
+                                        wordBreak: "break-word",
+                                      }}
+                                    >
+                                      {answer}
+                                    </Typography>
+                                  ) : (
+                                    <Box sx={{ mt: 0.2 }}>{answer}</Box>
+                                  )}
+                                </Box>
+                              );
+                            })}
                           </Stack>
                         </Paper>
                       ))}

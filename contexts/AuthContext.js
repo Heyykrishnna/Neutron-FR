@@ -16,6 +16,7 @@ const AUTH_REJECTION_ERRORS = new Set([
   "SESSION_REVOKED",
   "SESSION_EXPIRED",
   "USER_NOT_FOUND",
+  "ACCOUNT_SUSPENDED",
   "ACCOUNT_REVOKED",
 ]);
 
@@ -23,7 +24,7 @@ const isExplicitAuthRejection = (error) => {
   const status = error?.response?.status;
   const code = error?.response?.data?.error;
 
-  if (status !== 401) return false;
+  if (status !== 401 && status !== 403) return false;
   return AUTH_REJECTION_ERRORS.has(code);
 };
 
@@ -155,6 +156,16 @@ export function AuthProvider({ children }) {
     };
   }, [router]);
 
+  useEffect(() => {
+    if (!user) return;
+
+    const interval = window.setInterval(() => {
+      checkAuth();
+    }, 15000);
+
+    return () => window.clearInterval(interval);
+  }, [user]);
+
   const checkAuth = async () => {
     try {
       const response = await apiClient.get("/auth/me");
@@ -221,6 +232,7 @@ export function AuthProvider({ children }) {
     isSA: user?.role === "SA",
     isDH: user?.role === "DH",
     isVH: user?.role === "VH",
+    isJudge: user?.role === "JUDGE",
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

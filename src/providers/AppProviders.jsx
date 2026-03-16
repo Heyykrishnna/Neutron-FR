@@ -73,54 +73,54 @@ export function AppProviders({ children }) {
   return (
     <QueryProvider>
       <EmotionRegistry>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <SnackbarProvider
-          maxSnack={4}
-          autoHideDuration={3500}
-          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-          Components={{
-            success: StyledContent,
-            error: StyledContent,
-            warning: StyledContent,
-            info: StyledContent,
-          }}
-          iconVariant={{
-            success: <CheckCircle {...iconProps} />,
-            error: <XCircle {...iconProps} />,
-            warning: <AlertTriangle {...iconProps} />,
-            info: <Info {...iconProps} />,
-          }}
-          action={(id) => (
-            <button
-              onClick={() => closeSnackbar(id)}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                padding: "2px 2px 2px 8px",
-                display: "flex",
-                alignItems: "center",
-                color: "rgba(255,255,255,0.22)",
-                marginLeft: "auto",
-                flexShrink: 0,
-                lineHeight: 0,
-                transition: "color 0.15s",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.color = "rgba(255,255,255,0.6)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.color = "rgba(255,255,255,0.22)")
-              }
-            >
-              <X size={12} />
-            </button>
-          )}
-        >
-          <AuthProvider>{children}</AuthProvider>
-        </SnackbarProvider>
-      </ThemeProvider>
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <SnackbarProvider
+            maxSnack={4}
+            autoHideDuration={3500}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            Components={{
+              success: StyledContent,
+              error: StyledContent,
+              warning: StyledContent,
+              info: StyledContent,
+            }}
+            iconVariant={{
+              success: <CheckCircle {...iconProps} />,
+              error: <XCircle {...iconProps} />,
+              warning: <AlertTriangle {...iconProps} />,
+              info: <Info {...iconProps} />,
+            }}
+            action={(id) => (
+              <button
+                onClick={() => closeSnackbar(id)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "2px 2px 2px 8px",
+                  display: "flex",
+                  alignItems: "center",
+                  color: "rgba(255,255,255,0.22)",
+                  marginLeft: "auto",
+                  flexShrink: 0,
+                  lineHeight: 0,
+                  transition: "color 0.15s",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.color = "rgba(255,255,255,0.6)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.color = "rgba(255,255,255,0.22)")
+                }
+              >
+                <X size={12} />
+              </button>
+            )}
+          >
+            <AuthProvider>{children}</AuthProvider>
+          </SnackbarProvider>
+        </ThemeProvider>
       </EmotionRegistry>
     </QueryProvider>
   );

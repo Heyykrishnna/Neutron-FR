@@ -260,9 +260,10 @@ export function useInviteUser() {
       const roleMap = {
         VOL: "VOLUNTEER",
         PART: "USER",
+        VH: "VOLUNTEER",
       };
 
-      const apiRole = roleMap[role] || role || undefined;
+      const apiRole = roleMap[role] || role || "USER";
 
       const { data } = await apiClient.post("/auth/invite", {
         email,

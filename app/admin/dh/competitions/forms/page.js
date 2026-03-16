@@ -21,6 +21,8 @@ import {
   ArrowDown,
   ChevronLeft,
   ChevronRight,
+  Image as ImageIcon,
+  Upload,
 } from "lucide-react";
 import { ConfirmDialog } from "@/src/components/ConfirmDialog";
 import { useCompetitions } from "@/src/hooks/api/useCompetitions";
@@ -49,6 +51,7 @@ const FIELD_TYPES = [
   "CHECKBOX",
   "DATE",
   "FILE",
+  "IMAGE",
 ];
 
 const FIELD_SCOPES = ["ALL_MEMBERS", "LEADER_ONLY", "TEAM"];
@@ -309,6 +312,113 @@ const fieldToApi = (field) => {
   };
 };
 
+function ImageFieldPreview() {
+  const [previewUrl, setPreviewUrl] = useState("");
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  return (
+    <Box sx={{ mt: 1.25 }}>
+      <Box
+        sx={{
+          borderRadius: "10px",
+          border: "1px dashed rgba(168,85,247,0.45)",
+          background: "rgba(168,85,247,0.06)",
+          p: 1.5,
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+          <ImageIcon size={14} color="rgba(192,132,252,0.95)" />
+          <Typography
+            sx={{
+              fontSize: 12,
+              color: "rgba(192,132,252,0.95)",
+              fontFamily: "'Syne', sans-serif",
+              fontWeight: 600,
+            }}
+          >
+            Image Upload Field
+          </Typography>
+        </Box>
+
+        <label
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            cursor: "pointer",
+            fontSize: 12,
+            borderRadius: 8,
+            padding: "7px 12px",
+            border: "1px solid rgba(168,85,247,0.35)",
+            background: "rgba(168,85,247,0.14)",
+            color: "rgba(233,213,255,0.95)",
+            fontFamily: "'Syne', sans-serif",
+          }}
+        >
+          <Upload size={13} />
+          Choose Image
+          <input
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+
+              setPreviewUrl((current) => {
+                if (current) {
+                  URL.revokeObjectURL(current);
+                }
+                return URL.createObjectURL(file);
+              });
+            }}
+          />
+        </label>
+
+        <Box
+          sx={{
+            mt: 1.25,
+            height: 160,
+            borderRadius: "8px",
+            border: "1px solid rgba(255,255,255,0.08)",
+            background: "rgba(255,255,255,0.03)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+          }}
+        >
+          {previewUrl ? (
+            <Box
+              component="img"
+              src={previewUrl}
+              alt="Preview"
+              sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          ) : (
+            <Typography
+              sx={{
+                fontSize: 12,
+                color: "rgba(255,255,255,0.35)",
+                fontFamily: "'DM Mono', monospace",
+              }}
+            >
+              Image preview appears here
+            </Typography>
+          )}
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
 function PreviewDialog({ open, onClose, formTitle, fields }) {
   return (
     <Dialog
@@ -357,29 +467,33 @@ function PreviewDialog({ open, onClose, formTitle, fields }) {
                   </Typography>
                 ) : null}
 
-                <TextField
-                  fullWidth
-                  disabled
-                  size="small"
-                  placeholder={field.placeholder || "Response"}
-                  multiline={field.fieldType === "TEXTAREA"}
-                  minRows={field.fieldType === "TEXTAREA" ? 3 : undefined}
-                  select={OPTIONS_FIELD_TYPES.has(field.fieldType)}
-                  value=""
-                  sx={{ ...inputSx, mt: 1 }}
-                >
-                  {OPTIONS_FIELD_TYPES.has(field.fieldType)
-                    ? field.optionsText
-                        .split("\n")
-                        .map((line) => line.trim())
-                        .filter(Boolean)
-                        .map((optionValue) => (
-                          <MenuItem key={optionValue} value={optionValue}>
-                            {optionValue}
-                          </MenuItem>
-                        ))
-                    : null}
-                </TextField>
+                {field.fieldType === "IMAGE" ? (
+                  <ImageFieldPreview />
+                ) : (
+                  <TextField
+                    fullWidth
+                    disabled
+                    size="small"
+                    placeholder={field.placeholder || "Response"}
+                    multiline={field.fieldType === "TEXTAREA"}
+                    minRows={field.fieldType === "TEXTAREA" ? 3 : undefined}
+                    select={OPTIONS_FIELD_TYPES.has(field.fieldType)}
+                    value=""
+                    sx={{ ...inputSx, mt: 1 }}
+                  >
+                    {OPTIONS_FIELD_TYPES.has(field.fieldType)
+                      ? field.optionsText
+                          .split("\n")
+                          .map((line) => line.trim())
+                          .filter(Boolean)
+                          .map((optionValue) => (
+                            <MenuItem key={optionValue} value={optionValue}>
+                              {optionValue}
+                            </MenuItem>
+                          ))
+                      : null}
+                  </TextField>
+                )}
                 <Box sx={{ mt: 1, display: "flex", gap: 1, flexWrap: "wrap" }}>
                   <Chip
                     size="small"

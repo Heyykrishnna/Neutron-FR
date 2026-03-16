@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Box,
   Typography,
@@ -38,6 +38,73 @@ import { LoadingState } from "@/src/components/LoadingState";
 const cellSx = { color: "#d4d4d8", borderColor: "#27272a" };
 const headSx = { color: "#a1a1aa", borderColor: "#27272a", fontWeight: 600 };
 
+const subtleButtonSx = {
+  textTransform: "none",
+  fontFamily: "'Syne', sans-serif",
+  fontWeight: 600,
+  fontSize: 12,
+  borderRadius: "8px",
+  px: 1.8,
+  py: 0.7,
+  border: "1px solid rgba(255,255,255,0.12)",
+  color: "rgba(255,255,255,0.75)",
+  background: "rgba(255,255,255,0.04)",
+  backdropFilter: "blur(2px)",
+  transition: "all 0.18s",
+  "&:hover": {
+    background: "rgba(255,255,255,0.08)",
+    borderColor: "rgba(255,255,255,0.2)",
+    boxShadow: "0 8px 24px rgba(0,0,0,0.22)",
+  },
+};
+
+const approveButtonSx = {
+  textTransform: "none",
+  fontWeight: 600,
+  fontFamily: "'Syne', sans-serif",
+  fontSize: 12,
+  borderRadius: "8px",
+  px: 1.8,
+  py: 0.7,
+  border: "1px solid rgba(74,222,128,0.3)",
+  background:
+    "linear-gradient(135deg, rgba(22,163,74,0.9) 0%, rgba(21,128,61,0.95) 100%)",
+  color: "#fff",
+  boxShadow: "0 4px 16px rgba(22,163,74,0.2)",
+  transition: "all 0.18s",
+  "&:hover": {
+    background:
+      "linear-gradient(135deg, rgba(34,197,94,0.95) 0%, rgba(22,163,74,1) 100%)",
+    boxShadow: "0 6px 20px rgba(22,163,74,0.28)",
+  },
+};
+
+const rejectButtonSx = {
+  textTransform: "none",
+  fontWeight: 600,
+  fontFamily: "'Syne', sans-serif",
+  fontSize: 12,
+  borderRadius: "8px",
+  px: 1.8,
+  py: 0.7,
+  border: "1px solid rgba(239,68,68,0.35)",
+  color: "#fca5a5",
+  background: "rgba(239,68,68,0.1)",
+  boxShadow: "0 4px 16px rgba(239,68,68,0.12)",
+  transition: "all 0.18s",
+  "&:hover": {
+    borderColor: "rgba(239,68,68,0.58)",
+    backgroundColor: "rgba(239,68,68,0.18)",
+    boxShadow: "0 6px 20px rgba(239,68,68,0.2)",
+  },
+};
+
+const isUuid = (value) =>
+  typeof value === "string" &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+
 export default function RegistrationsPage() {
   const { enqueueSnackbar } = useSnackbar();
 
@@ -49,6 +116,7 @@ export default function RegistrationsPage() {
   const [rejectDialog, setRejectDialog] = useState({
     open: false,
     registration: null,
+    registrationId: null,
   });
   const [rejectReason, setRejectReason] = useState("");
 
@@ -58,24 +126,29 @@ export default function RegistrationsPage() {
   // Data
   const { data: competitions = [], isLoading: competitionsLoading } =
     useCompetitions();
-  const {
-    data: registrations = [],
-    isLoading,
-    refetch,
-  } = usePendingRegistrations(competitionId ? { competitionId } : {});
+  const { data: registrations = [], isLoading } = usePendingRegistrations(
+    competitionId ? { competitionId } : {},
+  );
 
   const { mutateAsync: approve } = useApproveRegistration();
   const { mutate: reject, isPending: isRejecting } = useRejectRegistration();
 
   // Client-side search filter
-  const filtered = registrations.filter((r) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    const name = (r.user?.name || r.userName || "").toLowerCase();
-    const email = (r.user?.email || r.userEmail || "").toLowerCase();
-    const team = (r.team?.name || r.teamName || "").toLowerCase();
-    return name.includes(q) || email.includes(q) || team.includes(q);
-  });
+  const filtered = useMemo(() => {
+    return registrations.filter((r) => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      const name = (r.user?.name || r.userName || "").toLowerCase();
+      const email = (r.user?.email || r.userEmail || "").toLowerCase();
+      const team = (r.team?.name || r.teamName || "").toLowerCase();
+      return name.includes(q) || email.includes(q) || team.includes(q);
+    });
+  }, [registrations, search]);
+
+  const getRegistrationId = (row) => {
+    const candidate = row?.registrationId || row?.id || row?.registration?.id;
+    return isUuid(candidate) ? candidate : null;
+  };
 
   async function handleApprove(registrationId) {
     setApprovingId(registrationId);
@@ -92,18 +165,27 @@ export default function RegistrationsPage() {
     }
   }
 
-  function openRejectDialog(registration) {
-    setRejectDialog({ open: true, registration });
+  function openRejectDialog(registration, registrationId) {
+    setRejectDialog({ open: true, registration, registrationId });
     setRejectReason("");
   }
 
   function handleReject() {
+    if (!rejectDialog.registrationId) {
+      enqueueSnackbar("Invalid registration ID", { variant: "error" });
+      return;
+    }
+
     reject(
-      { registrationId: rejectDialog.registration.id, reason: rejectReason },
+      { registrationId: rejectDialog.registrationId, reason: rejectReason },
       {
         onSuccess: () => {
           enqueueSnackbar("Registration rejected", { variant: "success" });
-          setRejectDialog({ open: false, registration: null });
+          setRejectDialog({
+            open: false,
+            registration: null,
+            registrationId: null,
+          });
         },
         onError: (err) => {
           enqueueSnackbar(
@@ -267,7 +349,7 @@ export default function RegistrationsPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filtered.map((row) => {
+              {filtered.map((row, index) => {
                 const name = row.user?.name || row.userName || "Unknown";
                 const email = row.user?.email || row.userEmail || "";
                 const competitionName =
@@ -277,11 +359,12 @@ export default function RegistrationsPage() {
                   "—";
                 const teamName = row.team?.name || row.teamName || null;
                 const type = row.competition?.type || row.type || null;
-                const isApproving = approvingId === row.id;
+                const registrationId = getRegistrationId(row);
+                const isApproving = approvingId === registrationId;
 
                 return (
                   <TableRow
-                    key={row.id}
+                    key={registrationId || `pending-row-${index}`}
                     sx={{
                       "&:hover": { backgroundColor: "rgba(255,255,255,0.02)" },
                     }}
@@ -384,23 +467,19 @@ export default function RegistrationsPage() {
                           <span>
                             <Button
                               size="small"
-                              variant="contained"
-                              onClick={() => handleApprove(row.id)}
-                              disabled={isApproving}
+                              onClick={() => handleApprove(registrationId)}
+                              disabled={isApproving || !registrationId}
                               startIcon={
                                 isApproving ? (
-                                  <CircularProgress size={14} />
+                                  <CircularProgress
+                                    size={14}
+                                    sx={{ color: "rgba(255,255,255,0.9)" }}
+                                  />
                                 ) : (
                                   <CheckCircle size={14} />
                                 )
                               }
-                              sx={{
-                                backgroundColor: "#16a34a",
-                                "&:hover": { backgroundColor: "#15803d" },
-                                textTransform: "none",
-                                fontWeight: 600,
-                                fontSize: 12,
-                              }}
+                              sx={approveButtonSx}
                             >
                               Approve
                             </Button>
@@ -409,20 +488,12 @@ export default function RegistrationsPage() {
                         <Tooltip title="Reject">
                           <Button
                             size="small"
-                            variant="outlined"
-                            onClick={() => openRejectDialog(row)}
+                            onClick={() =>
+                              openRejectDialog(row, registrationId)
+                            }
+                            disabled={!registrationId}
                             startIcon={<XCircle size={14} />}
-                            sx={{
-                              borderColor: "#ef4444",
-                              color: "#ef4444",
-                              "&:hover": {
-                                borderColor: "#dc2626",
-                                backgroundColor: "rgba(239,68,68,0.08)",
-                              },
-                              textTransform: "none",
-                              fontWeight: 600,
-                              fontSize: 12,
-                            }}
+                            sx={rejectButtonSx}
                           >
                             Reject
                           </Button>
@@ -440,7 +511,13 @@ export default function RegistrationsPage() {
       {/* Reject dialog */}
       <Dialog
         open={rejectDialog.open}
-        onClose={() => setRejectDialog({ open: false, registration: null })}
+        onClose={() =>
+          setRejectDialog({
+            open: false,
+            registration: null,
+            registrationId: null,
+          })
+        }
         PaperProps={{
           sx: {
             background: "#0e0e0e",
@@ -499,19 +576,14 @@ export default function RegistrationsPage() {
           }}
         >
           <Button
-            onClick={() => setRejectDialog({ open: false, registration: null })}
-            sx={{
-              textTransform: "none",
-              fontFamily: "'Syne', sans-serif",
-              borderRadius: "8px",
-              color: "rgba(255,255,255,0.55)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              px: 2,
-              "&:hover": {
-                background: "rgba(255,255,255,0.05)",
-                borderColor: "rgba(255,255,255,0.2)",
-              },
-            }}
+            onClick={() =>
+              setRejectDialog({
+                open: false,
+                registration: null,
+                registrationId: null,
+              })
+            }
+            sx={subtleButtonSx}
           >
             Cancel
           </Button>
@@ -526,15 +598,17 @@ export default function RegistrationsPage() {
               )
             }
             sx={{
-              textTransform: "none",
-              fontWeight: 600,
-              fontFamily: "'Syne', sans-serif",
-              borderRadius: "8px",
-              px: 2,
-              background: "rgba(239,68,68,0.9)",
-              border: "1px solid rgba(239,68,68,0.5)",
+              ...rejectButtonSx,
               color: "#fff",
-              "&:hover": { background: "rgba(220,38,38,0.95)" },
+              border: "1px solid rgba(239,68,68,0.55)",
+              background:
+                "linear-gradient(135deg, rgba(239,68,68,0.92) 0%, rgba(220,38,38,0.96) 100%)",
+              "&:hover": {
+                background:
+                  "linear-gradient(135deg, rgba(248,113,113,0.95) 0%, rgba(239,68,68,1) 100%)",
+                borderColor: "rgba(248,113,113,0.75)",
+                boxShadow: "0 8px 24px rgba(239,68,68,0.35)",
+              },
             }}
           >
             Reject

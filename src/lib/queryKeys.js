@@ -116,6 +116,16 @@ export const queryKeys = {
       "admin-round-teams",
       roundId,
     ],
+    teamScoreDetails: (roundId, teamId) => [
+      ...queryKeys.judging.all,
+      "team-score-details",
+      roundId,
+      teamId,
+    ],
+    pendingLockRequests: () => [
+      ...queryKeys.judging.all,
+      "pending-lock-requests",
+    ],
   },
 
   // Attendance queries (DH)
