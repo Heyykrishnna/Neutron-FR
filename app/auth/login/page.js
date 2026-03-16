@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Box, CircularProgress, Typography } from "@mui/material";
 import { useAuth } from "@/contexts/AuthContext";
 
-export default function PublicLoginPage() {
+function PublicLoginPageContent() {
   const { user, loading, login } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -142,6 +142,30 @@ export default function PublicLoginPage() {
         </Typography>
       </Box>
     </Box>
+  );
+}
+
+function LoginPageFallback() {
+  return (
+    <Box
+      sx={{
+        minHeight: "100vh",
+        background: "#050505",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <CircularProgress size={24} sx={{ color: "#a855f7" }} />
+    </Box>
+  );
+}
+
+export default function PublicLoginPage() {
+  return (
+    <Suspense fallback={<LoginPageFallback />}>
+      <PublicLoginPageContent />
+    </Suspense>
   );
 }
 

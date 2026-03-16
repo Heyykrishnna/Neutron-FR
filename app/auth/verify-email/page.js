@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Box, CircularProgress, Typography } from "@mui/material";
 import { CheckCircle2, AlertCircle } from "lucide-react";
 import apiClient from "@/lib/axios";
 
-export default function PublicVerifyEmailPage() {
+function PublicVerifyEmailPageContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
 
@@ -160,5 +160,30 @@ export default function PublicVerifyEmailPage() {
         )}
       </Box>
     </Box>
+  );
+}
+
+function VerifyEmailPageFallback() {
+  return (
+    <Box
+      sx={{
+        minHeight: "100vh",
+        background: "#050505",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        px: 2,
+      }}
+    >
+      <CircularProgress size={28} sx={{ color: "#a855f7" }} />
+    </Box>
+  );
+}
+
+export default function PublicVerifyEmailPage() {
+  return (
+    <Suspense fallback={<VerifyEmailPageFallback />}>
+      <PublicVerifyEmailPageContent />
+    </Suspense>
   );
 }
