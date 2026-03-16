@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Box,
@@ -17,7 +17,7 @@ import { ArrowRight, Lock } from "lucide-react";
 import apiClient from "@/lib/axios";
 import { useSnackbar } from "notistack";
 
-export default function AcceptInvitePage() {
+function AcceptInvitePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
@@ -372,5 +372,35 @@ export default function AcceptInvitePage() {
         </Box>
       </Box>
     </Box>
+  );
+}
+
+function AcceptInviteFallback() {
+  return (
+    <Box
+      sx={{
+        minHeight: "100vh",
+        backgroundColor: "#000",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        p: 2,
+      }}
+    >
+      <Box sx={{ textAlign: "center" }}>
+        <CircularProgress size={24} sx={{ color: "#818cf8", mb: 1.25 }} />
+        <Typography sx={{ color: "rgba(255,255,255,0.5)", fontSize: 13 }}>
+          Loading invitation...
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
+
+export default function AcceptInvitePage() {
+  return (
+    <Suspense fallback={<AcceptInviteFallback />}>
+      <AcceptInvitePageContent />
+    </Suspense>
   );
 }
