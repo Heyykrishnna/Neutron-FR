@@ -5,7 +5,12 @@ import { Box, Typography, Paper, Chip, InputBase, Grid } from "@mui/material";
 import { Trophy, Search, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMyJudgingCompetitions } from "@/src/hooks/api/useJudging";
-import { LoadingState } from "@/src/components/LoadingState";
+
+import {
+  AsyncDataBoundary,
+  CardSuspense,
+} from "@/src/components/AsyncBoundary";
+import { CardSkeleton } from "@/src/components/SuspenseBoundary";
 
 const STATUS_CONFIG = {
   DRAFT: {
@@ -153,7 +158,11 @@ function CompetitionCard({ competition, isHeadJudge, onClick }) {
 export default function JudgeCompetitionsPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const { data: assignments = [], isLoading } = useMyJudgingCompetitions();
+  const {
+    data: assignments = [],
+    isLoading,
+    error,
+  } = useMyJudgingCompetitions();
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -240,43 +249,60 @@ export default function JudgeCompetitionsPage() {
       </Paper>
 
       {/* Content */}
-      {isLoading ? (
-        <LoadingState message="Loading competitions…" />
-      ) : filtered.length === 0 ? (
-        <Paper
-          sx={{
-            p: 6,
-            textAlign: "center",
-            background: "#0c0c0c",
-            border: "1px solid rgba(255,255,255,0.06)",
-            borderRadius: "12px",
-          }}
-        >
-          <Typography sx={{ color: "#71717a", mb: 1 }}>
-            {search
-              ? "No competitions match your search"
-              : "You are not assigned to any competitions yet"}
-          </Typography>
-        </Paper>
-      ) : (
-        <Grid container spacing={2}>
-          {filtered.map((assignment) => {
-            const comp = assignment.competition || assignment;
-            const compId = assignment.competitionId || comp.id;
-            return (
-              <Grid item xs={12} sm={6} md={4} key={compId}>
-                <CompetitionCard
-                  competition={assignment}
-                  isHeadJudge={assignment.isHeadJudge}
-                  onClick={() =>
-                    router.push(`/admin/judge/competitions/${compId}/rounds`)
-                  }
-                />
-              </Grid>
-            );
-          })}
-        </Grid>
-      )}
+      <AsyncDataBoundary
+        data={assignments}
+        loading={isLoading}
+        error={error}
+        fallback={<CardSkeleton count={3} height={160} />}
+      >
+        <CompetitionsContent
+          filtered={filtered}
+          search={search}
+          router={router}
+        />
+      </AsyncDataBoundary>
     </Box>
+  );
+}
+
+function CompetitionsContent({ filtered, search, router }) {
+  if (filtered.length === 0) {
+    return (
+      <Paper
+        sx={{
+          p: 6,
+          textAlign: "center",
+          background: "#0c0c0c",
+          border: "1px solid rgba(255,255,255,0.06)",
+          borderRadius: "12px",
+        }}
+      >
+        <Typography sx={{ color: "#71717a", mb: 1 }}>
+          {search
+            ? "No competitions match your search"
+            : "You are not assigned to any competitions yet"}
+        </Typography>
+      </Paper>
+    );
+  }
+
+  return (
+    <Grid container spacing={2}>
+      {filtered.map((assignment) => {
+        const comp = assignment.competition || assignment;
+        const compId = assignment.competitionId || comp.id;
+        return (
+          <Grid item xs={12} sm={6} md={4} key={compId}>
+            <CompetitionCard
+              competition={assignment}
+              isHeadJudge={assignment.isHeadJudge}
+              onClick={() =>
+                router.push(`/admin/judge/competitions/${compId}/rounds`)
+              }
+            />
+          </Grid>
+        );
+      })}
+    </Grid>
   );
 }
