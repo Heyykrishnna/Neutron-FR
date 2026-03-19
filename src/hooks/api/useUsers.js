@@ -5,13 +5,14 @@ import apiClient from "@/lib/axios";
 /**
  * Fetch all users with optional filters
  */
-export function useUsers(filters = {}) {
+export function useUsers(filters = {}, queryOptions = {}) {
   return useQuery({
     queryKey: queryKeys.users.list(filters),
     queryFn: async () => {
       const { data } = await apiClient.get("/sa/users", { params: filters });
       return data.data.users; // Return just the users array
     },
+    ...queryOptions,
   });
 }
 

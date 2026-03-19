@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { Suspense, useState, useMemo } from "react";
 import Image from "next/image";
 import {
   useUsers,
@@ -185,7 +185,24 @@ const RowDivider = () => (
 );
 
 export default function UsersPage() {
-  const { data: users = [], isLoading, isError, error } = useUsers();
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <UsersPageContent />
+    </Suspense>
+  );
+}
+
+function UsersPageContent() {
+  const {
+    data: users = [],
+    isError,
+    error,
+  } = useUsers(
+    {},
+    {
+      suspense: true,
+    },
+  );
   const updateRoleMutation = useUpdateUserRole();
   const suspendMutation = useSuspendUser();
   const unsuspendMutation = useUnsuspendUser();
@@ -381,7 +398,6 @@ export default function UsersPage() {
       day: "numeric",
     });
 
-  if (isLoading) return <LoadingState />;
   if (isError)
     return (
       <Box sx={{ p: 4 }}>

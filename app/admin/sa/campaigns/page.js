@@ -787,37 +787,57 @@ export default function CampaignManagerPage() {
                   >
                     Departments (multi-select)
                   </Typography>
-                  <Box
-                    component="select"
-                    multiple
-                    value={campaignDepartmentIds}
-                    onChange={(event) =>
-                      setCampaignDepartmentIds(
-                        Array.from(
-                          event.target.selectedOptions,
-                          (option) => option.value,
-                        ),
-                      )
-                    }
-                    sx={{
-                      width: "100%",
-                      minHeight: 90,
-                      px: 1.25,
-                      py: 0.9,
-                      borderRadius: "8px",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      background: "#070707",
-                      color: "#fff",
-                      fontSize: 12,
-                      outline: "none",
-                    }}
-                  >
-                    {departments.map((department) => (
-                      <option key={department.id} value={department.id}>
-                        {department.name}
-                      </option>
-                    ))}
-                  </Box>
+                  {departments.length ? (
+                    <Box
+                      component="select"
+                      multiple
+                      value={campaignDepartmentIds}
+                      onChange={(event) =>
+                        setCampaignDepartmentIds(
+                          Array.from(
+                            event.target.selectedOptions,
+                            (option) => option.value,
+                          ),
+                        )
+                      }
+                      sx={{
+                        width: "100%",
+                        minHeight: 90,
+                        px: 1.25,
+                        py: 0.9,
+                        borderRadius: "8px",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        background: "#070707",
+                        color: "#fff",
+                        fontSize: 12,
+                        outline: "none",
+                      }}
+                    >
+                      {departments.map((department) => (
+                        <option key={department.id} value={department.id}>
+                          {department.name}
+                        </option>
+                      ))}
+                    </Box>
+                  ) : (
+                    <Box
+                      sx={{
+                        width: "100%",
+                        minHeight: 42,
+                        px: 1.25,
+                        py: 1.1,
+                        borderRadius: "8px",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        background: "#070707",
+                        color: "rgba(255,255,255,0.45)",
+                        fontSize: 12,
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      No departments available yet.
+                    </Box>
+                  )}
                 </Box>
 
                 <Box>

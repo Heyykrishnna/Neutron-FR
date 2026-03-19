@@ -4,18 +4,44 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Box,
-  Card,
   Typography,
   CircularProgress,
-  Avatar,
   TextField,
   Button,
   Alert,
-  Paper,
+  Divider,
 } from "@mui/material";
-import { ArrowRight, Lock } from "lucide-react";
+import { ArrowRight, Mail } from "lucide-react";
 import apiClient from "@/lib/axios";
 import { useSnackbar } from "notistack";
+
+const fieldStyles = {
+  "& .MuiInputLabel-root": {
+    color: "rgba(255,255,255,0.45)",
+    fontFamily: "'Syne', sans-serif",
+    fontSize: 12,
+    letterSpacing: "0.03em",
+  },
+  "& .MuiInputLabel-root.Mui-focused": {
+    color: "rgba(255,255,255,0.72)",
+  },
+  "& .MuiOutlinedInput-root": {
+    background: "rgba(255,255,255,0.03)",
+    borderRadius: "10px",
+    color: "#f3f4f6",
+    fontFamily: "'Syne', sans-serif",
+    fontSize: 13,
+    "& fieldset": {
+      borderColor: "rgba(255,255,255,0.1)",
+    },
+    "&:hover fieldset": {
+      borderColor: "rgba(255,255,255,0.18)",
+    },
+    "&.Mui-focused fieldset": {
+      borderColor: "rgba(255,255,255,0.26)",
+    },
+  },
+};
 
 function AcceptInvitePageContent() {
   const router = useRouter();
@@ -134,64 +160,82 @@ function AcceptInvitePageContent() {
     <Box
       sx={{
         minHeight: "100vh",
-        backgroundColor: "#000",
+        backgroundColor: "#050505",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        p: 2,
+        p: { xs: 2, md: 3 },
       }}
     >
-      <Box sx={{ width: "100%", maxWidth: 500 }}>
-        {/* Header */}
-        <Box sx={{ textAlign: "center", mb: 4 }}>
-          <Avatar
+      <Box sx={{ width: "100%", maxWidth: 560 }}>
+        <Box sx={{ mb: 3, textAlign: "center" }}>
+          <Typography
             sx={{
-              width: 64,
-              height: 64,
-              mx: "auto",
-              mb: 2,
-              background: "linear-gradient(135deg, #a855f7 0%, #3b82f6 100%)",
+              color: "#f4f4f5",
+              fontWeight: 600,
+              fontFamily: "'Syne', sans-serif",
+              fontSize: 24,
+              letterSpacing: "0.01em",
+              mb: 0.75,
             }}
           >
-            <Lock size={32} />
-          </Avatar>
-          <Typography
-            variant="h4"
-            sx={{ color: "#fff", fontWeight: 700, mb: 1 }}
-          >
-            Set Up Your Account
+            Accept Invitation
           </Typography>
-          <Typography variant="body1" color="textSecondary">
-            Create a password to finish activating your account.
+          <Typography
+            sx={{
+              color: "rgba(255,255,255,0.38)",
+              fontFamily: "'Syne', sans-serif",
+              fontSize: 13,
+              letterSpacing: "0.03em",
+            }}
+          >
+            Finish account setup to access the Neutron admin panel.
           </Typography>
         </Box>
 
-        {/* Card */}
-        <Card
+        <Box
           sx={{
-            p: 4,
-            background: "#0b0b0b",
+            p: { xs: 2.5, md: 3 },
+            background: "#0c0c0c",
             border: "1px solid rgba(255,255,255,0.08)",
             borderRadius: "14px",
-            boxShadow: "0 24px 60px rgba(0,0,0,0.55)",
+            boxShadow: "0 18px 44px rgba(0,0,0,0.45)",
           }}
         >
           {validating ? (
-            <Box sx={{ py: 3, textAlign: "center" }}>
-              <CircularProgress size={22} sx={{ color: "#818cf8", mb: 1.25 }} />
-              <Typography sx={{ color: "rgba(255,255,255,0.5)", fontSize: 13 }}>
+            <Box
+              sx={{
+                py: 4,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 1.25,
+              }}
+            >
+              <CircularProgress
+                size={22}
+                sx={{ color: "rgba(255,255,255,0.65)" }}
+              />
+              <Typography
+                sx={{
+                  color: "rgba(255,255,255,0.5)",
+                  fontSize: 12,
+                  fontFamily: "'DM Mono', monospace",
+                  letterSpacing: "0.05em",
+                }}
+              >
                 Validating invitation...
               </Typography>
             </Box>
           ) : !isInviteValid ? (
-            <Box>
+            <Box sx={{ py: 1 }}>
               <Alert severity="warning" sx={{ mb: 2.5 }}>
                 {error || "This invitation link is invalid or has expired."}
               </Alert>
               <Typography
                 sx={{
                   fontSize: 13,
-                  color: "rgba(255,255,255,0.45)",
+                  color: "rgba(255,255,255,0.42)",
                   fontFamily: "'Syne', sans-serif",
                   mb: 2.5,
                 }}
@@ -203,14 +247,14 @@ function AcceptInvitePageContent() {
                 variant="outlined"
                 onClick={() => router.push("/admin/auth")}
                 sx={{
-                  height: 46,
+                  height: 44,
                   borderRadius: "10px",
                   textTransform: "uppercase",
                   letterSpacing: "0.1em",
                   fontFamily: "'Syne', sans-serif",
                   fontWeight: 600,
                   borderColor: "rgba(148,163,184,0.3)",
-                  color: "rgba(226,232,240,0.86)",
+                  color: "rgba(255,255,255,0.8)",
                   "&:hover": {
                     borderColor: "rgba(148,163,184,0.55)",
                     background: "rgba(148,163,184,0.08)",
@@ -229,8 +273,7 @@ function AcceptInvitePageContent() {
               )}
 
               {inviteMeta?.email && (
-                <Paper
-                  elevation={0}
+                <Box
                   sx={{
                     mb: 2.5,
                     p: 1.5,
@@ -239,28 +282,37 @@ function AcceptInvitePageContent() {
                     border: "1px solid rgba(255,255,255,0.07)",
                   }}
                 >
-                  <Typography
+                  <Box
                     sx={{
-                      fontSize: 11,
-                      color: "rgba(255,255,255,0.35)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.16em",
-                      fontFamily: "'Syne', sans-serif",
-                      mb: 0.4,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 0.8,
+                      mb: 0.45,
                     }}
                   >
-                    Invited Email
-                  </Typography>
+                    <Mail size={13} color="rgba(255,255,255,0.48)" />
+                    <Typography
+                      sx={{
+                        fontSize: 11,
+                        color: "rgba(255,255,255,0.35)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.16em",
+                        fontFamily: "'Syne', sans-serif",
+                      }}
+                    >
+                      Invited Email
+                    </Typography>
+                  </Box>
                   <Typography
                     sx={{
-                      fontSize: 13,
+                      fontSize: 12,
                       color: "#f8fafc",
                       fontFamily: "'DM Mono', monospace",
                     }}
                   >
                     {inviteMeta.email}
                   </Typography>
-                </Paper>
+                </Box>
               )}
 
               <TextField
@@ -268,17 +320,7 @@ function AcceptInvitePageContent() {
                 label="Full Name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                sx={{
-                  mb: 2,
-                  "& .MuiOutlinedInput-root": {
-                    background: "rgba(255,255,255,0.03)",
-                    borderRadius: "10px",
-                    color: "#f3f4f6",
-                  },
-                  "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "rgba(255,255,255,0.12)",
-                  },
-                }}
+                sx={{ mb: 2, ...fieldStyles }}
               />
 
               <TextField
@@ -287,35 +329,31 @@ function AcceptInvitePageContent() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                sx={{
-                  mb: 2,
-                  "& .MuiOutlinedInput-root": {
-                    background: "rgba(255,255,255,0.03)",
-                    borderRadius: "10px",
-                    color: "#f3f4f6",
-                  },
-                  "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "rgba(255,255,255,0.12)",
-                  },
-                }}
+                sx={{ mb: 2, ...fieldStyles }}
               />
+
               <TextField
                 fullWidth
                 label="Confirm Password"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+                sx={{ mb: 1.25, ...fieldStyles }}
+              />
+
+              <Typography
                 sx={{
-                  mb: 3,
-                  "& .MuiOutlinedInput-root": {
-                    background: "rgba(255,255,255,0.03)",
-                    borderRadius: "10px",
-                    color: "#f3f4f6",
-                  },
-                  "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "rgba(255,255,255,0.12)",
-                  },
+                  fontSize: 11,
+                  color: "rgba(255,255,255,0.34)",
+                  fontFamily: "'DM Mono', monospace",
+                  mb: 2.2,
                 }}
+              >
+                Password must be at least 8 characters.
+              </Typography>
+
+              <Divider
+                sx={{ borderColor: "rgba(255,255,255,0.07)", mb: 2.2 }}
               />
 
               <Button
@@ -326,35 +364,32 @@ function AcceptInvitePageContent() {
                 disabled={!canSubmit}
                 endIcon={submitting ? null : <ArrowRight size={16} />}
                 sx={{
-                  height: 48,
+                  height: 46,
                   borderRadius: "10px",
                   fontFamily: "'Syne', sans-serif",
                   fontWeight: 600,
                   fontSize: 13,
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  background:
-                    "linear-gradient(135deg, #3356d4 0%, #5577ff 100%)",
-                  boxShadow:
-                    "0 4px 24px rgba(60,90,220,0.35), 0 0 0 1px rgba(120,160,255,0.15) inset",
-                  transition: "all 0.25s",
+                  background: "rgba(255,255,255,0.12)",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  color: "#f8fafc",
+                  boxShadow: "none",
+                  transition: "all 0.2s",
                   "&:hover": {
-                    background:
-                      "linear-gradient(135deg, #3d65e8 0%, #6688ff 100%)",
-                    boxShadow:
-                      "0 6px 32px rgba(60,90,220,0.5), 0 0 0 1px rgba(140,175,255,0.2) inset",
-                    transform: "translateY(-1px)",
+                    background: "rgba(255,255,255,0.18)",
+                    borderColor: "rgba(255,255,255,0.3)",
                   },
                   "&.Mui-disabled": {
-                    background: "rgba(60,80,160,0.25)",
-                    color: "rgba(180,200,255,0.3)",
+                    background: "rgba(255,255,255,0.05)",
+                    color: "rgba(255,255,255,0.28)",
                   },
                 }}
               >
                 {submitting ? (
                   <CircularProgress
-                    size={18}
-                    sx={{ color: "rgba(180,210,255,0.6)" }}
+                    size={17}
+                    sx={{ color: "rgba(255,255,255,0.62)" }}
                   />
                 ) : (
                   "Accept Invite"
@@ -362,11 +397,18 @@ function AcceptInvitePageContent() {
               </Button>
             </Box>
           )}
-        </Card>
+        </Box>
 
-        {/* Footer */}
-        <Box sx={{ mt: 4, textAlign: "center" }}>
-          <Typography variant="body2" sx={{ color: "#52525b" }}>
+        <Box sx={{ mt: 3, textAlign: "center" }}>
+          <Typography
+            variant="body2"
+            sx={{
+              color: "rgba(255,255,255,0.22)",
+              fontFamily: "'Syne', sans-serif",
+              fontSize: 11,
+              letterSpacing: "0.04em",
+            }}
+          >
             © {new Date().getFullYear()} Neutron. All rights reserved.
           </Typography>
         </Box>
@@ -380,7 +422,7 @@ function AcceptInviteFallback() {
     <Box
       sx={{
         minHeight: "100vh",
-        backgroundColor: "#000",
+        backgroundColor: "#050505",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -388,8 +430,18 @@ function AcceptInviteFallback() {
       }}
     >
       <Box sx={{ textAlign: "center" }}>
-        <CircularProgress size={24} sx={{ color: "#818cf8", mb: 1.25 }} />
-        <Typography sx={{ color: "rgba(255,255,255,0.5)", fontSize: 13 }}>
+        <CircularProgress
+          size={24}
+          sx={{ color: "rgba(255,255,255,0.65)", mb: 1.25 }}
+        />
+        <Typography
+          sx={{
+            color: "rgba(255,255,255,0.5)",
+            fontSize: 12,
+            fontFamily: "'DM Mono', monospace",
+            letterSpacing: "0.05em",
+          }}
+        >
           Loading invitation...
         </Typography>
       </Box>
