@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Box, Typography } from "@mui/material";
@@ -12,6 +12,14 @@ import {
 } from "@/src/lib/authContinuation";
 
 export default function PublicSignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <PublicSignupPageContent />
+    </Suspense>
+  );
+}
+
+function PublicSignupPageContent() {
   const searchParams = useSearchParams();
   const queryNext = searchParams.get("next") || "";
   const queryForceLogin = searchParams.get("forceLogin") === "1";
@@ -84,7 +92,9 @@ export default function PublicSignupPage() {
         >
           Create your account. You must verify email before registration.
         </Typography>
-        <Typography sx={{ color: "rgba(255,255,255,0.62)", fontSize: 12, mb: 1 }}>
+        <Typography
+          sx={{ color: "rgba(255,255,255,0.62)", fontSize: 12, mb: 1 }}
+        >
           After sign in, you’ll continue to your team invite.
         </Typography>
         {showInviteContinuationChip && (
