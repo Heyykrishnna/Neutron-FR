@@ -2,7 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AppProviders } from "@/src/providers/AppProviders";
 import PublicHeaderGate from "@/src/components/navigation/PublicHeaderGate";
-
+import Clarity from "@microsoft/clarity";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -19,6 +19,8 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
+  const projectId = process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID;
+  Clarity.init(projectId);
   return (
     <html lang="en">
       <head>
