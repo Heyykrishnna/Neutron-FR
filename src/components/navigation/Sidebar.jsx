@@ -28,6 +28,7 @@ import {
   UserCog,
   FileText,
   AlertTriangle,
+  Megaphone,
 } from "lucide-react";
 
 const SA_NAVIGATION = [
@@ -35,6 +36,7 @@ const SA_NAVIGATION = [
   { name: "Departments", href: "/admin/sa/departments", icon: Building2 },
   { name: "Approvals", href: "/admin/sa/approvals", icon: ShieldCheck },
   { name: "Audit Logs", href: "/admin/sa/audit", icon: ClipboardList },
+  { name: "Campaign Manager", href: "/admin/sa/campaigns", icon: Megaphone },
 ];
 
 const DH_NAVIGATION = [

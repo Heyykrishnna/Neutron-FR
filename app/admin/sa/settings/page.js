@@ -720,7 +720,8 @@ export default function SettingsPage() {
             ml: 0.5,
           }}
         >
-          Manage platform-wide controls and email templates
+          Manage platform-wide controls and email templates. Campaign workflows
+          are available in Campaign Manager.
         </Typography>
       </Box>
 
@@ -738,8 +739,6 @@ export default function SettingsPage() {
         {[
           { key: "platform", label: "Platform" },
           { key: "emails", label: "Emails" },
-          { key: "campaigns", label: "Campaigns" },
-          { key: "pending", label: "Pending" },
         ].map((tab) => (
           <Box
             key={tab.key}

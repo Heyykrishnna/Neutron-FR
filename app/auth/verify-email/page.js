@@ -2,17 +2,48 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Box, CircularProgress, Typography } from "@mui/material";
 import { CheckCircle2, AlertCircle } from "lucide-react";
 import apiClient from "@/lib/axios";
+import {
+  buildAuthPageHref,
+  getAuthContinuation,
+  setAuthContinuation,
+} from "@/src/lib/authContinuation";
 
 function PublicVerifyEmailPageContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
+  const queryNext = searchParams.get("next") || "";
+  const queryForceLogin = searchParams.get("forceLogin") === "1";
+  const continuation = useMemo(() => getAuthContinuation(), []);
+  const next = queryNext || continuation.next || "";
+  const forceLogin = queryForceLogin || continuation.forceLogin;
+  const showInviteContinuationChip = next.startsWith("/team-invite/");
+  const loginHref = useMemo(() => {
+    return buildAuthPageHref("/auth/login", { next, forceLogin });
+  }, [next, forceLogin]);
 
   const [status, setStatus] = useState("loading");
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    setAuthContinuation({ next, forceLogin });
+  }, [next, forceLogin]);
+
+  useEffect(() => {
+    if (status !== "success") return;
+
+    const timer = window.setTimeout(() => {
+      router.replace(loginHref);
+    }, 2500);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [status, router, loginHref]);
 
   useEffect(() => {
     let mounted = true;
@@ -135,7 +166,39 @@ function PublicVerifyEmailPageContent() {
               {message}
             </Typography>
 
-            <Link href="/auth/login" style={{ textDecoration: "none" }}>
+            <Typography
+              sx={{ color: "rgba(255,255,255,0.62)", fontSize: 12, mb: 1.2 }}
+            >
+              After sign in, you’ll continue to your team invite.
+            </Typography>
+
+            {showInviteContinuationChip && (
+              <Typography
+                sx={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  border: "1px solid rgba(192,132,252,0.4)",
+                  borderRadius: 999,
+                  px: 1,
+                  py: 0.3,
+                  color: "#c084fc",
+                  fontSize: 11,
+                  mb: 1.2,
+                }}
+              >
+                Continuing to: Team Invite
+              </Typography>
+            )}
+
+            {isSuccess && (
+              <Typography
+                sx={{ color: "rgba(255,255,255,0.45)", fontSize: 11, mb: 1.6 }}
+              >
+                Redirecting to login...
+              </Typography>
+            )}
+
+            <Link href={loginHref} style={{ textDecoration: "none" }}>
               <button
                 type="button"
                 style={{

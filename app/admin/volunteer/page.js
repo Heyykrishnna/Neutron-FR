@@ -17,7 +17,6 @@ import {
   ShieldCheck,
   Trophy,
   ChevronRight,
-  Lock,
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
@@ -300,28 +299,6 @@ export default function VolunteerDashboardPage() {
             Report Issue
           </Button>
         </Stack>
-        {!canMarkAttendance && (
-          <Box
-            sx={{
-              mt: 1.5,
-              display: "flex",
-              alignItems: "center",
-              gap: 0.8,
-              p: 1.5,
-              borderRadius: "8px",
-              background: "rgba(255,255,255,0.02)",
-              border: "1px solid rgba(255,255,255,0.05)",
-            }}
-          >
-            <Lock size={12} color="rgba(255,255,255,0.2)" />
-            <Typography
-              sx={{ fontSize: 11, color: "rgba(255,255,255,0.25)", ...sy }}
-            >
-              Attendance actions require gate assignment or a competition with
-              attendance enabled
-            </Typography>
-          </Box>
-        )}
       </Box>
 
       {/* Assigned competitions */}
@@ -344,22 +321,6 @@ export default function VolunteerDashboardPage() {
                     gap: 2,
                   }}
                 >
-                  <Box
-                    sx={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: "8px",
-                      background: "rgba(168,85,247,0.08)",
-                      border: "1px solid rgba(168,85,247,0.15)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Trophy size={14} color="#c084fc" />
-                  </Box>
-
                   <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                     <Typography
                       sx={{
@@ -454,11 +415,6 @@ export default function VolunteerDashboardPage() {
               textAlign: "center",
             }}
           >
-            <Trophy
-              size={32}
-              color="rgba(255,255,255,0.12)"
-              style={{ marginBottom: 12 }}
-            />
             <Typography
               sx={{ fontSize: 13, color: "rgba(255,255,255,0.35)", ...sy }}
             >

@@ -1,8 +1,21 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import apiClient from "@/lib/axios";
 import { useRouter } from "next/navigation";
+import {
+  initSocket,
+  connectSocket,
+  disconnectSocket,
+  isSocketConnectionAllowed,
+  waitForSocketConnection,
+} from "@/lib/socket";
 
 const AuthContext = createContext(null);
 const AUTH_USER_CACHE_KEY = "neutron.auth.user";
@@ -124,21 +137,53 @@ const getClientDeviceName = async () => {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => getCachedUser());
   const [loading, setLoading] = useState(true);
+  const [isSocketReady, setIsSocketReady] = useState(false);
   const router = useRouter();
 
-  const clearUserAndRedirect = () => {
+  const clearUserAndRedirect = useCallback(() => {
     setUser(null);
     cacheUser(null);
+    disconnectSocket();
     router.push("/admin/auth");
-  };
+  }, [router]);
 
-  // Fetch current user on mount
   useEffect(() => {
-    checkAuth();
-  }, []);
+    initSocket({
+      onConnect: () => {
+        setIsSocketReady(true);
+      },
+      onDisconnect: (reason) => {
+        setIsSocketReady(false);
+
+        if (reason === "io server disconnect") {
+          clearUserAndRedirect();
+        }
+      },
+      onForceLogout: () => {
+        clearUserAndRedirect();
+      },
+      onConnectError: () => {
+        setIsSocketReady(false);
+      },
+    });
+
+    connectSocket();
+
+    const bootstrapAuth = async () => {
+      await waitForSocketConnection(1500);
+      await checkAuth();
+    };
+
+    bootstrapAuth();
+
+    return () => {
+      disconnectSocket();
+    };
+  }, [clearUserAndRedirect]);
 
   useEffect(() => {
     const onServerRejectedAuth = () => {
+      disconnectSocket();
       clearUserAndRedirect();
     };
 
@@ -154,26 +199,25 @@ export function AuthProvider({ children }) {
         );
       }
     };
-  }, [router]);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const interval = window.setInterval(() => {
-      checkAuth();
-    }, 15000);
-
-    return () => window.clearInterval(interval);
-  }, [user]);
+  }, [clearUserAndRedirect]);
 
   const checkAuth = async () => {
     try {
+      if (!isSocketConnectionAllowed()) {
+        connectSocket();
+        await waitForSocketConnection(2500);
+      }
+
       const response = await apiClient.get("/auth/me");
       if (response.data.success) {
         setUser(response.data.data.user);
         cacheUser(response.data.data.user);
       }
     } catch (error) {
+      if (error?.response?.data?.error === "SOCKET_NOT_CONNECTED") {
+        console.warn("Auth check paused until socket reconnects.");
+      }
+
       if (isExplicitAuthRejection(error)) {
         setUser(null);
         cacheUser(null);
@@ -197,11 +241,14 @@ export function AuthProvider({ children }) {
       if (response.data.success) {
         setUser(response.data.data.user);
         cacheUser(response.data.data.user);
+        connectSocket();
+        await waitForSocketConnection(2000);
         return { success: true, user: response.data.data.user };
       }
     } catch (error) {
       return {
         success: false,
+        errorCode: error.response?.data?.error,
         error: error.response?.data?.message || "Login failed",
       };
     }
@@ -216,6 +263,7 @@ export function AuthProvider({ children }) {
         console.error("Logout error:", error);
       }
     } finally {
+      disconnectSocket();
       setUser(null);
       cacheUser(null);
       router.push("/admin/auth");
@@ -229,6 +277,7 @@ export function AuthProvider({ children }) {
     logout,
     checkAuth,
     isAuthenticated: !!user,
+    isSocketReady,
     isSA: user?.role === "SA",
     isDH: user?.role === "DH",
     isVH: user?.role === "VH",

@@ -105,6 +105,9 @@ export default function PublicCompetitionRegisterPage() {
       (registration) => registration.competition?.id === competitionId,
     );
   }, [myRegistrations, competitionId]);
+  const canReRegisterFromWithdrawn =
+    existingRegistration?.registration?.status === "WITHDRAWN" ||
+    existingRegistration?.status === "WITHDRAWN";
 
   const isMemberMode = mode === "member" && !!memberModeTeamId;
   const isExistingTeamMemberRegistration =
@@ -289,7 +292,11 @@ export default function PublicCompetitionRegisterPage() {
       return;
     }
 
-    if (existingRegistration && !isExistingTeamMemberRegistration) {
+    if (
+      existingRegistration &&
+      !canReRegisterFromWithdrawn &&
+      !isExistingTeamMemberRegistration
+    ) {
       setSubmitError("You are already registered for this competition.");
       return;
     }
@@ -440,7 +447,12 @@ export default function PublicCompetitionRegisterPage() {
     );
   }
 
-  if (existingRegistration && !isExistingTeamMemberRegistration && !success) {
+  if (
+    existingRegistration &&
+    !canReRegisterFromWithdrawn &&
+    !isExistingTeamMemberRegistration &&
+    !success
+  ) {
     return (
       <Box sx={{ minHeight: "100vh", background: "#050505", py: 7, px: 2 }}>
         <Box

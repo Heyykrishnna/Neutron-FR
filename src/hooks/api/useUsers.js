@@ -5,13 +5,14 @@ import apiClient from "@/lib/axios";
 /**
  * Fetch all users with optional filters
  */
-export function useUsers(filters = {}) {
+export function useUsers(filters = {}, queryOptions = {}) {
   return useQuery({
     queryKey: queryKeys.users.list(filters),
     queryFn: async () => {
       const { data } = await apiClient.get("/sa/users", { params: filters });
       return data.data.users; // Return just the users array
     },
+    ...queryOptions,
   });
 }
 
@@ -258,12 +259,31 @@ export function useInviteUser() {
     mutationFn: async ({ name, email, role }) => {
       // Map frontend role codes to backend enum values
       const roleMap = {
+        SA: "SA",
+        BOARD: "BOARD",
+        DH: "DH",
+        JUDGE: "JUDGE",
+        VOLUNTEER: "VOLUNTEER",
+        USER: "USER",
         VOL: "VOLUNTEER",
         PART: "USER",
         VH: "VOLUNTEER",
       };
 
-      const apiRole = roleMap[role] || role || "USER";
+      const apiRole = roleMap[role] || role;
+
+      const validRoles = new Set([
+        "SA",
+        "BOARD",
+        "DH",
+        "JUDGE",
+        "VOLUNTEER",
+        "USER",
+      ]);
+
+      if (!apiRole || !validRoles.has(apiRole)) {
+        throw new Error("Invalid invite role selected");
+      }
 
       const { data } = await apiClient.post("/auth/invite", {
         email,

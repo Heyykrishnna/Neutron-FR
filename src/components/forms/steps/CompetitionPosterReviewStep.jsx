@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Typography } from "@mui/material";
 import { Upload, ImageIcon, X } from "lucide-react";
 import { FieldLabel } from "./CompetitionBasicInfoStep";
@@ -94,11 +94,34 @@ export default function CompetitionPosterReviewStep({
 
   const formValues = watch();
 
-  const previewUrl = poster
-    ? URL.createObjectURL(poster)
-    : existingPosterPath
-      ? `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001"}/${existingPosterPath}`
-      : null;
+  const previewUrl = useMemo(() => {
+    if (poster) {
+      return URL.createObjectURL(poster);
+    }
+
+    if (!existingPosterPath) return null;
+
+    if (/^https?:\/\//i.test(existingPosterPath)) {
+      return existingPosterPath;
+    }
+
+    const base =
+      process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001";
+    const normalizedBase = base.endsWith("/") ? base.slice(0, -1) : base;
+    const normalizedPath = existingPosterPath.startsWith("/")
+      ? existingPosterPath
+      : `/${existingPosterPath}`;
+
+    return `${normalizedBase}${normalizedPath}`;
+  }, [poster, existingPosterPath]);
+
+  useEffect(() => {
+    return () => {
+      if (poster && previewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [poster, previewUrl]);
 
   function handleFiles(files) {
     if (!files || files.length === 0) return;
@@ -128,6 +151,17 @@ export default function CompetitionPosterReviewStep({
     typeof formValues.status === "object" && formValues.status !== null
       ? formValues.status.value || formValues.status.label || ""
       : formValues.status;
+  const subVenueSummary = Array.isArray(formValues.subVenues)
+    ? formValues.subVenues
+        .map((venue) => String(venue?.name || "").trim())
+        .filter(Boolean)
+    : [];
+
+  const promoCodeSummary = Array.isArray(formValues.promoCodes)
+    ? formValues.promoCodes
+        .map((promo) => String(promo?.code || "").trim())
+        .filter(Boolean)
+    : [];
 
   return (
     <Box sx={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 3 }}>
@@ -348,6 +382,10 @@ export default function CompetitionPosterReviewStep({
           <ReviewRow label="Venue" value={formValues.venueName} />
           <ReviewRow label="Room" value={formValues.venueRoom} />
           <ReviewRow label="Floor" value={formValues.venueFloor} />
+          <ReviewRow
+            label="Sub Venues"
+            value={subVenueSummary.length ? subVenueSummary.join(", ") : "None"}
+          />
         </ReviewSection>
 
         <ReviewSection title="Registration Config">
@@ -382,6 +420,12 @@ export default function CompetitionPosterReviewStep({
           <ReviewRow
             label="Attendance Req."
             value={boolLabel(formValues.attendanceRequired)}
+          />
+          <ReviewRow
+            label="Promo Codes"
+            value={
+              promoCodeSummary.length ? promoCodeSummary.join(", ") : "None"
+            }
           />
         </ReviewSection>
       </Box>

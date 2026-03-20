@@ -9,7 +9,6 @@ import {
   Avatar,
 } from "@mui/material";
 import {
-  Trophy,
   Search,
   Plus,
   Send,
@@ -1095,21 +1094,30 @@ export default function CompetitionsPage() {
 
   const { data: competitions = [], isLoading } = useCompetitions();
 
-  function handlePublishCompetition(comp) {
+  function handleTogglePublishCompetition(comp) {
+    const isCurrentlyOpen = comp.status === "OPEN";
     setPublishingId(comp.id);
     updateCompetition(
       {
         competitionId: comp.id,
-        status: "OPEN",
-        registrationsOpen: true,
+        status: isCurrentlyOpen ? "DRAFT" : "OPEN",
+        registrationsOpen: !isCurrentlyOpen,
       },
       {
         onSuccess: () => {
-          enqueueSnackbar("Competition published", { variant: "success" });
+          enqueueSnackbar(
+            isCurrentlyOpen
+              ? "Competition unpublished"
+              : "Competition published",
+            { variant: "success" },
+          );
         },
         onError: (err) =>
           enqueueSnackbar(
-            err?.response?.data?.message || "Failed to publish competition",
+            err?.response?.data?.message ||
+              (isCurrentlyOpen
+                ? "Failed to unpublish competition"
+                : "Failed to publish competition"),
             { variant: "error" },
           ),
         onSettled: () => setPublishingId(null),
@@ -1169,20 +1177,6 @@ export default function CompetitionsPage() {
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-            <Box
-              sx={{
-                width: 32,
-                height: 32,
-                borderRadius: "9px",
-                background: "#111",
-                border: "1px solid rgba(255,255,255,0.1)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Trophy size={15} color="rgba(255,255,255,0.7)" />
-            </Box>
             <Typography
               sx={{
                 fontSize: 18,
@@ -1535,20 +1529,27 @@ export default function CompetitionsPage() {
                       }}
                     >
                       <SmallActionBtn
-                        onClick={() => handlePublishCompetition(comp)}
+                        onClick={() => handleTogglePublishCompetition(comp)}
                         disabled={publishingCompetition || deletingCompetition}
-                        color="#4ade80"
-                        hoverBg="rgba(34,197,94,0.1)"
+                        color={comp.status === "OPEN" ? "#fbbf24" : "#4ade80"}
+                        hoverBg={
+                          comp.status === "OPEN"
+                            ? "rgba(234,179,8,0.1)"
+                            : "rgba(34,197,94,0.1)"
+                        }
                       >
                         {publishingId === comp.id ? (
                           <CircularProgress
                             size={11}
-                            sx={{ color: "#4ade80" }}
+                            sx={{
+                              color:
+                                comp.status === "OPEN" ? "#fbbf24" : "#4ade80",
+                            }}
                           />
                         ) : (
                           <Send size={11} />
                         )}
-                        Publish
+                        {comp.status === "OPEN" ? "Unpublish" : "Publish"}
                       </SmallActionBtn>
 
                       <SmallActionBtn

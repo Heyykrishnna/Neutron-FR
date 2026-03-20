@@ -27,6 +27,8 @@ export function usePendingRegistrations(filters = {}) {
             user: row.user || null,
             competition: row.competition || null,
             team: row.team || null,
+            formDetails: row.formDetails || null,
+            readiness: row.readiness || null,
           };
         }
 

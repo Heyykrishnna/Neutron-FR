@@ -1,42 +1,110 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Box, CircularProgress, Typography } from "@mui/material";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  buildAuthPageHref,
+  clearAuthContinuation,
+  getAuthContinuation,
+  setAuthContinuation,
+} from "@/src/lib/authContinuation";
 
 function PublicLoginPageContent() {
   const { user, loading, login } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/competitions";
+  const queryNext = searchParams.get("next") || "";
+  const queryForceLogin = searchParams.get("forceLogin") === "1";
+  const continuation = useMemo(() => getAuthContinuation(), []);
+  const next = queryNext || continuation.next || "/competitions";
+  const forceLogin = queryForceLogin || continuation.forceLogin;
+  const signupHref = useMemo(() => {
+    return buildAuthPageHref("/auth/signup", { next, forceLogin });
+  }, [next, forceLogin]);
+
+  useEffect(() => {
+    setAuthContinuation({ next, forceLogin });
+  }, [next, forceLogin]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [errorCode, setErrorCode] = useState("");
+  const [resendSubmitting, setResendSubmitting] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
+  const [resendError, setResendError] = useState("");
+  const showInviteContinuationChip = next.startsWith("/team-invite/");
 
   useEffect(() => {
-    if (!loading && user) {
+    if (!loading && user && !forceLogin) {
       router.replace(next);
     }
-  }, [loading, user, router, next]);
+  }, [loading, user, router, next, forceLogin]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setSubmitting(true);
     setError("");
+    setErrorCode("");
+    setResendMessage("");
+    setResendError("");
 
     const result = await login({ email: email.trim(), password });
 
     if (!result.success) {
+      setErrorCode(result.errorCode || "");
       setError(result.error || "Failed to login");
       setSubmitting(false);
       return;
     }
 
+    clearAuthContinuation();
     router.replace(next);
+  };
+
+  const handleResendVerification = async () => {
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+      setResendError("Enter your email to resend verification.");
+      return;
+    }
+
+    try {
+      setResendSubmitting(true);
+      setResendError("");
+      setResendMessage("");
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001"}/api/v1/auth/resend-verification-public`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: normalizedEmail }),
+        },
+      );
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        setResendError(data?.message || "Failed to resend verification email.");
+        return;
+      }
+
+      setResendMessage(
+        data?.message ||
+          "If your account needs verification, we sent a verification email.",
+      );
+    } catch (resendVerificationError) {
+      setResendError(
+        resendVerificationError?.message ||
+          "Failed to resend verification email.",
+      );
+    } finally {
+      setResendSubmitting(false);
+    }
   };
 
   if (loading) {
@@ -84,8 +152,32 @@ function PublicLoginPageContent() {
         <Typography
           sx={{ color: "rgba(255,255,255,0.4)", fontSize: 13, mb: 2.2 }}
         >
-          Continue to complete your competition registration.
+          {forceLogin
+            ? "Sign in with the account that received the invite."
+            : "Continue to complete your competition registration."}
         </Typography>
+        <Typography
+          sx={{ color: "rgba(255,255,255,0.62)", fontSize: 12, mb: 1 }}
+        >
+          After sign in, you’ll continue to your team invite.
+        </Typography>
+        {showInviteContinuationChip && (
+          <Typography
+            sx={{
+              display: "inline-flex",
+              alignItems: "center",
+              border: "1px solid rgba(192,132,252,0.4)",
+              borderRadius: 999,
+              px: 1,
+              py: 0.3,
+              color: "#c084fc",
+              fontSize: 11,
+              mb: 1.6,
+            }}
+          >
+            Continuing to: Team Invite
+          </Typography>
+        )}
 
         <Box
           component="form"
@@ -115,6 +207,33 @@ function PublicLoginPageContent() {
             </Typography>
           )}
 
+          {errorCode === "EMAIL_NOT_VERIFIED" && (
+            <>
+              <button
+                type="button"
+                disabled={resendSubmitting}
+                onClick={handleResendVerification}
+                style={secondaryButtonStyle(resendSubmitting)}
+              >
+                {resendSubmitting
+                  ? "Resending..."
+                  : "Resend verification email"}
+              </button>
+
+              {resendMessage && (
+                <Typography sx={{ color: "#4ade80", fontSize: 12 }}>
+                  {resendMessage}
+                </Typography>
+              )}
+
+              {resendError && (
+                <Typography sx={{ color: "#f87171", fontSize: 12 }}>
+                  {resendError}
+                </Typography>
+              )}
+            </>
+          )}
+
           <button
             type="submit"
             disabled={submitting}
@@ -134,7 +253,7 @@ function PublicLoginPageContent() {
         >
           New here?{" "}
           <Link
-            href="/auth/signup"
+            href={signupHref}
             style={{ color: "#c084fc", textDecoration: "none" }}
           >
             Create account
@@ -197,4 +316,18 @@ const buttonStyle = (disabled) => ({
   textTransform: "uppercase",
   cursor: disabled ? "not-allowed" : "pointer",
   marginTop: 4,
+});
+
+const secondaryButtonStyle = (disabled) => ({
+  border: "1px solid rgba(192,132,252,0.35)",
+  borderRadius: 10,
+  padding: "9px 14px",
+  background: "transparent",
+  color: disabled ? "rgba(255,255,255,0.4)" : "#c084fc",
+  fontFamily: "'Syne', sans-serif",
+  fontWeight: 600,
+  fontSize: 12,
+  letterSpacing: "0.05em",
+  textTransform: "uppercase",
+  cursor: disabled ? "not-allowed" : "pointer",
 });

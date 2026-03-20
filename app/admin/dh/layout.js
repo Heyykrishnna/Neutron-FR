@@ -11,7 +11,7 @@ import {
   Typography,
   CircularProgress,
 } from "@mui/material";
-import { Menu, Bell } from "lucide-react";
+import { Menu } from "lucide-react";
 import {
   Sidebar,
   SIDEBAR_WIDTH,
@@ -113,10 +113,6 @@ export default function DHLayout({ children }) {
             >
               {currentPage}
             </Typography>
-
-            <IconButton sx={{ color: "#a1a1aa", "&:hover": { color: "#fff" } }}>
-              <Bell size={20} />
-            </IconButton>
           </Toolbar>
         </AppBar>
 

@@ -19,6 +19,30 @@ export const queryKeys = {
     detail: (id) => [...queryKeys.users.details(), id],
   },
 
+  // Public profile queries
+  publicProfiles: {
+    all: ["public-profiles"],
+    details: () => [...queryKeys.publicProfiles.all, "detail"],
+    detail: (userId) => [...queryKeys.publicProfiles.details(), userId],
+  },
+
+  // Public registration + team management queries
+  publicRegistrations: {
+    all: ["public-registrations"],
+    my: () => [...queryKeys.publicRegistrations.all, "my"],
+    invitePreview: (inviteToken) => [
+      ...queryKeys.publicRegistrations.all,
+      "invite-preview",
+      inviteToken,
+    ],
+    pendingInvites: () => [
+      ...queryKeys.publicRegistrations.all,
+      "pending-invites",
+    ],
+    teams: () => [...queryKeys.publicRegistrations.all, "teams"],
+    team: (teamId) => [...queryKeys.publicRegistrations.teams(), teamId],
+  },
+
   // Department queries
   departments: {
     all: ["departments"],

@@ -1,11 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Box, Typography } from "@mui/material";
 import apiClient from "@/lib/axios";
+import {
+  buildAuthPageHref,
+  getAuthContinuation,
+  setAuthContinuation,
+} from "@/src/lib/authContinuation";
 
 export default function PublicSignupPage() {
+  const searchParams = useSearchParams();
+  const queryNext = searchParams.get("next") || "";
+  const queryForceLogin = searchParams.get("forceLogin") === "1";
+  const continuation = useMemo(() => getAuthContinuation(), []);
+  const next = queryNext || continuation.next || "";
+  const forceLogin = queryForceLogin || continuation.forceLogin;
+  const showInviteContinuationChip = next.startsWith("/team-invite/");
+  const loginHref = useMemo(() => {
+    return buildAuthPageHref("/auth/login", { next, forceLogin });
+  }, [next, forceLogin]);
+
+  useEffect(() => {
+    setAuthContinuation({ next, forceLogin });
+  }, [next, forceLogin]);
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -63,6 +84,26 @@ export default function PublicSignupPage() {
         >
           Create your account. You must verify email before registration.
         </Typography>
+        <Typography sx={{ color: "rgba(255,255,255,0.62)", fontSize: 12, mb: 1 }}>
+          After sign in, you’ll continue to your team invite.
+        </Typography>
+        {showInviteContinuationChip && (
+          <Typography
+            sx={{
+              display: "inline-flex",
+              alignItems: "center",
+              border: "1px solid rgba(192,132,252,0.4)",
+              borderRadius: 999,
+              px: 1,
+              py: 0.3,
+              color: "#c084fc",
+              fontSize: 11,
+              mb: 1.6,
+            }}
+          >
+            Continuing to: Team Invite
+          </Typography>
+        )}
 
         {success ? (
           <Box>
@@ -70,7 +111,7 @@ export default function PublicSignupPage() {
               Account created. Check your email to verify, then login.
             </Typography>
             <Link
-              href="/auth/login"
+              href={loginHref}
               style={{ color: "#c084fc", textDecoration: "none" }}
             >
               Go to login
@@ -125,7 +166,7 @@ export default function PublicSignupPage() {
             >
               Already have an account?{" "}
               <Link
-                href="/auth/login"
+                href={loginHref}
                 style={{ color: "#c084fc", textDecoration: "none" }}
               >
                 Login

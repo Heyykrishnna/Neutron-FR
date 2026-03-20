@@ -21,7 +21,6 @@ export default function AdminAuthPage() {
       else if (user.role === "VH") router.replace("/admin/vh");
       else if (user.role === "VOLUNTEER") router.replace("/admin/volunteer");
       else if (user.role === "JUDGE") router.replace("/admin/judge");
-      else router.replace("/admin/dashboard");
     }
   }, [user, loading, router]);
 
@@ -30,6 +29,7 @@ export default function AdminAuthPage() {
     setIsLoggingIn(true);
     try {
       const result = await login(credentials);
+      console.log(result);
       if (!result.success) {
         const errorMessage = result.error || "Invalid email or password";
         setLoginError(errorMessage);

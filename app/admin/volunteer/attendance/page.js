@@ -324,11 +324,6 @@ export default function VolunteerAttendancePage() {
             textAlign: "center",
           }}
         >
-          <Lock
-            size={28}
-            color="rgba(255,255,255,0.15)"
-            style={{ marginBottom: 12 }}
-          />
           <Typography
             sx={{ fontSize: 13, color: "rgba(255,255,255,0.35)", ...sy }}
           >

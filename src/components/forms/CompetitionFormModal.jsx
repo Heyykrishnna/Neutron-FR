@@ -250,6 +250,7 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
     handleSubmit,
     trigger,
     watch,
+    setValue,
     reset,
     formState: { errors },
   } = useForm({
@@ -296,6 +297,12 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
 
   function buildFormData(data) {
     const fd = new FormData();
+    const normalizedRegistrationFee = Number(data.registrationFee ?? 0) || 0;
+    const normalizedIsPaid = Boolean(data.isPaid);
+    const normalizedPerPerson = normalizedIsPaid
+      ? Boolean(data.perPerson)
+      : false;
+    const allowPromoCodes = normalizedRegistrationFee > 0;
 
     const append = (key, value) => {
       if (value === undefined || value === null || value === "") return;
@@ -348,7 +355,7 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
     if (data.rulesRichText) fd.append("rulesRichText", data.rulesRichText);
 
     // Numeric
-    fd.append("registrationFee", String(data.registrationFee ?? 0));
+    fd.append("registrationFee", String(normalizedRegistrationFee));
     if (data.maxRegistrations)
       fd.append("maxRegistrations", String(data.maxRegistrations));
     if (data.minTeamSize) fd.append("minTeamSize", String(data.minTeamSize));
@@ -359,8 +366,8 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
     fd.append("requiresApproval", String(data.requiresApproval ?? true));
     fd.append("autoApproveTeams", String(data.autoApproveTeams ?? false));
     fd.append("attendanceRequired", String(data.attendanceRequired ?? false));
-    fd.append("isPaid", String(data.isPaid ?? false));
-    fd.append("perPerson", String(data.perPerson ?? false));
+    fd.append("isPaid", String(normalizedIsPaid));
+    fd.append("perPerson", String(normalizedPerPerson));
 
     // Serialize prize pool as JSON (backend parses it)
     if (Array.isArray(data.prizePool) && data.prizePool.length > 0) {
@@ -378,7 +385,11 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
       fd.append("prizePool", JSON.stringify(normalized));
     }
 
-    if (Array.isArray(data.promoCodes) && data.promoCodes.length > 0) {
+    if (
+      allowPromoCodes &&
+      Array.isArray(data.promoCodes) &&
+      data.promoCodes.length > 0
+    ) {
       const normalizedPromoCodes = data.promoCodes
         .map((pc) => ({
           code: String(pc?.code || "")
@@ -468,13 +479,14 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
       control={control}
       errors={errors}
       watch={watch}
+      setValue={setValue}
     />,
     <CompetitionPosterReviewStep
       key="poster"
       watch={watch}
       poster={poster}
       onPosterChange={setPoster}
-      existingPosterPath={competition?.posterPath}
+      existingPosterPath={resolvedCompetition?.posterPath}
     />,
   ];
 

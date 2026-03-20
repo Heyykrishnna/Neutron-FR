@@ -50,115 +50,168 @@ const optCoercedInt = z
   })
   .optional();
 
-export const competitionSchema = z.object({
-  // ── Step 1: Basic Info
-  title: z.string().min(1, "Title is required"),
-  shortDescription: z.string().optional(),
-  category: z.string().optional(),
-  eventType: z.enum(["COMPETITION", "WORKSHOP", "EVENT"]),
-  type: z.enum(["SOLO", "TEAM"]),
-  status: z.enum([
-    "DRAFT",
-    "OPEN",
-    "CLOSED",
-    "ARCHIVED",
-    "CANCELLED",
-    "POSTPONED",
-  ]),
+export const competitionSchema = z
+  .object({
+    // ── Step 1: Basic Info
+    title: z.string().min(1, "Title is required"),
+    shortDescription: z.string().optional(),
+    category: z.string().optional(),
+    eventType: z.enum(["COMPETITION", "WORKSHOP", "EVENT"]),
+    type: z.enum(["SOLO", "TEAM"]),
+    status: z.enum([
+      "DRAFT",
+      "OPEN",
+      "CLOSED",
+      "ARCHIVED",
+      "CANCELLED",
+      "POSTPONED",
+    ]),
 
-  // ── Step 2: Schedule & Venue
-  startTime: z.string().optional(),
-  endTime: z.string().optional(),
-  registrationDeadline: z.string().optional(),
-  venueName: z.string().optional(),
-  venueRoom: z.string().optional(),
-  venueFloor: z.string().optional(),
-  subVenues: z
-    .array(
-      z.object({
-        name: z.string().min(1, "Sub venue name is required"),
-        room: z.string().optional(),
-        floor: z.string().optional(),
-        capacity: z
-          .union([z.literal(""), z.string(), z.number()])
-          .transform((v) => {
-            if (v === "" || v === null || v === undefined) return undefined;
-            const n = typeof v === "number" ? v : parseInt(String(v), 10);
-            return Number.isNaN(n) ? undefined : n;
-          })
-          .optional(),
-        notes: z.string().optional(),
+    // ── Step 2: Schedule & Venue
+    startTime: z.string().optional(),
+    endTime: z.string().optional(),
+    registrationDeadline: z.string().optional(),
+    venueName: z.string().optional(),
+    venueRoom: z.string().optional(),
+    venueFloor: z.string().optional(),
+    subVenues: z
+      .array(
+        z.object({
+          name: z.string().min(1, "Sub venue name is required"),
+          room: z.string().optional(),
+          floor: z.string().optional(),
+          capacity: z
+            .union([z.literal(""), z.string(), z.number()])
+            .transform((v) => {
+              if (v === "" || v === null || v === undefined) return undefined;
+              const n = typeof v === "number" ? v : parseInt(String(v), 10);
+              return Number.isNaN(n) ? undefined : n;
+            })
+            .optional(),
+          notes: z.string().optional(),
+        }),
+      )
+      .optional(),
+
+    // ── Step 3: Rules
+    rulesRichText: z.string().optional(),
+
+    // ── Step 4: Registration Config
+    registrationFee: z
+      .union([z.literal(""), z.string(), z.number()])
+      .transform((v) => {
+        if (v === "" || v === undefined || v === null) return 0;
+        const n = typeof v === "number" ? v : parseInt(String(v), 10);
+        return isNaN(n) ? 0 : n;
       }),
-    )
-    .optional(),
+    maxRegistrations: optCoercedInt,
+    minTeamSize: optCoercedInt,
+    maxTeamSize: optCoercedInt,
+    registrationsOpen: z.boolean(),
+    requiresApproval: z.boolean(),
+    autoApproveTeams: z.boolean(),
+    attendanceRequired: z.boolean(),
+    isPaid: z.boolean(),
+    perPerson: z.boolean(),
 
-  // ── Step 3: Rules
-  rulesRichText: z.string().optional(),
+    // ── Prize Pool (flexible array of ranked/named prizes)
+    // Each entry: { rank: string, label: string, cash: number|null, inkind: string[] }
+    prizePool: z
+      .array(
+        z.object({
+          rank: z.string().optional(),
+          label: z.string().min(1, "Prize label is required"),
+          cash: z
+            .union([z.number(), z.string(), z.literal(""), z.null()])
+            .transform((v) => {
+              if (v === "" || v === null || v === undefined) return undefined;
+              const n = typeof v === "number" ? v : Number(v);
+              return Number.isNaN(n) ? undefined : n;
+            })
+            .optional(),
+          inkind: z.string().optional(),
+        }),
+      )
+      .optional(),
 
-  // ── Step 4: Registration Config
-  registrationFee: z
-    .union([z.literal(""), z.string(), z.number()])
-    .transform((v) => {
-      if (v === "" || v === undefined || v === null) return 0;
-      const n = typeof v === "number" ? v : parseInt(String(v), 10);
-      return isNaN(n) ? 0 : n;
-    }),
-  maxRegistrations: optCoercedInt,
-  minTeamSize: optCoercedInt,
-  maxTeamSize: optCoercedInt,
-  registrationsOpen: z.boolean(),
-  requiresApproval: z.boolean(),
-  autoApproveTeams: z.boolean(),
-  attendanceRequired: z.boolean(),
-  isPaid: z.boolean(),
-  perPerson: z.boolean(),
+    promoCodes: z
+      .array(
+        z.object({
+          code: z.string().min(1, "Promo code is required"),
+          discountType: z.enum(["PERCENT", "FLAT"]),
+          discountValue: z
+            .union([z.number(), z.string(), z.literal("")])
+            .transform((v) => {
+              if (v === "" || v === undefined || v === null) return undefined;
+              const n = typeof v === "number" ? v : Number(v);
+              return Number.isNaN(n) ? undefined : n;
+            }),
+          maxUses: z
+            .union([z.literal(""), z.string(), z.number()])
+            .transform((v) => {
+              if (v === "" || v === null || v === undefined) return undefined;
+              const n = typeof v === "number" ? v : parseInt(String(v), 10);
+              return Number.isNaN(n) ? undefined : n;
+            })
+            .optional(),
+          isActive: z.boolean(),
+          description: z.string().optional(),
+        }),
+      )
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.type === "TEAM") {
+      if (data.minTeamSize == null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["minTeamSize"],
+          message: "Min team size is required for team competitions",
+        });
+      }
 
-  // ── Prize Pool (flexible array of ranked/named prizes)
-  // Each entry: { rank: string, label: string, cash: number|null, inkind: string[] }
-  prizePool: z
-    .array(
-      z.object({
-        rank: z.string().optional(),
-        label: z.string().min(1, "Prize label is required"),
-        cash: z
-          .union([z.number(), z.string(), z.literal(""), z.null()])
-          .transform((v) => {
-            if (v === "" || v === null || v === undefined) return undefined;
-            const n = typeof v === "number" ? v : Number(v);
-            return Number.isNaN(n) ? undefined : n;
-          })
-          .optional(),
-        inkind: z.string().optional(),
-      }),
-    )
-    .optional(),
+      if (data.maxTeamSize == null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["maxTeamSize"],
+          message: "Max team size is required for team competitions",
+        });
+      }
 
-  promoCodes: z
-    .array(
-      z.object({
-        code: z.string().min(1, "Promo code is required"),
-        discountType: z.enum(["PERCENT", "FLAT"]),
-        discountValue: z
-          .union([z.number(), z.string(), z.literal("")])
-          .transform((v) => {
-            if (v === "" || v === undefined || v === null) return undefined;
-            const n = typeof v === "number" ? v : Number(v);
-            return Number.isNaN(n) ? undefined : n;
-          }),
-        maxUses: z
-          .union([z.literal(""), z.string(), z.number()])
-          .transform((v) => {
-            if (v === "" || v === null || v === undefined) return undefined;
-            const n = typeof v === "number" ? v : parseInt(String(v), 10);
-            return Number.isNaN(n) ? undefined : n;
-          })
-          .optional(),
-        isActive: z.boolean(),
-        description: z.string().optional(),
-      }),
-    )
-    .optional(),
-});
+      if (
+        data.minTeamSize != null &&
+        data.maxTeamSize != null &&
+        data.maxTeamSize < data.minTeamSize
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["maxTeamSize"],
+          message:
+            "Max team size must be greater than or equal to min team size",
+        });
+      }
+    }
+
+    if (!data.isPaid && data.perPerson) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["perPerson"],
+        message: "Fee per person is only available for paid events",
+      });
+    }
+
+    if (
+      (data.registrationFee ?? 0) <= 0 &&
+      (data.promoCodes?.length || 0) > 0
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["promoCodes"],
+        message:
+          "Promo codes are only allowed when registration fee is greater than zero",
+      });
+    }
+  });
 
 export const DEFAULT_VALUES = {
   title: "",

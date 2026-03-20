@@ -6,7 +6,6 @@ import {
   Typography,
   Paper,
   Button,
-  IconButton,
   Chip,
   TextField,
   MenuItem,
@@ -25,7 +24,7 @@ import {
   Tooltip,
   InputAdornment,
 } from "@mui/material";
-import { CheckCircle, XCircle, Search, ClipboardList } from "lucide-react";
+import { CheckCircle, XCircle, Search, ClipboardList, Eye } from "lucide-react";
 import { useSnackbar } from "notistack";
 import {
   usePendingRegistrations,
@@ -122,6 +121,10 @@ export default function RegistrationsPage() {
 
   // In-flight tracking
   const [approvingId, setApprovingId] = useState(null);
+  const [formDialog, setFormDialog] = useState({
+    open: false,
+    row: null,
+  });
 
   // Data
   const { data: competitions = [], isLoading: competitionsLoading } =
@@ -145,10 +148,72 @@ export default function RegistrationsPage() {
     });
   }, [registrations, search]);
 
-  const getRegistrationId = (row) => {
+  const groupedByTeam = useMemo(() => {
+    const groups = new Map();
+
+    filtered.forEach((row, index) => {
+      const teamId = row.team?.id || row.teamId || null;
+      const teamName = row.team?.name || row.teamName || "Solo Registration";
+      const competitionName =
+        row.competition?.name ||
+        row.competition?.title ||
+        row.competitionName ||
+        "—";
+      const type =
+        row.competition?.type || row.type || (teamId ? "TEAM" : "SOLO");
+
+      const soloFallbackKey = getRegistrationId(row) || `solo-${index}`;
+      const groupKey = teamId ? `team:${teamId}` : `solo:${soloFallbackKey}`;
+
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, {
+          key: groupKey,
+          teamId,
+          teamName,
+          competitionName,
+          type,
+          members: [],
+        });
+      }
+
+      groups.get(groupKey).members.push(row);
+    });
+
+    const normalized = Array.from(groups.values());
+
+    normalized.forEach((group) => {
+      group.members.sort((a, b) => {
+        const aIsLeader =
+          group.teamId &&
+          (a.team?.leaderId || a.teamLeaderId) &&
+          (a.team?.leaderId || a.teamLeaderId) === (a.user?.id || a.userId);
+        const bIsLeader =
+          group.teamId &&
+          (b.team?.leaderId || b.teamLeaderId) &&
+          (b.team?.leaderId || b.teamLeaderId) === (b.user?.id || b.userId);
+
+        if (aIsLeader && !bIsLeader) return -1;
+        if (!aIsLeader && bIsLeader) return 1;
+
+        const aName = (a.user?.name || a.userName || "").toLowerCase();
+        const bName = (b.user?.name || b.userName || "").toLowerCase();
+        return aName.localeCompare(bName);
+      });
+    });
+
+    normalized.sort((a, b) => {
+      if (a.teamId && !b.teamId) return -1;
+      if (!a.teamId && b.teamId) return 1;
+      return (a.teamName || "").localeCompare(b.teamName || "");
+    });
+
+    return normalized;
+  }, [filtered]);
+
+  function getRegistrationId(row) {
     const candidate = row?.registrationId || row?.id || row?.registration?.id;
     return isUuid(candidate) ? candidate : null;
-  };
+  }
 
   async function handleApprove(registrationId) {
     setApprovingId(registrationId);
@@ -204,6 +269,10 @@ export default function RegistrationsPage() {
       month: "short",
       year: "numeric",
     });
+  }
+
+  function openFormDialog(row) {
+    setFormDialog({ open: true, row });
   }
 
   return (
@@ -327,186 +396,397 @@ export default function RegistrationsPage() {
           </Typography>
         </Paper>
       ) : (
-        <TableContainer
-          component={Paper}
-          sx={{
-            background: "#0c0c0c",
-            border: "1px solid rgba(255,255,255,0.06)",
-            borderRadius: "12px",
-          }}
-        >
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={headSx}>Participant</TableCell>
-                <TableCell sx={headSx}>Competition</TableCell>
-                <TableCell sx={headSx}>Team</TableCell>
-                <TableCell sx={headSx}>Type</TableCell>
-                <TableCell sx={headSx}>Submitted</TableCell>
-                <TableCell sx={{ ...headSx, textAlign: "right" }}>
-                  Actions
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filtered.map((row, index) => {
-                const name = row.user?.name || row.userName || "Unknown";
-                const email = row.user?.email || row.userEmail || "";
-                const competitionName =
-                  row.competition?.name ||
-                  row.competition?.title ||
-                  row.competitionName ||
-                  "—";
-                const teamName = row.team?.name || row.teamName || null;
-                const type = row.competition?.type || row.type || null;
-                const registrationId = getRegistrationId(row);
-                const isApproving = approvingId === registrationId;
-
-                return (
-                  <TableRow
-                    key={registrationId || `pending-row-${index}`}
-                    sx={{
-                      "&:hover": { backgroundColor: "rgba(255,255,255,0.02)" },
-                    }}
+        <Box sx={{ display: "grid", gap: 2 }}>
+          {groupedByTeam.map((group) => (
+            <Paper
+              key={group.key}
+              sx={{
+                background: "#0c0c0c",
+                border: "1px solid rgba(255,255,255,0.06)",
+                borderRadius: "12px",
+                overflow: "hidden",
+              }}
+            >
+              <Box
+                sx={{
+                  px: 2,
+                  py: 1.4,
+                  borderBottom: "1px solid rgba(255,255,255,0.06)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 1,
+                  flexWrap: "wrap",
+                }}
+              >
+                <Box>
+                  <Typography
+                    sx={{ color: "#fff", fontSize: 14, fontWeight: 600 }}
                   >
-                    {/* Participant */}
-                    <TableCell sx={cellSx}>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1.5 }}
-                      >
-                        <Avatar
+                    {group.teamName}
+                  </Typography>
+                  <Typography sx={{ color: "#71717a", fontSize: 12 }}>
+                    {group.competitionName}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Chip
+                    label={group.type}
+                    size="small"
+                    sx={{
+                      backgroundColor:
+                        group.type === "TEAM" ? "#7c3aed22" : "#0369a122",
+                      color: group.type === "TEAM" ? "#a78bfa" : "#38bdf8",
+                      fontWeight: 600,
+                      fontSize: 11,
+                    }}
+                  />
+                  <Chip
+                    label={`${group.members.length} member${group.members.length > 1 ? "s" : ""}`}
+                    size="small"
+                    sx={{
+                      backgroundColor: "rgba(255,255,255,0.08)",
+                      color: "rgba(255,255,255,0.72)",
+                      fontWeight: 600,
+                      fontSize: 11,
+                    }}
+                  />
+                </Box>
+              </Box>
+
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={headSx}>Participant</TableCell>
+                      <TableCell sx={headSx}>Form</TableCell>
+                      <TableCell sx={headSx}>Submitted</TableCell>
+                      <TableCell sx={{ ...headSx, textAlign: "right" }}>
+                        Actions
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {group.members.map((row, memberIndex) => {
+                      const name = row.user?.name || row.userName || "Unknown";
+                      const email = row.user?.email || row.userEmail || "";
+                      const registrationId = getRegistrationId(row);
+                      const isApproving = approvingId === registrationId;
+                      const readiness = row.readiness || null;
+                      const readinessReady = readiness?.ready !== false;
+                      const readinessReasons = Array.isArray(
+                        readiness?.missingRequirements,
+                      )
+                        ? readiness.missingRequirements
+                        : [];
+                      const canApprove = Boolean(
+                        readinessReady && !isApproving && registrationId,
+                      );
+                      const approvalTooltip = readinessReady
+                        ? "Approve"
+                        : readinessReasons[0] ||
+                          readiness?.reason ||
+                          "Registration is not ready for approval";
+                      const formDetails = row.formDetails || {};
+                      const hasSubmittedForm = Boolean(
+                        formDetails.hasSubmittedForm,
+                      );
+                      const requiredCount = Number(
+                        formDetails.requiredCount || 0,
+                      );
+                      const requiredAnsweredCount = Number(
+                        formDetails.requiredAnsweredCount || 0,
+                      );
+                      const answeredCount = Number(
+                        formDetails.answeredCount || 0,
+                      );
+                      const submittedText = requiredCount
+                        ? `${requiredAnsweredCount}/${requiredCount} required`
+                        : `${answeredCount} answered`;
+
+                      return (
+                        <TableRow
+                          key={
+                            registrationId ||
+                            `${group.key}-member-${memberIndex}`
+                          }
                           sx={{
-                            width: 36,
-                            height: 36,
-                            backgroundColor: "#3f3f46",
-                            fontSize: 14,
-                            fontWeight: 700,
+                            "&:hover": {
+                              backgroundColor: "rgba(255,255,255,0.02)",
+                            },
                           }}
                         >
-                          {name.charAt(0).toUpperCase()}
-                        </Avatar>
-                        <Box>
-                          <Typography
-                            variant="body2"
-                            sx={{ color: "#fff", fontWeight: 500 }}
-                          >
-                            {name}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            sx={{ color: "#71717a" }}
-                          >
-                            {email}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
+                          <TableCell sx={cellSx}>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1.5,
+                              }}
+                            >
+                              <Avatar
+                                sx={{
+                                  width: 36,
+                                  height: 36,
+                                  backgroundColor: "#3f3f46",
+                                  fontSize: 14,
+                                  fontWeight: 700,
+                                }}
+                              >
+                                {name.charAt(0).toUpperCase()}
+                              </Avatar>
+                              <Box>
+                                <Typography
+                                  variant="body2"
+                                  sx={{ color: "#fff", fontWeight: 500 }}
+                                >
+                                  {name}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  sx={{ color: "#71717a" }}
+                                >
+                                  {email}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          </TableCell>
 
-                    {/* Competition */}
-                    <TableCell sx={cellSx}>
-                      <Typography variant="body2">{competitionName}</Typography>
-                    </TableCell>
+                          <TableCell sx={cellSx}>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                              }}
+                            >
+                              <Chip
+                                label={
+                                  hasSubmittedForm ? "Filled" : "Not filled"
+                                }
+                                size="small"
+                                sx={{
+                                  backgroundColor: hasSubmittedForm
+                                    ? "rgba(34,197,94,0.16)"
+                                    : "rgba(239,68,68,0.14)",
+                                  color: hasSubmittedForm
+                                    ? "#4ade80"
+                                    : "#fca5a5",
+                                  fontWeight: 600,
+                                  fontSize: 11,
+                                }}
+                              />
+                              <Typography
+                                variant="caption"
+                                sx={{ color: "#a1a1aa" }}
+                              >
+                                {submittedText}
+                              </Typography>
+                              {!readinessReady ? (
+                                <Typography
+                                  variant="caption"
+                                  sx={{ color: "#fca5a5" }}
+                                >
+                                  {approvalTooltip}
+                                </Typography>
+                              ) : null}
+                            </Box>
+                          </TableCell>
 
-                    {/* Team */}
-                    <TableCell sx={cellSx}>
-                      {teamName ? (
-                        <Box>
-                          <Typography variant="body2" sx={{ color: "#fff" }}>
-                            {teamName}
-                          </Typography>
-                          {row.team?.members?.length && (
+                          <TableCell sx={cellSx}>
                             <Typography
-                              variant="caption"
-                              sx={{ color: "#71717a" }}
+                              variant="body2"
+                              sx={{ color: "#a1a1aa" }}
                             >
-                              {row.team.members.length} members
+                              {formatDate(row.createdAt || row.submittedAt)}
                             </Typography>
-                          )}
-                        </Box>
-                      ) : (
-                        <Typography variant="caption" sx={{ color: "#52525b" }}>
-                          Solo
-                        </Typography>
-                      )}
-                    </TableCell>
+                          </TableCell>
 
-                    {/* Type */}
-                    <TableCell sx={cellSx}>
-                      {type && (
-                        <Chip
-                          label={type}
-                          size="small"
-                          sx={{
-                            backgroundColor:
-                              type === "TEAM" ? "#7c3aed22" : "#0369a122",
-                            color: type === "TEAM" ? "#a78bfa" : "#38bdf8",
-                            fontWeight: 600,
-                            fontSize: 11,
-                          }}
-                        />
-                      )}
-                    </TableCell>
-
-                    {/* Submitted */}
-                    <TableCell sx={cellSx}>
-                      <Typography variant="body2" sx={{ color: "#a1a1aa" }}>
-                        {formatDate(row.createdAt || row.submittedAt)}
-                      </Typography>
-                    </TableCell>
-
-                    {/* Actions */}
-                    <TableCell sx={{ ...cellSx, textAlign: "right" }}>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "flex-end",
-                          gap: 1,
-                        }}
-                      >
-                        <Tooltip title="Approve">
-                          <span>
-                            <Button
-                              size="small"
-                              onClick={() => handleApprove(registrationId)}
-                              disabled={isApproving || !registrationId}
-                              startIcon={
-                                isApproving ? (
-                                  <CircularProgress
-                                    size={14}
-                                    sx={{ color: "rgba(255,255,255,0.9)" }}
-                                  />
-                                ) : (
-                                  <CheckCircle size={14} />
-                                )
-                              }
-                              sx={approveButtonSx}
+                          <TableCell sx={{ ...cellSx, textAlign: "right" }}>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                justifyContent: "flex-end",
+                                gap: 1,
+                                flexWrap: "wrap",
+                              }}
                             >
-                              Approve
-                            </Button>
-                          </span>
-                        </Tooltip>
-                        <Tooltip title="Reject">
-                          <Button
-                            size="small"
-                            onClick={() =>
-                              openRejectDialog(row, registrationId)
-                            }
-                            disabled={!registrationId}
-                            startIcon={<XCircle size={14} />}
-                            sx={rejectButtonSx}
-                          >
-                            Reject
-                          </Button>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                              <Button
+                                size="small"
+                                onClick={() => openFormDialog(row)}
+                                startIcon={<Eye size={14} />}
+                                sx={subtleButtonSx}
+                              >
+                                View form
+                              </Button>
+                              <Tooltip title={approvalTooltip}>
+                                <span>
+                                  <Button
+                                    size="small"
+                                    onClick={() =>
+                                      handleApprove(registrationId)
+                                    }
+                                    disabled={!canApprove}
+                                    startIcon={
+                                      isApproving ? (
+                                        <CircularProgress
+                                          size={14}
+                                          sx={{
+                                            color: "rgba(255,255,255,0.9)",
+                                          }}
+                                        />
+                                      ) : (
+                                        <CheckCircle size={14} />
+                                      )
+                                    }
+                                    sx={approveButtonSx}
+                                  >
+                                    Approve
+                                  </Button>
+                                </span>
+                              </Tooltip>
+                              <Tooltip title="Reject">
+                                <Button
+                                  size="small"
+                                  onClick={() =>
+                                    openRejectDialog(row, registrationId)
+                                  }
+                                  disabled={!registrationId}
+                                  startIcon={<XCircle size={14} />}
+                                  sx={rejectButtonSx}
+                                >
+                                  Reject
+                                </Button>
+                              </Tooltip>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          ))}
+        </Box>
       )}
+
+      <Dialog
+        open={formDialog.open}
+        onClose={() => setFormDialog({ open: false, row: null })}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            background: "#0e0e0e",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "16px",
+            boxShadow: "0 32px 80px rgba(0,0,0,0.8)",
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            color: "#f4f4f5",
+            fontWeight: 600,
+            fontFamily: "'Syne', sans-serif",
+            fontSize: 16,
+            borderBottom: "1px solid rgba(255,255,255,0.06)",
+          }}
+        >
+          Form Details
+        </DialogTitle>
+        <DialogContent sx={{ pt: "18px !important" }}>
+          <Typography
+            sx={{ color: "#fff", fontSize: 14, fontWeight: 600, mb: 0.4 }}
+          >
+            {formDialog.row?.user?.name ||
+              formDialog.row?.userName ||
+              "Participant"}
+          </Typography>
+          <Typography sx={{ color: "#71717a", fontSize: 12, mb: 2 }}>
+            {formDialog.row?.user?.email || formDialog.row?.userEmail || ""}
+          </Typography>
+
+          {formDialog.row?.formDetails?.fields?.length ? (
+            <Box sx={{ display: "grid", gap: 1.2 }}>
+              {formDialog.row.formDetails.fields.map((field) => (
+                <Box
+                  key={field.fieldId}
+                  sx={{
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: "10px",
+                    p: 1.2,
+                    background: "rgba(255,255,255,0.02)",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 1,
+                      mb: 0.6,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <Typography
+                      sx={{ color: "#fff", fontSize: 12, fontWeight: 600 }}
+                    >
+                      {field.label}
+                    </Typography>
+                    <Chip
+                      label={field.hasValue ? "Filled" : "Not filled"}
+                      size="small"
+                      sx={{
+                        backgroundColor: field.hasValue
+                          ? "rgba(34,197,94,0.16)"
+                          : "rgba(239,68,68,0.14)",
+                        color: field.hasValue ? "#4ade80" : "#fca5a5",
+                        fontWeight: 600,
+                        fontSize: 10,
+                      }}
+                    />
+                  </Box>
+                  <Typography sx={{ color: "#a1a1aa", fontSize: 12, mb: 0.3 }}>
+                    Scope: {field.scope}
+                    {field.isRequired ? " • Required" : " • Optional"}
+                  </Typography>
+                  <Typography
+                    sx={{
+                      color: field.hasValue
+                        ? "rgba(255,255,255,0.9)"
+                        : "#52525b",
+                      fontSize: 12,
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {field.displayValue || "—"}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          ) : (
+            <Typography sx={{ color: "#71717a", fontSize: 13 }}>
+              No form fields were configured for this registration.
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions
+          sx={{
+            px: 3,
+            py: 2,
+            borderTop: "1px solid rgba(255,255,255,0.06)",
+          }}
+        >
+          <Button
+            onClick={() => setFormDialog({ open: false, row: null })}
+            sx={subtleButtonSx}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Reject dialog */}
       <Dialog

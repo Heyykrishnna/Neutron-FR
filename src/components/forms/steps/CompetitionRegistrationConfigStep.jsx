@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { Controller, useWatch, useFieldArray } from "react-hook-form";
 import { Box, Typography } from "@mui/material";
 import { Plus, Trash2 } from "lucide-react";
@@ -43,6 +44,7 @@ function Toggle({ checked, onChange, disabled }) {
     <button
       type="button"
       onClick={() => !disabled && onChange(!checked)}
+      disabled={disabled}
       style={{
         width: 40,
         height: 22,
@@ -54,6 +56,7 @@ function Toggle({ checked, onChange, disabled }) {
         transition: "background 0.2s",
         flexShrink: 0,
         padding: 0,
+        opacity: disabled ? 0.5 : 1,
       }}
     >
       <span
@@ -72,9 +75,19 @@ function Toggle({ checked, onChange, disabled }) {
   );
 }
 
-export default function CompetitionRegistrationConfigStep({ control, errors }) {
+export default function CompetitionRegistrationConfigStep({
+  control,
+  errors,
+  setValue,
+}) {
   const competitionType = useWatch({ control, name: "type" });
+  const registrationFee = useWatch({ control, name: "registrationFee" });
+  const isPaid = useWatch({ control, name: "isPaid" });
   const isTeam = competitionType === "TEAM";
+  const normalizedFee = Number(registrationFee || 0);
+  const promoCodesDisabled =
+    !Number.isFinite(normalizedFee) || normalizedFee <= 0;
+  const perPersonDisabled = !isPaid;
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -95,6 +108,18 @@ export default function CompetitionRegistrationConfigStep({ control, errors }) {
     const token = Math.random().toString(36).toUpperCase().slice(2, 8);
     return `NEUTRON-${token}`;
   };
+
+  useEffect(() => {
+    if (perPersonDisabled) {
+      setValue("perPerson", false, { shouldDirty: true, shouldValidate: true });
+    }
+  }, [perPersonDisabled, setValue]);
+
+  useEffect(() => {
+    if (promoCodesDisabled) {
+      setValue("promoCodes", [], { shouldDirty: true, shouldValidate: true });
+    }
+  }, [promoCodesDisabled, setValue]);
 
   return (
     <Box
@@ -230,7 +255,13 @@ export default function CompetitionRegistrationConfigStep({ control, errors }) {
                     {item.description}
                   </Typography>
                 </Box>
-                <Toggle checked={!!field.value} onChange={field.onChange} />
+                <Toggle
+                  checked={!!field.value}
+                  onChange={field.onChange}
+                  disabled={
+                    item.name === "perPerson" ? perPersonDisabled : false
+                  }
+                />
               </Box>
             )}
           />
@@ -469,7 +500,8 @@ export default function CompetitionRegistrationConfigStep({ control, errors }) {
           </Box>
           <button
             type="button"
-            onClick={() =>
+            onClick={() => {
+              if (promoCodesDisabled) return;
               appendPromo({
                 code: generatePromoCode(),
                 discountType: "PERCENT",
@@ -477,8 +509,9 @@ export default function CompetitionRegistrationConfigStep({ control, errors }) {
                 maxUses: "",
                 isActive: true,
                 description: "",
-              })
-            }
+              });
+            }}
+            disabled={promoCodesDisabled}
             style={{
               display: "flex",
               alignItems: "center",
@@ -490,7 +523,8 @@ export default function CompetitionRegistrationConfigStep({ control, errors }) {
               fontSize: 12,
               fontFamily: "'Syne', sans-serif",
               padding: "6px 12px",
-              cursor: "pointer",
+              cursor: promoCodesDisabled ? "not-allowed" : "pointer",
+              opacity: promoCodesDisabled ? 0.45 : 1,
             }}
           >
             <Plus size={13} />
@@ -514,7 +548,9 @@ export default function CompetitionRegistrationConfigStep({ control, errors }) {
                 fontFamily: "'DM Mono', monospace",
               }}
             >
-              No promo codes added yet
+              {promoCodesDisabled
+                ? "Promo codes are disabled when registration fee is 0"
+                : "No promo codes added yet"}
             </Typography>
           </Box>
         )}
@@ -554,19 +590,22 @@ export default function CompetitionRegistrationConfigStep({ control, errors }) {
                 <button
                   type="button"
                   onClick={() =>
+                    !promoCodesDisabled &&
                     updatePromo(index, {
                       ...promoFields[index],
                       code: generatePromoCode(),
                     })
                   }
+                  disabled={promoCodesDisabled}
                   style={{
                     background: "transparent",
                     border: "1px solid rgba(255,255,255,0.15)",
                     borderRadius: 6,
-                    cursor: "pointer",
+                    cursor: promoCodesDisabled ? "not-allowed" : "pointer",
                     color: "rgba(255,255,255,0.6)",
                     padding: "4px 8px",
                     fontSize: 11,
+                    opacity: promoCodesDisabled ? 0.45 : 1,
                   }}
                 >
                   Generate
@@ -607,6 +646,7 @@ export default function CompetitionRegistrationConfigStep({ control, errors }) {
                     <input
                       {...f}
                       placeholder="NEUTRON-ABC123"
+                      disabled={promoCodesDisabled}
                       style={inputCss}
                     />
                   )}
@@ -618,7 +658,11 @@ export default function CompetitionRegistrationConfigStep({ control, errors }) {
                   name={`promoCodes.${index}.discountType`}
                   control={control}
                   render={({ field: f }) => (
-                    <select {...f} style={inputCss}>
+                    <select
+                      {...f}
+                      disabled={promoCodesDisabled}
+                      style={inputCss}
+                    >
                       <option value="PERCENT" style={{ background: "#0e0e0e" }}>
                         Percent
                       </option>
@@ -643,6 +687,7 @@ export default function CompetitionRegistrationConfigStep({ control, errors }) {
                       type="number"
                       min="0"
                       placeholder="e.g. 20"
+                      disabled={promoCodesDisabled}
                       style={inputCss}
                     />
                   )}
@@ -663,6 +708,7 @@ export default function CompetitionRegistrationConfigStep({ control, errors }) {
                       type="number"
                       min="1"
                       placeholder="Unlimited"
+                      disabled={promoCodesDisabled}
                       style={inputCss}
                     />
                   )}
@@ -677,6 +723,7 @@ export default function CompetitionRegistrationConfigStep({ control, errors }) {
                     <input
                       {...f}
                       placeholder="Early bird, Campus ambassador..."
+                      disabled={promoCodesDisabled}
                       style={inputCss}
                     />
                   )}
@@ -697,7 +744,11 @@ export default function CompetitionRegistrationConfigStep({ control, errors }) {
                   }}
                 >
                   <FieldLabel>Active</FieldLabel>
-                  <Toggle checked={!!f.value} onChange={f.onChange} />
+                  <Toggle
+                    checked={!!f.value}
+                    onChange={f.onChange}
+                    disabled={promoCodesDisabled}
+                  />
                 </Box>
               )}
             />

@@ -50,7 +50,7 @@ export function useCampaignMetadata() {
   });
 }
 
-export function useCampaigns(filters = {}) {
+export function useCampaigns(filters = {}, queryOptions = {}) {
   return useQuery({
     queryKey: queryKeys.campaigns.list(filters),
     queryFn: async () => {
@@ -59,10 +59,11 @@ export function useCampaigns(filters = {}) {
       });
       return data?.data || { campaigns: [], pagination: null };
     },
+    ...queryOptions,
   });
 }
 
-export function useCampaignDetail(campaignId) {
+export function useCampaignDetail(campaignId, queryOptions = {}) {
   return useQuery({
     queryKey: queryKeys.campaigns.detail(campaignId),
     queryFn: async () => {
@@ -70,10 +71,15 @@ export function useCampaignDetail(campaignId) {
       return data?.data;
     },
     enabled: !!campaignId,
+    ...queryOptions,
   });
 }
 
-export function useCampaignRecipients(campaignId, filters = {}) {
+export function useCampaignRecipients(
+  campaignId,
+  filters = {},
+  queryOptions = {},
+) {
   return useQuery({
     queryKey: queryKeys.campaigns.recipients(campaignId, filters),
     queryFn: async () => {
@@ -86,6 +92,7 @@ export function useCampaignRecipients(campaignId, filters = {}) {
       return data?.data || { recipients: [], pagination: null };
     },
     enabled: !!campaignId,
+    ...queryOptions,
   });
 }
 

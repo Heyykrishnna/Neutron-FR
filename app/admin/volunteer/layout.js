@@ -69,30 +69,69 @@ function SidebarContent({ user, pathname, onLogout, onClose }) {
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <Box
             sx={{
-              width: 30,
-              height: 30,
-              borderRadius: "8px",
-              background: "rgba(168,85,247,0.15)",
-              border: "1px solid rgba(168,85,247,0.3)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              position: "relative",
+              width: 36,
+              height: 36,
+              flexShrink: 0,
             }}
           >
-            <UserCheck size={14} color="#c084fc" />
+            <Box
+              sx={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: "9px",
+                background: "#111",
+                border: "1px solid rgba(255,255,255,0.1)",
+                boxShadow: "0 0 0 1px rgba(255,255,255,0.04) inset",
+              }}
+            />
+            <Box
+              sx={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path
+                  d="M3 15V3L9 12V3M9 12V15M9 3L15 15V3"
+                  stroke="rgba(255,255,255,0.85)"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </Box>
           </Box>
-          <Typography
-            sx={{
-              fontSize: 13,
-              fontWeight: 700,
-              color: "#f4f4f5",
-              fontFamily: "'Syne', sans-serif",
-              letterSpacing: "0.04em",
-              textTransform: "uppercase",
-            }}
-          >
-            Volunteer
-          </Typography>
+          <Box>
+            <Typography
+              sx={{
+                color: "#f4f4f5",
+                fontWeight: 600,
+                fontSize: 15,
+                fontFamily: "'Syne', sans-serif",
+                letterSpacing: "0.02em",
+                lineHeight: 1.2,
+              }}
+            >
+              Neutron
+            </Typography>
+            <Typography
+              sx={{
+                color: "rgba(255,255,255,0.28)",
+                fontSize: 10,
+                fontFamily: "'Syne', sans-serif",
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
+                lineHeight: 1,
+                mt: 0.4,
+              }}
+            >
+              Volunteer
+            </Typography>
+          </Box>
         </Box>
       </Box>
 
