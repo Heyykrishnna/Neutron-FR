@@ -259,12 +259,31 @@ export function useInviteUser() {
     mutationFn: async ({ name, email, role }) => {
       // Map frontend role codes to backend enum values
       const roleMap = {
+        SA: "SA",
+        BOARD: "BOARD",
+        DH: "DH",
+        JUDGE: "JUDGE",
+        VOLUNTEER: "VOLUNTEER",
+        USER: "USER",
         VOL: "VOLUNTEER",
         PART: "USER",
         VH: "VOLUNTEER",
       };
 
-      const apiRole = roleMap[role] || role || "USER";
+      const apiRole = roleMap[role] || role;
+
+      const validRoles = new Set([
+        "SA",
+        "BOARD",
+        "DH",
+        "JUDGE",
+        "VOLUNTEER",
+        "USER",
+      ]);
+
+      if (!apiRole || !validRoles.has(apiRole)) {
+        throw new Error("Invalid invite role selected");
+      }
 
       const { data } = await apiClient.post("/auth/invite", {
         email,

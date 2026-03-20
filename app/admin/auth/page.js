@@ -29,6 +29,7 @@ export default function AdminAuthPage() {
     setIsLoggingIn(true);
     try {
       const result = await login(credentials);
+      console.log(result);
       if (!result.success) {
         const errorMessage = result.error || "Invalid email or password";
         setLoginError(errorMessage);

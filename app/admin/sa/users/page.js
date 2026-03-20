@@ -43,6 +43,7 @@ const ROLE_OPTIONS = [
   { value: "DH", label: "Department Head" },
   { value: "JUDGE", label: "Judge" },
   { value: "VOLUNTEER", label: "Volunteer" },
+  { value: "USER", label: "User" },
 ];
 
 const ROLE_COLORS = {
