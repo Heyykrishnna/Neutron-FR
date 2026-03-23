@@ -110,7 +110,7 @@ export default function IssuesResolutionPage() {
             ml: 0.5,
           }}
         >
-          DH / SA resolution queue for volunteer-reported issues
+          DH / SA resolution queue for support issues submitted by users
         </Typography>
       </Box>
 

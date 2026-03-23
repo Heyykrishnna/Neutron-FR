@@ -15,6 +15,7 @@ import { QueryProvider } from "./QueryProvider";
 import { theme } from "@/src/theme";
 import EmotionRegistry from "./EmotionRegistry";
 import ClarityTracker from "@/src/components/analytics/ClarityTracker";
+import SupportIssueWidget from "@/src/components/support/SupportIssueWidget";
 
 const base = {
   fontFamily: "'Syne', sans-serif",
@@ -122,6 +123,7 @@ export function AppProviders({ children }) {
             <AuthProvider>
               <ClarityTracker />
               {children}
+              <SupportIssueWidget />
             </AuthProvider>
           </SnackbarProvider>
         </ThemeProvider>
