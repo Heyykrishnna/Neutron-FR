@@ -248,7 +248,7 @@ export default function SpaceLanding() {
           aria-hidden
           className="pointer-events-none fixed inset-0 z-0"
           style={{
-            backgroundImage: "url('https://cdn.mos.cms.futurecdn.net/HuGGeENt6kGyixe3hT9tnY-1200-80.jpg')",
+            backgroundImage: "url('https://4kwallpapers.com/images/wallpapers/stars-galaxy-3840x2160-10307.jpg')",
             backgroundSize: "cover",
             backgroundPosition: "center",
             filter: "brightness(0.5) saturate(1.55)",
