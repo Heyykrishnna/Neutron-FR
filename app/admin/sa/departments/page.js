@@ -95,6 +95,7 @@ export default function DepartmentsPage() {
 
     if (type === "members") {
       setSelectedVolunteerIds([]);
+      setSelectedDepartmentId(dept?.id || null);
       setDialogOpen(true);
       handleMenuClose();
       return;
@@ -270,15 +271,27 @@ export default function DepartmentsPage() {
 
   const [volunteerSearch, setVolunteerSearch] = useState("");
 
-  const filteredVolunteers = useMemo(() => {
-    if (!volunteerSearch) return volunteers;
-    const q = volunteerSearch.toLowerCase();
+  const existingMemberIds = useMemo(() => {
+    const members = selectedDepartment?.members || [];
+    return new Set(members.map((member) => member?.userId).filter(Boolean));
+  }, [selectedDepartment?.members]);
+
+  const availableVolunteers = useMemo(() => {
+    if (dialogType !== "members") return volunteers;
     return volunteers.filter(
+      (volunteer) => !existingMemberIds.has(volunteer.id),
+    );
+  }, [dialogType, existingMemberIds, volunteers]);
+
+  const filteredVolunteers = useMemo(() => {
+    if (!volunteerSearch) return availableVolunteers;
+    const q = volunteerSearch.toLowerCase();
+    return availableVolunteers.filter(
       (v) =>
         (v.name || "").toLowerCase().includes(q) ||
         (v.email || "").toLowerCase().includes(q),
     );
-  }, [volunteers, volunteerSearch]);
+  }, [availableVolunteers, volunteerSearch]);
 
   if (isLoading) return <LoadingState />;
 
@@ -849,7 +862,7 @@ export default function DepartmentsPage() {
             borderRadius: "10px",
           }}
         >
-          {isVolunteersLoading ? (
+          {isVolunteersLoading || isDepartmentDetailsLoading ? (
             <Box sx={{ py: 4, textAlign: "center" }}>
               <Typography
                 sx={{
@@ -870,7 +883,9 @@ export default function DepartmentsPage() {
                   fontFamily: "'Syne', sans-serif",
                 }}
               >
-                No volunteers found
+                {availableVolunteers.length === 0
+                  ? "All volunteers are already added"
+                  : "No volunteers found"}
               </Typography>
             </Box>
           ) : (
