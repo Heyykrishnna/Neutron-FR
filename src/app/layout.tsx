@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Neutron Flight Deck",
-  description: "Smooth 3D orbit landing page with routed planetary destinations.",
+  title: "Neutron",
+  description: "Neutron.",
 };
 
 export default function RootLayout({

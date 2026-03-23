@@ -793,6 +793,18 @@ async function createScene({
         labelPos.y -= entry.scale * 0.45;
         const screen = worldToScreen(labelPos);
         const behind = worldPos.clone().project(camera).z > 1;
+        
+        // 3D Occlusion Check: Hide labels that are blocked by massive front planets
+        let occluded = false;
+        if (!behind) {
+           const dir = labelPos.clone().sub(camera.position).normalize();
+           raycaster.set(camera.position, dir);
+           const hits = raycaster.intersectObjects(interactiveTargets, true);
+           const blocker = hits.find(h => h.object.userData?.planetSlug !== entry.slug);
+           if (blocker && blocker.distance < camera.position.distanceTo(labelPos) - 0.5) {
+             occluded = true;
+           }
+        }
 
         const starWorldPos = worldPos.clone().add(
           new THREE.Vector3(
@@ -804,15 +816,26 @@ async function createScene({
         const starScreen = worldToScreen(starWorldPos);
         const starBehind = starWorldPos.clone().project(camera).z > 1;
 
+        let starOccluded = false;
+        if (!starBehind) {
+           const dir = starWorldPos.clone().sub(camera.position).normalize();
+           raycaster.set(camera.position, dir);
+           const hits = raycaster.intersectObjects(interactiveTargets, true);
+           const blocker = hits.find(h => h.object.userData?.planetSlug !== entry.slug);
+           if (blocker && blocker.distance < camera.position.distanceTo(starWorldPos) - 0.5) {
+             starOccluded = true;
+           }
+        }
+
         return { 
           slug: entry.slug, 
           x: screen.x, 
           y: screen.y + entry.scale * 36, 
-          visible: !behind && entry.scale > 0.14 && spread > 0.28, 
+          visible: !behind && !occluded && entry.scale > 0.14 && spread > 0.28, 
           scale: entry.scale,
           starX: starScreen.x,
           starY: starScreen.y,
-          starVisible: !starBehind && entry.scale > 0.05 && spread > 0.12
+          starVisible: !starBehind && !starOccluded && entry.scale > 0.05 && spread > 0.12
         };
       });
       onScreenPositions(screenPositions);
