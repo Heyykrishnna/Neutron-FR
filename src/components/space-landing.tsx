@@ -148,7 +148,6 @@ export default function SpaceLanding() {
 
   useEffect(() => {
     const onScroll = () => {
-      // Fade video out entirely by 150vh, identical to the intro phase duration
       const scrolledVH = (window.scrollY / window.innerHeight) * 100;
       setVideoOpacity(Math.max(0, 1 - scrolledVH / 150));
       setIsScrolled(scrolledVH > 50);
@@ -188,14 +187,13 @@ export default function SpaceLanding() {
             progressRef.current = progress;
             if (navigatingRef.current) return;
             
-            // Track local scroll correctly invariant of height
             const scrollMax = (document.documentElement.scrollHeight - window.innerHeight) || 1;
             const scrolledPx = progress * scrollMax;
             const vh = window.innerHeight || 800;
             const scrolledVH = (scrolledPx / vh) * 100;
 
             const N = PLANET_RECORDS.length;
-            const cycleProgress = Math.max(0, scrolledVH - 420) / 380; // 380vh for exactly 1 revolution
+            const cycleProgress = Math.max(0, scrolledVH - 420) / 380;
             const rawIndex = Math.floor((cycleProgress * N) + 0.5);
             const activeIndex = rawIndex % N;
             
@@ -639,7 +637,6 @@ async function createScene({
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.position.set(0, mobile ? 0.45 : 0.8, mobile ? 16.8 : 15.5);
     camera.updateProjectionMatrix();
-    // Base positions are now dynamically calculated in the render loop!
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.8));
     renderer.setSize(window.innerWidth, window.innerHeight, false);
   };
@@ -681,18 +678,14 @@ async function createScene({
     const delta = clock.getDelta();
     const elapsed = clock.elapsedTime;
     
-    // Map absolute progress mapped strictly to the number of screen heights (vh) passed
-    // so animation timeline layout is entirely independent of max page height!
     const scrollMax = (document.documentElement.scrollHeight - window.innerHeight) || 1;
     const scrolledPx = progressRef.current * scrollMax;
-    const vh = window.innerHeight || 800; // fallback if 0
+    const vh = window.innerHeight || 800;
     const scrolledVH = (scrolledPx / vh) * 100;
     
-    // Animate strictly based on vh scrolled, NOT total percentage
     const intro  = smoothstep(20, 150, scrolledVH);
     const spread = smoothstep(120, 300, scrolledVH);
     const focus  = smoothstep(280, 420, scrolledVH);
-    // No exit fade — the orbit loops forever, nothing should disappear
     const exit   = 0;
 
     const mob = window.innerWidth < 768;
@@ -706,8 +699,6 @@ async function createScene({
     planetsRig.rotation.z  = Math.cos(elapsed * 0.065) * 0.007;
 
     const N = PLANET_RECORDS.length;
-    // Infinite wheel spinning
-    // 380vh completes one full revolution, starts turning fully after 420vh when focus locks.
     const cycleProgress = Math.max(0, scrolledVH - 420) / 380;
     const globalAngleOffset = cycleProgress * (Math.PI * 2);
 
@@ -718,13 +709,11 @@ async function createScene({
 
     planetEntries.forEach((entry, index) => {
       const planet    = PLANET_RECORDS[index];
-      // Reveal sequentially from 100vh up to 300vh, then stay fully visible
       const revealIn  = smoothstep(100 + index * 30, 220 + index * 30, scrolledVH);
       const visibility = clamp(revealIn, 0.001, 1);
       const isScrollSelected = entry.slug === activePlanetRef.current;
       const isHovered = entry.slug === hoveredSlugRef.current;
       
-      // Solar System Orbit Math
       let currentAngle = (index * (Math.PI * 2) / N) - globalAngleOffset;
       if (currentAngle > Math.PI) currentAngle -= Math.PI * 2;
       if (currentAngle < -Math.PI) currentAngle += Math.PI * 2;
@@ -773,11 +762,9 @@ async function createScene({
     targetCameraPosition.set(0, mob ? 0.35 : 0.7, THREE.MathUtils.lerp(mob ? 19.5 : 18, mob ? 14.6 : 13.2, intro));
     targetLookAt.set(0, 0.2, -2.8);
     
-    // Spread phase: pull back to see the full wheel
     targetCameraPosition.lerp(new THREE.Vector3(0, mob ? 3.0 : 4.8, mob ? 18.2 : 20.5), spread);
     targetLookAt.lerp(new THREE.Vector3(0, 0.2, ringCenterZ), spread);
     
-    // Focus phase: fixed camera above + behind the front-bottom position looking at ring center
     targetCameraPosition.lerp(idealFrontPosition.clone().add(cameraOffset), focus);
     targetLookAt.lerp(focusLookAt, focus);
     
