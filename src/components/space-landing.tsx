@@ -794,7 +794,6 @@ async function createScene({
         const screen = worldToScreen(labelPos);
         const behind = worldPos.clone().project(camera).z > 1;
         
-        // 3D Occlusion Check: Hide labels that are blocked by massive front planets
         let occluded = false;
         if (!behind) {
            const dir = labelPos.clone().sub(camera.position).normalize();
