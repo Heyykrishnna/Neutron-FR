@@ -248,10 +248,10 @@ export default function SpaceLanding() {
           aria-hidden
           className="pointer-events-none fixed inset-0 z-0"
           style={{
-            backgroundImage: "url('https://images.pexels.com/photos/1169754/pexels-photo-1169754.jpeg?cs=srgb&dl=pexels-philippedonn-1169754.jpg&fm=jpg')",
+            backgroundImage: "url('https://cdn.mos.cms.futurecdn.net/HuGGeENt6kGyixe3hT9tnY-1200-80.jpg')",
             backgroundSize: "cover",
             backgroundPosition: "center",
-            filter: "brightness(0.38) saturate(1.15)",
+            filter: "brightness(0.5) saturate(1.55)",
           }}
         />
 
