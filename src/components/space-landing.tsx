@@ -244,6 +244,20 @@ export default function SpaceLanding() {
     <MotionConfig transition={{ type: "spring", stiffness: 240, damping: 28 }}>
       <div className="relative min-h-[50000svh] overflow-x-clip">
 
+        <style>{`
+          @keyframes drift-stars    { from{transform:translate(0,0)} to{transform:translate(-22px,-18px)} }
+          @keyframes pulse-cloud    { 0%,100%{transform:scale(1) translateY(0)} 50%{transform:scale(1.06) translateY(-8px)} }
+          @keyframes grain-shift    { 0%{transform:translate(0,0)} 20%{transform:translate(-3%,-4%)} 40%{transform:translate(2%,3%)} 60%{transform:translate(-2%,2%)} 80%{transform:translate(3%,-3%)} 100%{transform:translate(0,0)} }
+          @keyframes spin-loader    { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+          @keyframes star-glow-pulse{ 0%,100%{opacity:0.7;transform:scale(1)} 50%{opacity:1;transform:scale(1.18)} }
+          @keyframes star-link-a    { 0%,100%{transform:translate(0,0)} 50%{transform:translate(3px,-5px)} }
+          @keyframes star-link-b    { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-4px,4px)} }
+          @keyframes star-link-c    { 0%,100%{transform:translate(0,0)} 50%{transform:translate(5px,3px)} }
+          @keyframes star-link-d    { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-3px,-5px)} }
+          @keyframes star-link-e    { 0%,100%{transform:translate(0,0)} 50%{transform:translate(4px,5px)} }
+          @keyframes corner-glow    { 0%,100%{opacity:0.45} 50%{opacity:0.9} }
+        `}</style>
+
         <div
           aria-hidden
           className="pointer-events-none fixed inset-0 z-0"
@@ -251,46 +265,60 @@ export default function SpaceLanding() {
             backgroundImage: "url('https://4kwallpapers.com/images/wallpapers/stars-galaxy-3840x2160-10307.jpg')",
             backgroundSize: "cover",
             backgroundPosition: "center",
-            filter: "brightness(0.5) saturate(1.55)",
+            filter: "brightness(0.45) saturate(0.8) sepia(0.35)",
           }}
         />
 
-        <a 
-          href="/" 
-          className="fixed top-6 left-6 z-50 transition-transform duration-300 hover:scale-110"
-          aria-label="Neutron Home"
-        >
-          <Image 
-            src="/neutron.png" 
-            alt="Neutron Logo" 
-            width={48} 
-            height={48} 
-            className="object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]" 
-            priority
-          />
-        </a>
-        <AnimatePresence>
-          {navigatingPlanet && (
-            <motion.div
-              key={navigatingPlanet}
-              className="fixed inset-0 z-40"
-              style={{ background: "radial-gradient(circle at center,rgba(90,159,255,0.14),transparent 22%),linear-gradient(180deg,rgba(2,5,12,0.16),rgba(2,5,12,0.96))" }}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-            />
-          )}
-        </AnimatePresence>
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 z-0"
+          style={{ background: "linear-gradient(180deg,rgba(10,4,0,0.2) 0%,rgba(4,2,0,0.6) 100%)" }}
+        />
 
         <div aria-hidden className="pointer-events-none fixed inset-0 z-1 overflow-hidden">
-          <div className="absolute inset-[-25%] opacity-[0.42]" style={{ backgroundImage: "radial-gradient(circle,rgba(255,255,255,0.95) 0.75px,transparent 1.1px),radial-gradient(circle,rgba(255,255,255,0.8) 0.6px,transparent 0.9px)", backgroundPosition: "0 0,55px 72px", backgroundSize: "110px 110px,140px 140px", animation: "drift-stars 22s linear infinite" }} />
-          <div className="absolute inset-[-25%] opacity-[0.30]" style={{ backgroundImage: "radial-gradient(circle,rgba(200,228,255,0.85) 0.8px,transparent 1.2px),radial-gradient(circle,rgba(160,210,255,0.55) 0.65px,transparent 1px)", backgroundPosition: "28px 36px,88px 104px", backgroundSize: "160px 160px,210px 210px", animation: "drift-stars 30s -4s linear infinite reverse" }} />
-          <div className="absolute inset-[-25%] opacity-[0.22]" style={{ backgroundImage: "radial-gradient(circle,rgba(255,245,235,0.7) 0.7px,transparent 1.1px),radial-gradient(circle,rgba(255,220,180,0.4) 0.5px,transparent 0.8px)", backgroundPosition: "14px 60px,100px 130px", backgroundSize: "200px 200px,270px 270px", animation: "drift-stars 42s -8s linear infinite" }} />
-          <div className="absolute inset-[-25%] opacity-[0.14]" style={{ transform: "scale(1.2)", backgroundImage: "radial-gradient(circle,rgba(180,215,255,0.6) 0.6px,transparent 1px),radial-gradient(circle,rgba(140,195,255,0.35) 0.5px,transparent 0.8px)", backgroundPosition: "0 0,130px 150px", backgroundSize: "280px 280px,360px 360px", animation: "drift-stars 56s -16s linear infinite reverse" }} />
-          <div className="absolute rounded-full opacity-[0.18]" style={{ left: "-12vw", top: "18vh", height: "38vw", width: "38vw", background: "rgba(40,132,255,0.22)", animation: "pulse-cloud 14s ease-in-out infinite" }} />
-          <div className="absolute rounded-full opacity-[0.18]" style={{ right: "-10vw", top: "52vh", height: "32vw", width: "32vw", background: "rgba(255,148,74,0.18)", animation: "pulse-cloud 14s -6s ease-in-out infinite" }} />
-          <div className="absolute inset-0" style={{ background: "radial-gradient(circle at center,transparent 26%,rgba(1,2,6,0.72) 78%),linear-gradient(180deg,rgba(1,2,6,0.22),rgba(1,2,6,0.84))" }} />
+          <div
+            className="absolute inset-[-25%] opacity-[0.32]"
+            style={{
+              backgroundImage: "radial-gradient(circle,rgba(255,220,160,0.9) 0.7px,transparent 1.1px),radial-gradient(circle,rgba(255,200,120,0.7) 0.55px,transparent 0.9px)",
+              backgroundPosition: "0 0,55px 72px",
+              backgroundSize: "110px 110px,140px 140px",
+              animation: "drift-stars 22s linear infinite",
+            }}
+          />
+          <div
+            className="absolute inset-[-25%] opacity-[0.22]"
+            style={{
+              backgroundImage: "radial-gradient(circle,rgba(255,180,80,0.75) 0.8px,transparent 1.2px),radial-gradient(circle,rgba(220,160,60,0.5) 0.6px,transparent 1px)",
+              backgroundPosition: "28px 36px,88px 104px",
+              backgroundSize: "160px 160px,210px 210px",
+              animation: "drift-stars 30s -4s linear infinite reverse",
+            }}
+          />
+          <div
+            className="absolute inset-[-25%] opacity-[0.16]"
+            style={{
+              backgroundImage: "radial-gradient(circle,rgba(255,240,200,0.65) 0.7px,transparent 1.1px),radial-gradient(circle,rgba(220,180,120,0.38) 0.5px,transparent 0.8px)",
+              backgroundPosition: "14px 60px,100px 130px",
+              backgroundSize: "200px 200px,270px 270px",
+              animation: "drift-stars 42s -8s linear infinite",
+            }}
+          />
+          <div
+            className="absolute rounded-full"
+            style={{
+              left: "-14vw", top: "20vh", height: "42vw", width: "42vw",
+              background: "radial-gradient(circle,rgba(180,80,10,0.18),transparent 70%)",
+              animation: "pulse-cloud 16s ease-in-out infinite",
+            }}
+          />
+          <div
+            className="absolute rounded-full"
+            style={{
+              right: "-12vw", top: "48vh", height: "36vw", width: "36vw",
+              background: "radial-gradient(circle,rgba(120,50,5,0.16),transparent 70%)",
+              animation: "pulse-cloud 16s -7s ease-in-out infinite",
+            }}
+          />
         </div>
 
         <div
@@ -304,14 +332,64 @@ export default function SpaceLanding() {
             loop
             playsInline
             className="absolute inset-0 w-full h-full object-cover"
-            style={{ filter: "brightness(0.45) saturate(1.2)", transform: "scale(1.05)" }}
+            style={{ filter: "brightness(0.55) saturate(1.1) contrast(1)" }}
           >
             <source src="https://res.cloudinary.com/dpod2sj9t/video/upload/v1774324189/Neu_edaxyz.mp4" type="video/mp4" />
           </video>
-          <div className="absolute inset-[-20%] opacity-[0.5]" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23grain)' opacity='0.18'/%3E%3C/svg%3E\")", backgroundSize: "200px 200px", mixBlendMode: "overlay", animation: "grain-shift 1.8s steps(1) infinite" }} />
-          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center,transparent 28%,rgba(2,4,14,0.7) 80%,rgba(2,4,14,0.92) 100%)" }} />
+
+          <div
+            className="absolute inset-[-20%] opacity-[0.4]"
+            style={{
+              backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23grain)' opacity='0.22'/%3E%3C/svg%3E\")",
+              backgroundSize: "200px 200px",
+              mixBlendMode: "multiply",
+              animation: "grain-shift 1.8s steps(1) infinite",
+            }}
+          />
+
+          <div
+            className="absolute inset-0"
+            style={{ background: "radial-gradient(ellipse at center,transparent 30%,rgba(0,0,0,0.85) 85%,rgba(0,0,0,0.98) 100%)" }}
+          />
+
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: "repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.1) 2px,rgba(0,0,0,0.1) 4px)",
+              mixBlendMode: "multiply",
+            }}
+          />
         </div>
 
+        <a
+          href="/"
+          className="fixed top-6 left-6 z-50 transition-transform duration-300 hover:scale-110"
+          aria-label="Neutron Home"
+        >
+          <Image
+            src="/neutron.png"
+            alt="Neutron Logo"
+            width={48}
+            height={48}
+            className="object-contain"
+            style={{ filter: "drop-shadow(0 0 14px rgba(220,140,30,0.55)) drop-shadow(0 0 4px rgba(255,200,80,0.3))" }}
+            priority
+          />
+        </a>
+
+        <AnimatePresence>
+          {navigatingPlanet && (
+            <motion.div
+              key={navigatingPlanet}
+              className="fixed inset-0 z-40"
+              style={{ background: "radial-gradient(circle at center,rgba(180,90,10,0.14),transparent 22%),linear-gradient(180deg,rgba(8,3,0,0.18),rgba(8,3,0,0.96))" }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+            />
+          )}
+        </AnimatePresence>
 
         <canvas ref={canvasRef} className="fixed inset-0 z-10 h-full w-full touch-none" aria-hidden="true" />
 
@@ -327,26 +405,34 @@ export default function SpaceLanding() {
               key={pos.slug}
               style={{ position: "fixed", left: pos.x, top: pos.y, transform: "translate(-50%,0)", zIndex: 15, pointerEvents: "auto", cursor: "pointer", userSelect: "none" }}
               initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: pos.visible ? (isActive ? 1 : 0.65) : 0, y: 0, scale: isHovered ? 1.05 : isActive ? 1.03 : 1 }}
+              animate={{ opacity: pos.visible ? (isActive ? 1 : 0.62) : 0, y: 0, scale: isHovered ? 1.05 : isActive ? 1.03 : 1 }}
               transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
               onClick={() => handlePlanetSelect(pos.slug)}
               onMouseEnter={() => setHoveredPlanet(pos.slug)}
               onMouseLeave={() => setHoveredPlanet(null)}
             >
               <div
-                className="flex flex-col items-center gap-[0.42rem] rounded-[1.1rem] px-[0.9rem] py-[0.6rem] whitespace-nowrap"
+                className="flex flex-col items-center gap-[0.42rem] px-[0.9rem] py-[0.55rem] whitespace-nowrap"
                 style={{
-                  border: isActive ? "1px solid rgba(145,191,255,0.2)" : "1px solid rgba(145,191,255,0.12)",
-                  background: isActive ? "rgba(8,16,40,0.78)" : "rgba(5,10,24,0.52)",
+                  border: isActive
+                    ? "1px solid rgba(220,140,40,0.45)"
+                    : "1px solid rgba(180,100,20,0.22)",
+                  background: isActive
+                    ? "rgba(18,8,0,0.82)"
+                    : "rgba(10,4,0,0.56)",
                   backdropFilter: "blur(12px)",
                   WebkitBackdropFilter: "blur(12px)",
+                  clipPath: "polygon(6px 0%,calc(100% - 6px) 0%,100% 6px,100% calc(100% - 6px),calc(100% - 6px) 100%,6px 100%,0% calc(100% - 6px),0% 6px)",
                   boxShadow: isActive
-                    ? "0 10px 44px rgba(0,0,0,0.44),0 0 36px rgba(120,190,255,0.12),inset 0 1px 0 rgba(255,255,255,0.07)"
-                    : "0 8px 32px rgba(0,0,0,0.38),inset 0 1px 0 rgba(255,255,255,0.05)",
+                    ? "0 10px 44px rgba(0,0,0,0.55),0 0 30px rgba(200,120,20,0.15),inset 0 1px 0 rgba(255,180,60,0.08)"
+                    : "0 8px 32px rgba(0,0,0,0.42),inset 0 1px 0 rgba(255,180,60,0.04)",
                   transition: "background 240ms ease,border-color 240ms ease,box-shadow 240ms ease",
                 }}
               >
-                <div className="text-[0.82rem] font-semibold uppercase tracking-[0.18em] leading-none" style={{ color: pd.accent }}>
+                <div
+                  className="text-[0.78rem] font-bold uppercase tracking-[0.22em] leading-none"
+                  style={{ color: isActive ? "#ffbe6a" : "rgba(220,160,60,0.8)", fontFamily: "monospace" }}
+                >
                   {pd.name}
                 </div>
               </div>
@@ -362,8 +448,15 @@ export default function SpaceLanding() {
         >
           <motion.div
             layout
-            className="flex items-center gap-[0.7rem] rounded-full px-4 py-3"
-            style={{ border: "1px solid rgba(145,191,255,0.16)", background: "rgba(6,12,28,0.60)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", boxShadow: "0 24px 80px rgba(0,0,0,0.38),inset 0 1px 0 rgba(255,255,255,0.06)" }}
+            className="flex items-center gap-[0.7rem] px-4 py-3"
+            style={{
+              border: "1px solid rgba(200,120,20,0.3)",
+              background: "rgba(12,5,0,0.72)",
+              backdropFilter: "blur(14px)",
+              WebkitBackdropFilter: "blur(14px)",
+              clipPath: "polygon(8px 0%,calc(100% - 8px) 0%,100% 8px,100% calc(100% - 8px),calc(100% - 8px) 100%,8px 100%,0% calc(100% - 8px),0% 8px)",
+              boxShadow: "0 24px 80px rgba(0,0,0,0.5),0 0 40px rgba(180,100,10,0.08),inset 0 1px 0 rgba(255,180,50,0.07)",
+            }}
           >
             {PLANET_RECORDS.map((planet) => {
               const isActive = activePlanet === planet.slug;
@@ -373,32 +466,34 @@ export default function SpaceLanding() {
                   layout
                   title={planet.name}
                   aria-label={`Go to ${planet.name}`}
-                  className="relative h-[0.65rem] rounded-full cursor-pointer group"
+                  className="relative h-[0.6rem] cursor-pointer group"
                   style={{ border: "none", padding: 0, background: "transparent" }}
                   animate={{
                     width: isActive ? 48 : 10,
-                    opacity: isActive ? 1 : 0.48,
-                    backgroundColor: isActive ? planet.accent : "rgba(200,220,255,0.28)",
+                    opacity: isActive ? 1 : 0.42,
+                    backgroundColor: isActive ? "#e08020" : "rgba(180,120,40,0.28)",
                     boxShadow: isActive
-                      ? `0 0 0 1px rgba(255,255,255,0.10),0 0 28px ${planet.accent}66`
-                      : "0 0 0 1px rgba(255,255,255,0.04)",
+                      ? "0 0 0 1px rgba(255,200,80,0.18),0 0 22px rgba(220,140,30,0.55)"
+                      : "0 0 0 1px rgba(200,130,40,0.10)",
                   }}
                   whileHover={{
                     opacity: 1,
-                    scale: 1.25,
-                    backgroundColor: planet.accent,
-                    boxShadow: `0 0 0 2px ${planet.accent}44,0 0 20px ${planet.accent}88`,
+                    scale: 1.28,
+                    backgroundColor: "#f0a030",
+                    boxShadow: "0 0 0 2px rgba(255,200,80,0.3),0 0 18px rgba(240,160,48,0.7)",
                   }}
                   transition={{ type: "spring", stiffness: 320, damping: 26 }}
                   onClick={() => handlePlanetSelect(planet.slug)}
                 >
                   <span
-                    className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-full px-2.5 py-1 text-[0.62rem] uppercase tracking-[0.18em] opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                    className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap px-2.5 py-1 text-[0.62rem] uppercase tracking-[0.2em] opacity-0 transition-opacity duration-200 group-hover:opacity-100"
                     style={{
-                      background: "rgba(5,10,24,0.82)",
-                      border: `1px solid ${planet.accent}44`,
-                      color: planet.accent,
-                      backdropFilter: "blur(8px)",
+                      background: "rgba(12,5,0,0.88)",
+                      border: "1px solid rgba(200,120,30,0.4)",
+                      color: "#f0c060",
+                      backdropFilter: "blur(10px)",
+                      fontFamily: "monospace",
+                      clipPath: "polygon(4px 0%,calc(100% - 4px) 0%,100% 4px,100% 100%,0% 100%,0% 4px)",
                     }}
                   >
                     {planet.name}
@@ -426,20 +521,26 @@ export default function SpaceLanding() {
                 <span
                   className="absolute inset-0 rounded-full"
                   style={{
-                    border: "1px solid rgba(161,214,255,0.18)",
-                    borderTopColor: runtimeState === "error" ? "rgba(255,132,132,0.95)" : "rgba(161,214,255,0.9)",
-                    borderRightColor: runtimeState === "error" ? "rgba(255,186,117,0.9)" : "rgba(255,156,81,0.8)",
-                    boxShadow: "0 0 35px rgba(127,212,255,0.18)",
+                    border: "1px solid rgba(180,100,20,0.22)",
+                    borderTopColor: runtimeState === "error" ? "rgba(255,100,60,0.95)" : "rgba(255,180,60,0.9)",
+                    borderRightColor: runtimeState === "error" ? "rgba(255,140,60,0.9)" : "rgba(200,120,30,0.8)",
+                    boxShadow: "0 0 35px rgba(220,140,40,0.22)",
                     animation: "spin-loader 1.1s linear infinite",
                   }}
                 />
-                <span className="absolute h-[0.95rem] w-[0.95rem] rounded-full" style={{ background: "radial-gradient(circle,#ffffff 0%,#9fd5ff 55%,#2c5fff 100%)", boxShadow: "0 0 28px rgba(127,212,255,0.6)" }} />
+                <span
+                  className="absolute h-[0.95rem] w-[0.95rem] rounded-full"
+                  style={{
+                    background: "radial-gradient(circle,#fffbe8 0%,#f0c060 55%,#c06010 100%)",
+                    boxShadow: "0 0 28px rgba(220,160,40,0.7)",
+                  }}
+                />
               </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        <div 
+        <div
           className="pointer-events-none fixed inset-0 z-25 transition-opacity duration-1000"
           style={{ opacity: isScrolled ? 1 : 0 }}
         >
@@ -450,63 +551,64 @@ export default function SpaceLanding() {
             { label: "About",   href: "/about",   drift: "star-link-d 10s ease-in-out infinite", delay: "2s"    },
             { label: "FAQ",     href: "/faq",     drift: "star-link-e 12s ease-in-out infinite", delay: "0.9s"  },
           ].map(({ label, href, drift, delay }, index) => {
-            const color = "#d1e8ff";
+            const color = "#f0c060";
             const pos = planetPositions[index];
             if (!pos) return null;
 
             return (
-          <div
-            key={label}
-            className="fixed z-25 transition-opacity duration-500"
-            style={{ 
-              left: pos.starX, 
-              top: pos.starY, 
-              opacity: pos.starVisible && isScrolled ? 1 : 0, 
-              pointerEvents: pos.starVisible && isScrolled ? "auto" : "none" 
-            }}
-          >
-            <div style={{ transform: "translate(-50%, -50%)" }}>
-              <a
-                href={href}
-                className="group pointer-events-auto flex flex-col items-center gap-[0.4rem]"
-                style={{ animation: drift, animationDelay: delay }}
+              <div
+                key={label}
+                className="fixed z-25 transition-opacity duration-500"
+                style={{
+                  left: pos.starX,
+                  top: pos.starY,
+                  opacity: pos.starVisible && isScrolled ? 1 : 0,
+                  pointerEvents: pos.starVisible && isScrolled ? "auto" : "none",
+                }}
               >
-            <span
-              className="relative block rounded-full transition-transform duration-300 group-hover:scale-150"
-              style={{
-                width: 14,
-                height: 14,
-                background: `radial-gradient(circle at 38% 34%, rgba(255,255,255,0.92), ${color} 60%)`,
-                boxShadow: `0 0 10px 4px ${color}88, 0 0 30px 8px ${color}44`,
-                animation: `star-glow-pulse 3s ease-in-out infinite`,
-                animationDelay: delay,
-                color,
-              }}
-            >
-              <span
-                className="absolute inset-0 rounded-full opacity-60"
-                style={{ background: `radial-gradient(circle,transparent 30%,${color}55 100%)`, animation: `star-glow-pulse 3s ease-in-out infinite reverse`, animationDelay: delay }}
-              />
-            </span>
-            <span
-              className="whitespace-nowrap rounded-full px-3 py-1 text-[0.62rem] font-medium uppercase tracking-[0.22em] opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0 translate-y-1"
-              style={{
-                background: "rgba(5,10,24,0.72)",
-                border: `1px solid ${color}44`,
-                backdropFilter: "blur(10px)",
-                color,
-                boxShadow: `0 4px 20px ${color}22`,
-              }}
-            >
-              {label}
-            </span>
-              </a>
-            </div>
-          </div>
+                <div style={{ transform: "translate(-50%, -50%)" }}>
+                  <a
+                    href={href}
+                    className="group pointer-events-auto flex flex-col items-center gap-[0.4rem]"
+                    style={{ animation: drift, animationDelay: delay }}
+                  >
+                    <span
+                      className="relative block rounded-full transition-transform duration-300 group-hover:scale-150"
+                      style={{
+                        width: 14,
+                        height: 14,
+                        background: `radial-gradient(circle at 38% 34%, rgba(255,255,220,0.95), ${color} 60%)`,
+                        boxShadow: `0 0 10px 4px ${color}88, 0 0 30px 8px ${color}44`,
+                        animation: `star-glow-pulse 3s ease-in-out infinite`,
+                        animationDelay: delay,
+                        color,
+                      }}
+                    >
+                      <span
+                        className="absolute inset-0 rounded-full opacity-60"
+                        style={{ background: `radial-gradient(circle,transparent 30%,${color}55 100%)`, animation: `star-glow-pulse 3s ease-in-out infinite reverse`, animationDelay: delay }}
+                      />
+                    </span>
+                    <span
+                      className="whitespace-nowrap px-3 py-1 text-[0.62rem] font-medium uppercase tracking-[0.22em] opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0 translate-y-1"
+                      style={{
+                        background: "rgba(10,4,0,0.82)",
+                        border: `1px solid ${color}55`,
+                        backdropFilter: "blur(10px)",
+                        color,
+                        fontFamily: "monospace",
+                        boxShadow: `0 4px 20px ${color}22`,
+                        clipPath: "polygon(4px 0%,calc(100% - 4px) 0%,100% 4px,100% 100%,0% 100%,0% 4px)",
+                      }}
+                    >
+                      {label}
+                    </span>
+                  </a>
+                </div>
+              </div>
             );
           })}
         </div>
-
 
         <div ref={scrollRef} className="relative z-20 pointer-events-none h-[50000svh]" aria-hidden="true" />
       </div>
@@ -538,32 +640,32 @@ async function createScene({
   renderer.shadowMap.enabled = false;
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2("#030714", 0.024);
+  scene.fog = new THREE.FogExp2("#0a0400", 0.022);
 
   const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 160);
   camera.position.set(0, 0.8, 15.5);
 
-  const dirLight = new THREE.DirectionalLight("#fff5e8", 2.4);
+  const dirLight = new THREE.DirectionalLight("#ffe8d0", 2.2);
   dirLight.position.set(7, 9, 9);
-  const ptLight1 = new THREE.PointLight("#ff9a5c", 2.0, 52, 1.8);
+  const ptLight1 = new THREE.PointLight("#e07830", 2.2, 52, 1.8);
   ptLight1.position.set(-8, 2.5, 7);
-  const ptLight2 = new THREE.PointLight("#5aaeff", 1.7, 44, 1.8);
+  const ptLight2 = new THREE.PointLight("#a04010", 1.4, 44, 1.8);
   ptLight2.position.set(9, -3.5, -8);
-  const ptLight3 = new THREE.PointLight("#d0eaff", 0.6, 30, 2);
+  const ptLight3 = new THREE.PointLight("#f0c880", 0.7, 30, 2);
   ptLight3.position.set(-2, 5, 12);
   scene.add(
-    new THREE.AmbientLight("#b8d8ff", 1.1),
-    new THREE.HemisphereLight("#cce8ff", "#020812", 0.9),
+    new THREE.AmbientLight("#4a2a10", 1.4),
+    new THREE.HemisphereLight("#f0c080", "#0a0400", 0.75),
     dirLight, ptLight1, ptLight2, ptLight3,
   );
 
-  const starsNear = createStarField(1100, 72, 0.034, "#f0f6ff");
-  const starsMid  = createStarField(720,  90, 0.024, "#d0e8ff");
-  const starsFar  = createStarField(480, 110, 0.018, "#b0ccff");
-  const starsWarm = createStarField(360, 100, 0.020, "#ffe8cc");
-  (starsMid.material  as THREE.PointsMaterial).opacity = 0.30;
-  (starsFar.material  as THREE.PointsMaterial).opacity = 0.18;
-  (starsWarm.material as THREE.PointsMaterial).opacity = 0.16;
+  const starsNear = createStarField(1100, 72, 0.034, "#ffe0a0");
+  const starsMid  = createStarField(720,  90, 0.024, "#ffcc80");
+  const starsFar  = createStarField(480, 110, 0.018, "#e0b060");
+  const starsWarm = createStarField(360, 100, 0.020, "#fff0c0");
+  (starsMid.material  as THREE.PointsMaterial).opacity = 0.32;
+  (starsFar.material  as THREE.PointsMaterial).opacity = 0.20;
+  (starsWarm.material as THREE.PointsMaterial).opacity = 0.22;
   scene.add(starsFar, starsMid, starsNear, starsWarm);
 
   const planetsRig = new THREE.Group();
