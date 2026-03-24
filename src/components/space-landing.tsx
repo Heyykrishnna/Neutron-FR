@@ -306,7 +306,7 @@ export default function SpaceLanding() {
             className="absolute inset-0 w-full h-full object-cover"
             style={{ filter: "brightness(0.45) saturate(1.2)", transform: "scale(1.05)" }}
           >
-            <source src="https://ik.imagekit.io/yatharth/Amazing_Views_of_the_Moon_in_4K_HDR_CGI_OLED_TV_Demo_1_1080P.mp4" type="video/mp4" />
+            <source src="https://res.cloudinary.com/dpod2sj9t/video/upload/v1774324189/Neu_edaxyz.mp4" type="video/mp4" />
           </video>
           <div className="absolute inset-[-20%] opacity-[0.5]" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23grain)' opacity='0.18'/%3E%3C/svg%3E\")", backgroundSize: "200px 200px", mixBlendMode: "overlay", animation: "grain-shift 1.8s steps(1) infinite" }} />
           <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center,transparent 28%,rgba(2,4,14,0.7) 80%,rgba(2,4,14,0.92) 100%)" }} />
@@ -670,14 +670,14 @@ async function createScene({
     return { x: (p.x * 0.5 + 0.5) * window.innerWidth, y: (-p.y * 0.5 + 0.5) * window.innerHeight };
   };
 
-  const clock = new THREE.Clock();
+  const clock = new THREE.Timer();
   let animationFrame = 0;
   let frameCount = 0;
 
   const render = () => {
     const delta = clock.getDelta();
-    const elapsed = clock.elapsedTime;
-    
+    const elapsed = clock.getElapsed();    
+
     const scrollMax = (document.documentElement.scrollHeight - window.innerHeight) || 1;
     const scrolledPx = progressRef.current * scrollMax;
     const vh = window.innerHeight || 800;
