@@ -52,6 +52,15 @@ export const queryKeys = {
     detail: (id) => [...queryKeys.departments.details(), id],
   },
 
+  // SA clubs management queries
+  clubs: {
+    all: ["clubs"],
+    lists: () => [...queryKeys.clubs.all, "list"],
+    list: (filters) => [...queryKeys.clubs.lists(), filters],
+    details: () => [...queryKeys.clubs.all, "detail"],
+    detail: (id) => [...queryKeys.clubs.details(), id],
+  },
+
   // Approval queries
   approvals: {
     all: ["approvals"],

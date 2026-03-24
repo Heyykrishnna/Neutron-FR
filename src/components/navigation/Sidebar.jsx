@@ -36,7 +36,7 @@ import {
 const SA_NAVIGATION = [
   { name: "Users", href: "/admin/sa/users", icon: Users },
   { name: "Departments", href: "/admin/sa/departments", icon: Building2 },
-  { name: "Club", href: "/admin/club", icon: UserCircle2 },
+  { name: "Clubs", href: "/admin/sa/clubs", icon: UserCircle2 },
   { name: "Reviews", href: "/admin/sa/reviews", icon: Gavel },
   { name: "Approvals", href: "/admin/sa/approvals", icon: ShieldCheck },
   { name: "Audit Logs", href: "/admin/sa/audit", icon: ClipboardList },
@@ -58,7 +58,7 @@ const DH_NAVIGATION = [
 ];
 
 const SA_DH_NAVIGATION = DH_NAVIGATION.filter(
-  (item) => item.href !== "/admin/dh/users",
+  (item) => item.href !== "/admin/dh/users" && item.href !== "/admin/club",
 );
 
 const SHARED_NAVIGATION = [
