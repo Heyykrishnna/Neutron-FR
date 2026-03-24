@@ -7,6 +7,9 @@ import {
   Dialog,
   CircularProgress,
   Avatar,
+  Menu,
+  MenuItem,
+  IconButton,
 } from "@mui/material";
 import {
   Search,
@@ -21,6 +24,8 @@ import {
   XCircle,
   Clock,
   Pencil,
+  MoreVertical,
+  Building2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSnackbar } from "notistack";
@@ -39,8 +44,12 @@ import {
   useRemoveJudge,
   useAssignVolunteer,
   useRemoveVolunteer,
+  useCompetitionClubs,
+  useAssignClubToCompetition,
+  useRemoveClubFromCompetition,
 } from "@/src/hooks/api/useCompetitions";
 import { useUsers } from "@/src/hooks/api/useUsers";
+import { useClubs } from "@/src/hooks/api/useClubs";
 import { LoadingState } from "@/src/components/LoadingState";
 import CompetitionFormModal from "@/src/components/forms/CompetitionFormModal";
 import PromoCodeApprovalModal from "@/src/components/forms/PromoCodeApprovalModal";
@@ -482,6 +491,15 @@ function ManageDialog({ competition, open, onClose }) {
   const { mutate: cancelOrPostpone, isPending: dangerPending } =
     useCancelOrPostpone();
 
+  const [selectedClubId, setSelectedClubId] = useState("");
+  const { data: competitionClubs = [], isLoading: compClubsLoading } =
+    useCompetitionClubs(open ? competition?.id : null);
+  const { data: allClubs = [] } = useClubs();
+  const { mutate: assignClub, isPending: assigningClub } =
+    useAssignClubToCompetition();
+  const { mutate: removeClub } = useRemoveClubFromCompetition();
+  const [removingClubId, setRemovingClubId] = useState(null);
+
   if (!competition) return null;
 
   const assignedJudgeIds = new Set(judges.map((j) => j.userId || j.user?.id));
@@ -489,10 +507,14 @@ function ManageDialog({ competition, open, onClose }) {
   const assignedVolIds = new Set(volunteers.map((v) => v.userId || v.user?.id));
   const availableVols = volunteerUsers.filter((u) => !assignedVolIds.has(u.id));
 
+  const assignedClubIds = new Set(competitionClubs.map((c) => c.clubId || c.id));
+  const availableClubs = allClubs.filter((c) => !assignedClubIds.has(c.id));
+
   const tabList = [
     { key: "judges", label: "Judges" },
     { key: "volunteers", label: "Volunteers" },
     { key: "controls", label: "Controls" },
+    { key: "clubs", label: "Clubs" },
   ];
 
   return (
@@ -537,7 +559,7 @@ function ManageDialog({ competition, open, onClose }) {
             mt: 0.25,
           }}
         >
-          Manage judges, volunteers and controls
+          Manage judges, volunteers, controls and clubs
         </Typography>
 
         {/* Tab switcher */}
@@ -1065,6 +1087,160 @@ function ManageDialog({ competition, open, onClose }) {
             </Box>
           </Box>
         )}
+
+        {/* Clubs tab */}
+        {tab === "clubs" && (
+          <Box>
+            <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
+              <select
+                value={selectedClubId}
+                onChange={(e) => setSelectedClubId(e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: "8px 12px",
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 8,
+                  color: "rgba(255,255,255,0.65)",
+                  fontSize: 13,
+                  fontFamily: "'Syne', sans-serif",
+                  outline: "none",
+                }}
+              >
+                <option value="">Select a club…</option>
+                {availableClubs.map((c) => (
+                  <option key={c.id} value={c.id} style={{ background: "#0e0e0e" }}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <SmallActionBtn
+                onClick={() => {
+                  if (!selectedClubId) return;
+                  assignClub(
+                    { competitionId: competition.id, clubId: selectedClubId },
+                    {
+                      onSuccess: () => {
+                        enqueueSnackbar("Club assigned", { variant: "success" });
+                        setSelectedClubId("");
+                      },
+                      onError: (err) =>
+                        enqueueSnackbar(
+                          err?.response?.data?.message || "Failed",
+                          { variant: "error" },
+                        ),
+                    },
+                  );
+                }}
+                color="#2dd4bf"
+                hoverBg="rgba(45,212,191,0.1)"
+                disabled={!selectedClubId || assigningClub}
+              >
+                {assigningClub ? (
+                  <CircularProgress size={11} sx={{ color: "#2dd4bf" }} />
+                ) : (
+                  <Building2 size={11} />
+                )}
+                Add
+              </SmallActionBtn>
+            </Box>
+            {compClubsLoading ? (
+              <LoadingState message="Loading…" size="small" />
+            ) : competitionClubs.length === 0 ? (
+              <Typography
+                sx={{
+                  color: "rgba(255,255,255,0.15)",
+                  fontSize: 12,
+                  fontFamily: "'DM Mono', monospace",
+                  py: 2,
+                }}
+              >
+                No clubs assigned yet
+              </Typography>
+            ) : (
+              competitionClubs.map((c) => {
+                const name = c.club?.name || c.name || "—";
+                const clubId = c.clubId || c.id;
+                return (
+                  <Box
+                    key={clubId}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1.5,
+                      py: 1.25,
+                      borderBottom: "1px solid rgba(255,255,255,0.04)",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: "8px",
+                        background: "rgba(45,212,191,0.15)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Building2 size={13} color="#2dd4bf" />
+                    </Box>
+                    <Typography
+                      sx={{
+                        flex: 1,
+                        fontSize: 13,
+                        color: "#e4e4e7",
+                        fontFamily: "'Syne', sans-serif",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {name}
+                    </Typography>
+                    <button
+                      type="button"
+                      disabled={removingClubId === clubId}
+                      onClick={() => {
+                        setRemovingClubId(clubId);
+                        removeClub(
+                          { competitionId: competition.id, clubId },
+                          {
+                            onSuccess: () =>
+                              enqueueSnackbar("Club removed", {
+                                variant: "success",
+                              }),
+                            onError: (e) =>
+                              enqueueSnackbar(
+                                e?.response?.data?.message || "Failed",
+                                { variant: "error" },
+                              ),
+                            onSettled: () => setRemovingClubId(null),
+                          },
+                        );
+                      }}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        color: "#f87171",
+                        padding: 4,
+                        lineHeight: 0,
+                      }}
+                    >
+                      {removingClubId === clubId ? (
+                        <CircularProgress size={11} sx={{ color: "#f87171" }} />
+                      ) : (
+                        <Trash2 size={13} />
+                      )}
+                    </button>
+                  </Box>
+                );
+              })
+            )}
+          </Box>
+        )}
       </Box>
 
       <Box sx={{ px: 3, pb: 2.5, display: "flex", justifyContent: "flex-end" }}>
@@ -1088,6 +1264,8 @@ export default function CompetitionsPage() {
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [promoCodeTarget, setPromoCodeTarget] = useState(null);
+  const [menuAnchor, setMenuAnchor] = useState(null);
+  const [menuComp, setMenuComp] = useState(null);
 
   const { mutate: updateCompetition, isPending: publishingCompetition } =
     useUpdateCompetition();
@@ -1383,8 +1561,8 @@ export default function CompetitionsPage() {
             sx={{
               display: "grid",
               gridTemplateColumns:
-                "minmax(220px,1fr) 120px 100px 110px 160px minmax(300px, 340px)",
-              minWidth: 1020,
+                "minmax(220px,1fr) 120px 100px 110px 160px 52px",
+              minWidth: 780,
               px: 3,
               py: 1.5,
               background: "rgba(255,255,255,0.02)",
@@ -1440,8 +1618,8 @@ export default function CompetitionsPage() {
                     sx={{
                       display: "grid",
                       gridTemplateColumns:
-                        "minmax(220px,1fr) 120px 100px 110px 160px minmax(300px, 340px)",
-                      minWidth: 1020,
+                        "minmax(220px,1fr) 120px 100px 110px 160px 52px",
+                      minWidth: 780,
                       alignItems: "center",
                       px: 3,
                       py: 2,
@@ -1537,95 +1715,24 @@ export default function CompetitionsPage() {
                     </Box>
 
                     {/* Actions */}
-                    <Box
-                      sx={{
-                        display: "grid",
-                        gridTemplateColumns:
-                          "repeat(auto-fit, minmax(60px, 1fr))",
-                        gap: 1,
-                        justifyItems: "stretch",
-                        alignItems: "stretch",
-                        width: "100%",
-                        minWidth: 0,
-                        maxWidth: "100%",
-                        overflow: "hidden",
-                        "& > button": {
-                          width: "100%",
-                          justifyContent: "center",
-                          minWidth: 0,
-                          whiteSpace: "nowrap",
-                        },
-                      }}
-                    >
-                      <SmallActionBtn
-                        onClick={() => handleTogglePublishCompetition(comp)}
-                        disabled={publishingCompetition || deletingCompetition}
-                        color={comp.status === "OPEN" ? "#fbbf24" : "#4ade80"}
-                        hoverBg={
-                          comp.status === "OPEN"
-                            ? "rgba(234,179,8,0.1)"
-                            : "rgba(34,197,94,0.1)"
-                        }
+                    <Box sx={{ display: "flex", justifyContent: "center" }}>
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          setMenuAnchor(e.currentTarget);
+                          setMenuComp(comp);
+                        }}
+                        sx={{
+                          color: "rgba(255,255,255,0.3)",
+                          borderRadius: "8px",
+                          "&:hover": {
+                            color: "rgba(255,255,255,0.7)",
+                            background: "rgba(255,255,255,0.06)",
+                          },
+                        }}
                       >
-                        {publishingId === comp.id ? (
-                          <CircularProgress
-                            size={11}
-                            sx={{
-                              color:
-                                comp.status === "OPEN" ? "#fbbf24" : "#4ade80",
-                            }}
-                          />
-                        ) : (
-                          <Send size={11} />
-                        )}
-                        {comp.status === "OPEN"
-                          ? "Unpublish"
-                          : user?.role === "DH"
-                            ? "Request Publish"
-                            : "Publish"}
-                      </SmallActionBtn>
-
-                      <SmallActionBtn
-                        onClick={() => handleDeleteCompetition(comp)}
-                        disabled={deletingCompetition || publishingCompetition}
-                        color="#f87171"
-                        hoverBg="rgba(239,68,68,0.1)"
-                      >
-                        {deletingId === comp.id ? (
-                          <CircularProgress
-                            size={11}
-                            sx={{ color: "#f87171" }}
-                          />
-                        ) : (
-                          <Trash2 size={11} />
-                        )}
-                        Delete
-                      </SmallActionBtn>
-
-                      <SmallActionBtn
-                        onClick={() => setEditTarget(comp)}
-                        color="#c084fc"
-                        hoverBg="rgba(168,85,247,0.1)"
-                      >
-                        <Pencil size={11} />
-                        Edit
-                      </SmallActionBtn>
-                      <SmallActionBtn
-                        onClick={() => setPromoCodeTarget(comp)}
-                        color="#4ade80"
-                        hoverBg="rgba(34,197,94,0.1)"
-                      >
-                        <Send size={11} />
-                        Promo
-                      </SmallActionBtn>
-                      <SmallActionBtn
-                        onClick={() => setManageTarget(comp)}
-                        color="rgba(255,255,255,0.5)"
-                        hoverBg="rgba(255,255,255,0.06)"
-                      >
-                        <Users size={11} />
-                        Manage
-                      </SmallActionBtn>
+                        <MoreVertical size={15} />
+                      </IconButton>
                     </Box>
                   </Box>
                   {idx < filtered.length - 1 && <RowDivider />}
@@ -1635,6 +1742,108 @@ export default function CompetitionsPage() {
           </Box>
         </Box>
       )}
+
+      {/* Row action menu */}
+      <Menu
+        anchorEl={menuAnchor}
+        open={!!menuAnchor}
+        onClose={() => { setMenuAnchor(null); setMenuComp(null); }}
+        PaperProps={{
+          sx: {
+            background: "#111",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "10px",
+            boxShadow: "0 12px 40px rgba(0,0,0,0.6)",
+            minWidth: 180,
+            py: 0.5,
+          },
+        }}
+      >
+        <MenuItem
+          onClick={() => {
+            handleTogglePublishCompetition(menuComp);
+            setMenuAnchor(null);
+            setMenuComp(null);
+          }}
+          sx={{
+            fontSize: 13,
+            fontFamily: "'Syne', sans-serif",
+            color: menuComp?.status === "OPEN" ? "#fbbf24" : "#4ade80",
+            gap: 1.5,
+            px: 2,
+            py: 1,
+            "&:hover": { background: "rgba(255,255,255,0.04)" },
+          }}
+        >
+          <Send size={13} />
+          {menuComp?.status === "OPEN"
+            ? "Unpublish"
+            : user?.role === "DH"
+              ? "Request Publish"
+              : "Publish"}
+        </MenuItem>
+        <MenuItem
+          onClick={() => { setEditTarget(menuComp); setMenuAnchor(null); setMenuComp(null); }}
+          sx={{
+            fontSize: 13,
+            fontFamily: "'Syne', sans-serif",
+            color: "#c084fc",
+            gap: 1.5,
+            px: 2,
+            py: 1,
+            "&:hover": { background: "rgba(255,255,255,0.04)" },
+          }}
+        >
+          <Pencil size={13} />
+          Edit
+        </MenuItem>
+        <MenuItem
+          onClick={() => { setManageTarget(menuComp); setMenuAnchor(null); setMenuComp(null); }}
+          sx={{
+            fontSize: 13,
+            fontFamily: "'Syne', sans-serif",
+            color: "rgba(255,255,255,0.6)",
+            gap: 1.5,
+            px: 2,
+            py: 1,
+            "&:hover": { background: "rgba(255,255,255,0.04)" },
+          }}
+        >
+          <Users size={13} />
+          Manage
+        </MenuItem>
+        <MenuItem
+          onClick={() => { setPromoCodeTarget(menuComp); setMenuAnchor(null); setMenuComp(null); }}
+          sx={{
+            fontSize: 13,
+            fontFamily: "'Syne', sans-serif",
+            color: "#4ade80",
+            gap: 1.5,
+            px: 2,
+            py: 1,
+            "&:hover": { background: "rgba(255,255,255,0.04)" },
+          }}
+        >
+          <Send size={13} />
+          Promo Codes
+        </MenuItem>
+        <Box sx={{ height: "1px", background: "rgba(255,255,255,0.05)", mx: 1, my: 0.5 }} />
+        <MenuItem
+          onClick={() => { handleDeleteCompetition(menuComp); setMenuAnchor(null); setMenuComp(null); }}
+          sx={{
+            fontSize: 13,
+            fontFamily: "'Syne', sans-serif",
+            color: "#f87171",
+            gap: 1.5,
+            px: 2,
+            py: 1,
+            "&:hover": { background: "rgba(239,68,68,0.07)" },
+          }}
+        >
+          <Trash2 size={13} />
+          Delete
+        </MenuItem>
+      </Menu>
 
       {/* Dialogs */}
       <ManageDialog

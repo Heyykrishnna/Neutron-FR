@@ -44,6 +44,7 @@ const ROLE_OPTIONS = [
   { value: "SA", label: "Super Admin" },
   { value: "BOARD", label: "Board" },
   { value: "DH", label: "Department Head" },
+  { value: "CH", label: "Club Head" },
   { value: "JUDGE", label: "Judge" },
   { value: "VOLUNTEER", label: "Volunteer" },
   { value: "USER", label: "User" },
@@ -59,6 +60,11 @@ const ROLE_COLORS = {
     bg: "rgba(168,85,247,0.1)",
     text: "#c084fc",
     border: "rgba(168,85,247,0.2)",
+  },
+  CH: {
+    bg: "rgba(20,184,166,0.1)",
+    text: "#2dd4bf",
+    border: "rgba(20,184,166,0.2)",
   },
   VH: {
     bg: "rgba(59,130,246,0.1)",
@@ -104,10 +110,10 @@ function RolePill({ role }) {
     <Box
       component="span"
       sx={{
-        px: 1.5,
-        py: 0.4,
+        px: 1.25,
+        py: 0.35,
         borderRadius: "6px",
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: 600,
         fontFamily: "'DM Mono', monospace",
         letterSpacing: "0.04em",
@@ -117,6 +123,10 @@ function RolePill({ role }) {
         border: `1px solid ${c.border}`,
         display: "inline-block",
         lineHeight: 1.6,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        maxWidth: "100%",
       }}
     >
       {label}
@@ -404,7 +414,7 @@ function UsersPageContent() {
     reader.onload = (e) => {
       const text = e.target.result;
       const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-      const validRoles = new Set(["SA", "BOARD", "DH", "JUDGE", "VOLUNTEER", "USER"]);
+      const validRoles = new Set(["SA", "BOARD", "DH", "CH", "JUDGE", "VOLUNTEER", "USER"]);
       const parsed = [];
       for (const line of lines) {
         const lower = line.toLowerCase();
@@ -828,7 +838,7 @@ function UsersPageContent() {
                       </Typography>
                     </Box>
                   </Box>
-                  <Box>
+                  <Box sx={{ overflow: "hidden", minWidth: 0 }}>
                     <RolePill role={user.role} />
                   </Box>
                   <Box>

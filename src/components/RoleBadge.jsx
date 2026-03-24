@@ -13,6 +13,11 @@ const roleConfig = {
     color: "#3b82f6",
     backgroundColor: "rgba(59, 130, 246, 0.1)",
   },
+  CH: {
+    label: "Club Head",
+    color: "#2dd4bf",
+    backgroundColor: "rgba(20, 184, 166, 0.1)",
+  },
   VH: {
     label: "Volunteer Head",
     color: "#10b981",

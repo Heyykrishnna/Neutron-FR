@@ -15,7 +15,7 @@ import {
 } from "@mui/material";
 
 const roleSchema = z.object({
-  role: z.enum(["SA", "DH", "VH", "V"], {
+  role: z.enum(["SA", "DH", "CH", "VH", "V"], {
     errorMap: () => ({ message: "Please select a valid role" }),
   }),
 });
@@ -23,6 +23,7 @@ const roleSchema = z.object({
 const roles = [
   { value: "SA", label: "Super Admin" },
   { value: "DH", label: "Department Head" },
+  { value: "CH", label: "Club Head" },
   { value: "VH", label: "Volunteer Head" },
   { value: "V", label: "Volunteer" },
 ];

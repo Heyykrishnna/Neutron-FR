@@ -30,15 +30,13 @@ import {
   AlertTriangle,
   Megaphone,
   UserCircle2,
-  Gavel,
 } from "lucide-react";
 
 const SA_NAVIGATION = [
   { name: "Users", href: "/admin/sa/users", icon: Users },
   { name: "Departments", href: "/admin/sa/departments", icon: Building2 },
   { name: "Clubs", href: "/admin/sa/clubs", icon: UserCircle2 },
-  { name: "Reviews", href: "/admin/sa/reviews", icon: Gavel },
-  { name: "Approvals", href: "/admin/sa/approvals", icon: ShieldCheck },
+  { name: "Requests", href: "/admin/sa/approvals", icon: ShieldCheck },
   { name: "Audit Logs", href: "/admin/sa/audit", icon: ClipboardList },
   { name: "Campaign Manager", href: "/admin/sa/campaigns", icon: Megaphone },
 ];
@@ -52,8 +50,6 @@ const DH_NAVIGATION = [
     icon: ClipboardList,
   },
   { name: "Competitions", href: "/admin/dh/competitions", icon: Trophy },
-  { name: "Judging", href: "/admin/dh/judging", icon: Star },
-  { name: "Attendance", href: "/admin/dh/attendance", icon: UserCheck },
   { name: "Issues", href: "/admin/dh/issues", icon: AlertTriangle },
 ];
 
@@ -69,6 +65,10 @@ const JUDGE_NAVIGATION = [
   { name: "My Competitions", href: "/admin/judge/competitions", icon: Trophy },
 ];
 
+const CH_NAVIGATION = [
+  { name: "Club", href: "/admin/club", icon: UserCircle2 },
+];
+
 export const SIDEBAR_WIDTH = 272;
 
 export function getAdminNavigation(role) {
@@ -82,6 +82,10 @@ export function getAdminNavigation(role) {
 
   if (role === "JUDGE") {
     return JUDGE_NAVIGATION;
+  }
+
+  if (role === "CH") {
+    return CH_NAVIGATION;
   }
 
   return [];
@@ -100,7 +104,7 @@ export function getAdminSettingsLink(role) {
 }
 
 export function getPersonalSettingsLink(role) {
-  if (role === "SA" || role === "DH" || role === "JUDGE") {
+  if (role === "SA" || role === "DH" || role === "JUDGE" || role === "CH") {
     return {
       name: "Personal Settings",
       href: "/admin/settings",
@@ -139,7 +143,9 @@ export function Sidebar({ user, onLogout, mobileOpen, onMobileClose }) {
       ? "Super Admin"
       : user?.role === "JUDGE"
         ? "Judge"
-        : "Department Head";
+        : user?.role === "CH"
+          ? "Club Head"
+          : "Department Head";
 
   const drawerContent = (
     <Box

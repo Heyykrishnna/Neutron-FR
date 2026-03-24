@@ -316,6 +316,52 @@ export function useRemoveVolunteer() {
 }
 
 /**
+ * Get clubs assigned to a competition
+ */
+export function useCompetitionClubs(competitionId) {
+  return useQuery({
+    queryKey: ['competitions', competitionId, 'clubs'],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/competitions/${competitionId}/clubs`);
+      return data?.data?.clubs || [];
+    },
+    enabled: !!competitionId,
+  });
+}
+
+/**
+ * Assign a club to a competition (SA/DH)
+ */
+export function useAssignClubToCompetition() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ competitionId, clubId }) => {
+      const { data } = await apiClient.post(`/competitions/${competitionId}/clubs`, { clubId });
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['competitions', variables.competitionId, 'clubs'] });
+    },
+  });
+}
+
+/**
+ * Remove a club from a competition (SA/DH)
+ */
+export function useRemoveClubFromCompetition() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ competitionId, clubId }) => {
+      const { data } = await apiClient.delete(`/competitions/${competitionId}/clubs/${clubId}`);
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['competitions', variables.competitionId, 'clubs'] });
+    },
+  });
+}
+
+/**
  * Request promo code approval (DH only)
  */
 export function useRequestPromoCodeApproval() {

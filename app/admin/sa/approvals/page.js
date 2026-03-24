@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import {
   useApprovals,
   useApprovalStats,
@@ -11,6 +12,8 @@ import {
   usePendingLockRequests,
   useReviewLockRequest,
 } from "@/src/hooks/api/useJudging";
+import { useReviewProposals } from "@/src/hooks/api/useReviews";
+import { useIssues, useResolveIssue } from "@/src/hooks/api/useIssues";
 import { Box, Dialog, Typography } from "@mui/material";
 import {
   ShieldCheck,
@@ -19,159 +22,148 @@ import {
   XCircle,
   Clock,
   CheckCheck,
-  X,
   Gavel,
   AlertCircle,
   Trophy,
   Star,
+  Wrench,
+  FileText,
+  Loader2,
 } from "lucide-react";
 import { useSnackbar } from "notistack";
 import { LoadingState } from "@/src/components/LoadingState";
+
+/* ── Constants ── */
 
 const TYPE_LABELS = {
   SCORE_LOCK: "Score Lock",
   EVENT_UPDATE: "Event Update",
   COMPETITION_EDIT: "Competition Update",
-  PROMO_CODE_ADD: "Promo Code Request",
+  PROMO_CODE_ADD: "Promo Code",
 };
 
 const TYPE_COLORS = {
-  SCORE_LOCK: {
-    bg: "rgba(59,130,246,0.1)",
-    text: "#60a5fa",
-    border: "rgba(59,130,246,0.2)",
-  },
-  EVENT_UPDATE: {
-    bg: "rgba(234,179,8,0.1)",
-    text: "#fbbf24",
-    border: "rgba(234,179,8,0.2)",
-  },
-  COMPETITION_EDIT: {
-    bg: "rgba(168,85,247,0.1)",
-    text: "#c084fc",
-    border: "rgba(168,85,247,0.2)",
-  },
-  PROMO_CODE_ADD: {
-    bg: "rgba(34,197,94,0.1)",
-    text: "#4ade80",
-    border: "rgba(34,197,94,0.2)",
-  },
-};
-
-const APPROVAL_ACTION_LABELS = {
-  PUBLISH_COMPETITION: "Publish Request",
+  SCORE_LOCK: { bg: "rgba(59,130,246,0.1)", text: "#60a5fa", border: "rgba(59,130,246,0.2)" },
+  EVENT_UPDATE: { bg: "rgba(234,179,8,0.1)", text: "#fbbf24", border: "rgba(234,179,8,0.2)" },
+  COMPETITION_EDIT: { bg: "rgba(168,85,247,0.1)", text: "#c084fc", border: "rgba(168,85,247,0.2)" },
+  PROMO_CODE_ADD: { bg: "rgba(34,197,94,0.1)", text: "#4ade80", border: "rgba(34,197,94,0.2)" },
 };
 
 const STATUS_COLORS = {
-  PENDING: {
-    bg: "rgba(234,179,8,0.1)",
-    text: "#fbbf24",
-    border: "rgba(234,179,8,0.2)",
-  },
-  APPROVED: {
-    bg: "rgba(34,197,94,0.1)",
-    text: "#4ade80",
-    border: "rgba(34,197,94,0.2)",
-  },
-  REJECTED: {
-    bg: "rgba(239,68,68,0.1)",
-    text: "#f87171",
-    border: "rgba(239,68,68,0.2)",
-  },
+  PENDING: { bg: "rgba(234,179,8,0.1)", text: "#fbbf24", border: "rgba(234,179,8,0.2)" },
+  APPROVED: { bg: "rgba(34,197,94,0.1)", text: "#4ade80", border: "rgba(34,197,94,0.2)" },
+  REJECTED: { bg: "rgba(239,68,68,0.1)", text: "#f87171", border: "rgba(239,68,68,0.2)" },
+  OPEN: { bg: "rgba(234,179,8,0.1)", text: "#fbbf24", border: "rgba(234,179,8,0.2)" },
+  RESOLVED: { bg: "rgba(34,197,94,0.1)", text: "#4ade80", border: "rgba(34,197,94,0.2)" },
 };
 
-function TypePill({ type }) {
-  const c = TYPE_COLORS[type] || {
-    bg: "rgba(255,255,255,0.06)",
-    text: "rgba(255,255,255,0.4)",
-    border: "rgba(255,255,255,0.1)",
-  };
+const fmtDate = (d) =>
+  d
+    ? new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+    : "—";
+
+const fmtDateTime = (d) =>
+  d
+    ? new Date(d).toLocaleString("en-US", {
+        year: "numeric", month: "short", day: "numeric",
+        hour: "2-digit", minute: "2-digit",
+      })
+    : "—";
+
+/* ── Sub-components ── */
+
+function Pill({ bg, text, border, children }) {
   return (
     <Box
       component="span"
       sx={{
-        px: 1.5,
-        py: 0.4,
-        borderRadius: "6px",
-        fontSize: 11,
-        fontWeight: 600,
+        px: 1.25, py: 0.35, borderRadius: "6px",
+        fontSize: 10, fontWeight: 600,
         fontFamily: "'DM Mono', monospace",
-        letterSpacing: "0.04em",
-        textTransform: "uppercase",
-        background: c.bg,
-        color: c.text,
-        border: `1px solid ${c.border}`,
-        display: "inline-block",
-        lineHeight: 1.6,
+        letterSpacing: "0.04em", textTransform: "uppercase",
+        background: bg, color: text, border: `1px solid ${border}`,
+        display: "inline-block", lineHeight: 1.6,
+        whiteSpace: "nowrap",
       }}
     >
-      {TYPE_LABELS[type] || type}
+      {children}
     </Box>
   );
 }
 
+function TypePill({ type }) {
+  const c = TYPE_COLORS[type] || { bg: "rgba(255,255,255,0.06)", text: "rgba(255,255,255,0.4)", border: "rgba(255,255,255,0.1)" };
+  return <Pill {...c}>{TYPE_LABELS[type] || type}</Pill>;
+}
+
+function StatusPill({ status }) {
+  const c = STATUS_COLORS[status] || STATUS_COLORS.PENDING;
+  return <Pill {...c}>{status}</Pill>;
+}
+
 function StatusBadge({ status }) {
   const c = STATUS_COLORS[status] || STATUS_COLORS.PENDING;
-  const Icon =
-    status === "APPROVED"
-      ? CheckCircle2
-      : status === "REJECTED"
-        ? XCircle
-        : Clock;
+  const Icon = status === "APPROVED" || status === "RESOLVED" ? CheckCircle2 : status === "REJECTED" ? XCircle : Clock;
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
       <Icon size={13} color={c.text} />
-      <Typography
-        sx={{ fontSize: 12, color: c.text, fontFamily: "'DM Mono', monospace" }}
-      >
+      <Typography sx={{ fontSize: 12, color: c.text, fontFamily: "'DM Mono', monospace" }}>
         {status}
       </Typography>
     </Box>
   );
 }
 
-const RowDivider = () => (
-  <Box sx={{ height: "1px", background: "rgba(255,255,255,0.06)" }} />
-);
+const RowDivider = () => <Box sx={{ height: "1px", background: "rgba(255,255,255,0.06)" }} />;
 
-export default function ApprovalsPage() {
+function TableHeader({ cols }) {
+  return (
+    <Box sx={{ display: "grid", gridTemplateColumns: cols, px: 3, py: 1.5, background: "rgba(255,255,255,0.02)" }}>
+      {cols.split(" ").map((_, i, arr) => null)}
+    </Box>
+  );
+}
+
+function EmptyRow({ message }) {
+  return (
+    <Box sx={{ py: 8, textAlign: "center" }}>
+      <AlertCircle size={16} color="rgba(255,255,255,0.15)" />
+      <Typography sx={{ mt: 1, fontSize: 12, color: "rgba(255,255,255,0.22)", fontFamily: "'Syne', sans-serif" }}>
+        {message}
+      </Typography>
+    </Box>
+  );
+}
+
+/* ── Main page ── */
+
+export default function RequestsPage() {
+  const [tab, setTab] = useState("approvals");
+
+  /* approvals */
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [approvalSearch, setApprovalSearch] = useState("");
 
-  const filters = {};
-  if (statusFilter !== "all") filters.status = statusFilter;
-  if (typeFilter !== "all") filters.type = typeFilter;
+  const approvalFilters = {};
+  if (statusFilter !== "all") approvalFilters.status = statusFilter;
+  if (typeFilter !== "all") approvalFilters.type = typeFilter;
 
-  const { data: approvalsRes, isLoading } = useApprovals(filters);
+  const { data: approvalsRes, isLoading: isApprovalsLoading } = useApprovals(approvalFilters);
   const { data: stats } = useApprovalStats();
-  const { data: lockRequests = [], isLoading: isLockRequestsLoading } =
-    usePendingLockRequests();
-
   const approveMutation = useApproveRequest();
   const rejectMutation = useRejectRequest();
-  const reviewLockRequestMutation = useReviewLockRequest();
-  const { enqueueSnackbar } = useSnackbar();
 
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [selectedApproval, setSelectedApproval] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [detailApproval, setDetailApproval] = useState(null);
-  const [lockReviewDialogOpen, setLockReviewDialogOpen] = useState(false);
-  const [selectedLockRequest, setSelectedLockRequest] = useState(null);
-  const [lockReviewNotes, setLockReviewNotes] = useState("");
-  const detailActionLabel =
-    APPROVAL_ACTION_LABELS[detailApproval?.requestData?.action] || null;
 
-  const allApprovals = useMemo(
-    () => approvalsRes?.data?.approvals || [],
-    [approvalsRes],
-  );
-
-  const filtered = useMemo(() => {
-    if (!searchQuery) return allApprovals;
-    const q = searchQuery.toLowerCase();
+  const allApprovals = useMemo(() => approvalsRes?.data?.approvals || [], [approvalsRes]);
+  const filteredApprovals = useMemo(() => {
+    if (!approvalSearch) return allApprovals;
+    const q = approvalSearch.toLowerCase();
     return allApprovals.filter(
       (a) =>
         (a.title || "").toLowerCase().includes(q) ||
@@ -179,27 +171,49 @@ export default function ApprovalsPage() {
         (a.requestedBy?.name || "").toLowerCase().includes(q) ||
         (a.requestedBy?.email || "").toLowerCase().includes(q),
     );
-  }, [allApprovals, searchQuery]);
+  }, [allApprovals, approvalSearch]);
 
-  const pendingCount =
-    stats?.pendingCount ??
-    allApprovals.filter((a) => a.status === "PENDING").length;
-  const approvedCount = allApprovals.filter(
-    (a) => a.status === "APPROVED",
-  ).length;
-  const rejectedCount = allApprovals.filter(
-    (a) => a.status === "REJECTED",
-  ).length;
+  const pendingCount = stats?.pendingCount ?? allApprovals.filter((a) => a.status === "PENDING").length;
 
+  /* score locks */
+  const { data: lockRequests = [], isLoading: isLockLoading } = usePendingLockRequests();
+  const reviewLockMutation = useReviewLockRequest();
+  const [lockDialogOpen, setLockDialogOpen] = useState(false);
+  const [selectedLock, setSelectedLock] = useState(null);
+  const [lockNotes, setLockNotes] = useState("");
+
+  /* reviews */
+  const [reviewStatus, setReviewStatus] = useState("PENDING");
+  const { data: reviewsData, isLoading: isReviewsLoading } = useReviewProposals({ status: reviewStatus });
+  const proposals = useMemo(() => reviewsData?.proposals || [], [reviewsData]);
+
+  /* issues */
+  const [showResolved, setShowResolved] = useState(false);
+  const [issueSearch, setIssueSearch] = useState("");
+  const { data: issues = [], isLoading: isIssuesLoading } = useIssues(showResolved ? {} : { resolved: false });
+  const resolveMutation = useResolveIssue();
+  const filteredIssues = useMemo(() => {
+    if (!issueSearch) return issues;
+    const q = issueSearch.toLowerCase();
+    return issues.filter(
+      (i) =>
+        (i.message || "").toLowerCase().includes(q) ||
+        (i.creator?.name || "").toLowerCase().includes(q) ||
+        (i.creator?.email || "").toLowerCase().includes(q),
+    );
+  }, [issues, issueSearch]);
+  const openIssues = issues.filter((i) => !i.resolved).length;
+
+  const { enqueueSnackbar } = useSnackbar();
+
+  /* handlers */
   const handleApprove = async (approval) => {
     try {
       await approveMutation.mutateAsync({ approvalId: approval.id });
       enqueueSnackbar("Request approved", { variant: "success" });
+      if (detailDialogOpen) setDetailDialogOpen(false);
     } catch (err) {
-      enqueueSnackbar(
-        err?.response?.data?.message || err?.message || "Failed to approve",
-        { variant: "error" },
-      );
+      enqueueSnackbar(err?.response?.data?.message || err?.message || "Failed", { variant: "error" });
     }
   };
 
@@ -207,953 +221,448 @@ export default function ApprovalsPage() {
     setSelectedApproval(approval);
     setRejectReason("");
     setRejectDialogOpen(true);
+    if (detailDialogOpen) setDetailDialogOpen(false);
   };
 
   const handleReject = async () => {
     if (!rejectReason.trim()) return;
     try {
-      await rejectMutation.mutateAsync({
-        approvalId: selectedApproval.id,
-        reason: rejectReason,
-      });
+      await rejectMutation.mutateAsync({ approvalId: selectedApproval.id, reason: rejectReason });
       enqueueSnackbar("Request rejected", { variant: "success" });
       setRejectDialogOpen(false);
       setSelectedApproval(null);
       setRejectReason("");
     } catch (err) {
-      enqueueSnackbar(
-        err?.response?.data?.message || err?.message || "Failed to reject",
-        { variant: "error" },
-      );
+      enqueueSnackbar(err?.response?.data?.message || err?.message || "Failed", { variant: "error" });
     }
   };
 
-  const openDetail = (approval) => {
-    setDetailApproval(approval);
-    setDetailDialogOpen(true);
-  };
+  const openLock = (req) => { setSelectedLock(req); setLockNotes(""); setLockDialogOpen(true); };
 
-  const openLockReview = (request) => {
-    setSelectedLockRequest(request);
-    setLockReviewNotes("");
-    setLockReviewDialogOpen(true);
-  };
-
-  const handleReviewLockRequest = async (status) => {
-    if (!selectedLockRequest?.id) return;
-
+  const handleLockReview = async (status) => {
     try {
-      await reviewLockRequestMutation.mutateAsync({
-        requestId: selectedLockRequest.id,
-        status,
-        reviewNotes: lockReviewNotes.trim() || undefined,
+      await reviewLockMutation.mutateAsync({ requestId: selectedLock.id, status, reviewNotes: lockNotes.trim() || undefined });
+      enqueueSnackbar(status === "APPROVED" ? "Score lock approved" : "Score lock rejected", {
+        variant: status === "APPROVED" ? "success" : "info",
       });
-
-      enqueueSnackbar(
-        status === "APPROVED"
-          ? "Score lock approved"
-          : "Score lock request rejected",
-        { variant: status === "APPROVED" ? "success" : "info" },
-      );
-
-      setLockReviewDialogOpen(false);
-      setSelectedLockRequest(null);
-      setLockReviewNotes("");
+      setLockDialogOpen(false);
     } catch (err) {
-      enqueueSnackbar(
-        err?.response?.data?.message ||
-          err?.message ||
-          "Failed to review score lock request",
-        { variant: "error" },
-      );
+      enqueueSnackbar(err?.response?.data?.message || err?.message || "Failed", { variant: "error" });
     }
   };
 
-  const fmtDate = (d) =>
-    new Date(d).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+  const handleResolve = async (issueId) => {
+    try {
+      await resolveMutation.mutateAsync({ issueId });
+      enqueueSnackbar("Issue resolved", { variant: "success" });
+    } catch (err) {
+      enqueueSnackbar(err?.response?.data?.message || err?.message || "Failed", { variant: "error" });
+    }
+  };
 
-  if (isLoading) return <LoadingState />;
+  const TABS = [
+    { id: "approvals", label: "Approvals", badge: pendingCount || null },
+    { id: "locks", label: "Score Locks", badge: lockRequests.length || null },
+    { id: "reviews", label: "Reviews", badge: proposals.filter((p) => p.status === "PENDING").length || null },
+    { id: "issues", label: "Issues", badge: openIssues || null },
+  ];
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1200 }}>
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 0.5 }}>
-          <Box
-            sx={{
-              width: 32,
-              height: 32,
-              borderRadius: "9px",
-              background: "#111",
-              border: "1px solid rgba(255,255,255,0.1)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
+          <Box sx={{ width: 32, height: 32, borderRadius: "9px", background: "#111", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <ShieldCheck size={15} color="rgba(255,255,255,0.7)" />
           </Box>
-          <Typography
-            sx={{
-              fontSize: 18,
-              fontWeight: 600,
-              color: "#f4f4f5",
-              fontFamily: "'Syne', sans-serif",
-              letterSpacing: "0.01em",
-            }}
-          >
-            Approvals
+          <Typography sx={{ fontSize: 18, fontWeight: 600, color: "#f4f4f5", fontFamily: "'Syne', sans-serif", letterSpacing: "0.01em" }}>
+            Requests
           </Typography>
         </Box>
-        <Typography
-          sx={{
-            fontSize: 12,
-            color: "rgba(255,255,255,0.3)",
-            fontFamily: "'Syne', sans-serif",
-            letterSpacing: "0.03em",
-            ml: 0.5,
-          }}
-        >
-          Review and act on pending score locks and event update requests
+        <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.3)", fontFamily: "'Syne', sans-serif", letterSpacing: "0.03em", ml: 0.5 }}>
+          Approvals, score locks, competition reviews, and support issues
         </Typography>
       </Box>
 
-      {/* Stats */}
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", sm: "repeat(3,1fr)" },
-          gap: 2,
-          mb: 3,
-        }}
-      >
-        {[
-          { label: "Pending", value: pendingCount, color: "#fbbf24" },
-          { label: "Approved", value: approvedCount, color: "#4ade80" },
-          { label: "Rejected", value: rejectedCount, color: "#f87171" },
-        ].map((s) => (
+      {/* Tab bar */}
+      <Box sx={{ display: "flex", gap: 0.5, mb: 3, p: 0.5, background: "rgba(255,255,255,0.03)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)", width: "fit-content" }}>
+        {TABS.map((t) => (
           <Box
-            key={s.label}
-            onClick={() =>
-              setStatusFilter(
-                statusFilter === s.label.toUpperCase()
-                  ? "all"
-                  : s.label.toUpperCase(),
-              )
-            }
+            key={t.id}
+            onClick={() => setTab(t.id)}
             sx={{
-              p: 2.5,
-              borderRadius: "12px",
-              background: "#0c0c0c",
-              border:
-                statusFilter === s.label.toUpperCase()
-                  ? `1px solid ${s.color}40`
-                  : "1px solid rgba(255,255,255,0.06)",
-              cursor: "pointer",
-              transition: "border-color 0.15s",
-              "&:hover": { borderColor: `${s.color}30` },
+              display: "flex", alignItems: "center", gap: 1,
+              px: 2, py: 0.75, borderRadius: "9px", cursor: "pointer",
+              transition: "all 0.15s",
+              background: tab === t.id ? "rgba(255,255,255,0.08)" : "transparent",
+              color: tab === t.id ? "#f4f4f5" : "rgba(255,255,255,0.35)",
             }}
           >
-            <Typography
-              sx={{
-                fontSize: 9.5,
-                letterSpacing: "0.2em",
-                textTransform: "uppercase",
-                color: "rgba(255,255,255,0.22)",
-                fontFamily: "'Syne', sans-serif",
-                mb: 1,
-              }}
-            >
-              {s.label}
+            <Typography sx={{ fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: tab === t.id ? 600 : 400 }}>
+              {t.label}
             </Typography>
-            <Typography
-              sx={{
-                fontSize: 28,
-                fontWeight: 700,
-                color: s.color,
-                fontFamily: "'Syne', sans-serif",
-                lineHeight: 1,
-              }}
-            >
-              {s.value}
-            </Typography>
+            {t.badge > 0 && (
+              <Box sx={{ px: 0.75, py: 0.1, borderRadius: "5px", background: tab === t.id ? "rgba(251,191,36,0.2)" : "rgba(255,255,255,0.06)", border: tab === t.id ? "1px solid rgba(251,191,36,0.3)" : "1px solid rgba(255,255,255,0.08)" }}>
+                <Typography sx={{ fontSize: 10, fontFamily: "'DM Mono', monospace", color: tab === t.id ? "#fbbf24" : "rgba(255,255,255,0.3)", lineHeight: 1.4 }}>
+                  {t.badge}
+                </Typography>
+              </Box>
+            )}
           </Box>
         ))}
       </Box>
 
-      {/* Filters */}
-      <Box
-        sx={{
-          p: 2,
-          mb: 2,
-          borderRadius: "12px",
-          background: "#0c0c0c",
-          border: "1px solid rgba(255,255,255,0.06)",
-          display: "flex",
-          gap: 1.5,
-          alignItems: "center",
-          flexWrap: "wrap",
-        }}
-      >
-        <Box sx={{ position: "relative", flex: "1 1 200px", minWidth: 180 }}>
-          <Box
-            sx={{
-              position: "absolute",
-              left: 11,
-              top: "50%",
-              transform: "translateY(-50%)",
-              pointerEvents: "none",
-            }}
-          >
-            <Search size={13} color="rgba(255,255,255,0.25)" />
-          </Box>
-          <input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by title, description, or requestor…"
-            style={{
-              width: "100%",
-              padding: "8px 12px 8px 32px",
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: 8,
-              color: "rgba(255,255,255,0.75)",
-              fontSize: 13,
-              fontFamily: "'Syne', sans-serif",
-              outline: "none",
-              boxSizing: "border-box",
-            }}
-          />
-        </Box>
-        <NativeSelect value={statusFilter} onChange={setStatusFilter}>
-          <option value="all">All Statuses</option>
-          <option value="PENDING">Pending</option>
-          <option value="APPROVED">Approved</option>
-          <option value="REJECTED">Rejected</option>
-        </NativeSelect>
-        <NativeSelect value={typeFilter} onChange={setTypeFilter}>
-          <option value="all">All Types</option>
-          <option value="SCORE_LOCK">Score Lock</option>
-          <option value="EVENT_UPDATE">Event Update</option>
-          <option value="COMPETITION_EDIT">Competition Update</option>
-        </NativeSelect>
-        <Typography
-          sx={{
-            fontSize: 11,
-            color: "rgba(255,255,255,0.18)",
-            fontFamily: "'DM Mono', monospace",
-            ml: "auto",
-          }}
-        >
-          {filtered.length} result{filtered.length !== 1 ? "s" : ""}
-        </Typography>
-      </Box>
-
-      {/* Table */}
-      <Box
-        sx={{
-          borderRadius: "12px",
-          border: "1px solid rgba(255,255,255,0.06)",
-          overflow: "hidden",
-          background: "#0c0c0c",
-        }}
-      >
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns:
-              "minmax(200px,1fr) 130px 160px 100px 110px 160px",
-            px: 3,
-            py: 1.5,
-            background: "rgba(255,255,255,0.02)",
-          }}
-        >
-          {["Request", "Type", "Requested By", "Date", "Status", ""].map(
-            (h, i) => (
-              <Typography
-                key={i}
-                sx={{
-                  fontSize: 9.5,
-                  letterSpacing: "0.2em",
-                  textTransform: "uppercase",
-                  color: "rgba(255,255,255,0.2)",
-                  fontFamily: "'Syne', sans-serif",
-                }}
-              >
-                {h}
-              </Typography>
-            ),
-          )}
-        </Box>
-        <Box
-          sx={{
-            maxHeight: "min(62vh, 620px)",
-            overflowY: "auto",
-            overflowX: "hidden",
-          }}
-        >
-          <RowDivider />
-
-          {filtered.length === 0 ? (
-            <Box sx={{ py: 8, textAlign: "center" }}>
-              <Typography
-                sx={{
-                  color: "rgba(255,255,255,0.2)",
-                  fontSize: 13,
-                  fontFamily: "'Syne', sans-serif",
-                }}
-              >
-                No approvals found
-              </Typography>
-            </Box>
-          ) : (
-            filtered.map((approval, idx) => (
-              <Box key={approval.id}>
-                <Box
-                  sx={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "minmax(200px,1fr) 130px 160px 100px 110px 160px",
-                    alignItems: "center",
-                    px: 3,
-                    py: 2,
-                    transition: "background 0.12s",
-                    "&:hover": { background: "rgba(255,255,255,0.02)" },
-                  }}
-                >
-                  {/* Title + description */}
+      {/* ── Tab: Approvals ── */}
+      {tab === "approvals" && (
+        <Box>
+          {isApprovalsLoading ? <LoadingState /> : (
+            <>
+              {/* Stats */}
+              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3,1fr)" }, gap: 2, mb: 3 }}>
+                {[
+                  { label: "Pending", value: pendingCount, color: "#fbbf24", id: "PENDING" },
+                  { label: "Approved", value: allApprovals.filter((a) => a.status === "APPROVED").length, color: "#4ade80", id: "APPROVED" },
+                  { label: "Rejected", value: allApprovals.filter((a) => a.status === "REJECTED").length, color: "#f87171", id: "REJECTED" },
+                ].map((s) => (
                   <Box
-                    sx={{ cursor: "pointer", minWidth: 0 }}
-                    onClick={() => openDetail(approval)}
+                    key={s.label}
+                    onClick={() => setStatusFilter(statusFilter === s.id ? "all" : s.id)}
+                    sx={{ p: 2.5, borderRadius: "12px", background: "#0c0c0c", border: statusFilter === s.id ? `1px solid ${s.color}40` : "1px solid rgba(255,255,255,0.06)", cursor: "pointer", transition: "border-color 0.15s", "&:hover": { borderColor: `${s.color}25` } }}
                   >
-                    <Typography
-                      sx={{
-                        fontSize: 13,
-                        fontWeight: 500,
-                        color: "#e4e4e7",
-                        fontFamily: "'Syne', sans-serif",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {approval.title}
-                    </Typography>
-                    {approval.description && (
-                      <Typography
-                        sx={{
-                          fontSize: 11,
-                          color: "rgba(255,255,255,0.28)",
-                          fontFamily: "'DM Mono', monospace",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {approval.description}
-                      </Typography>
-                    )}
+                    <Typography sx={{ fontSize: 9.5, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.22)", fontFamily: "'Syne', sans-serif", mb: 1 }}>{s.label}</Typography>
+                    <Typography sx={{ fontSize: 28, fontWeight: 700, color: s.color, fontFamily: "'Syne', sans-serif", lineHeight: 1 }}>{s.value}</Typography>
                   </Box>
-
-                  <Box>
-                    <TypePill type={approval.type} />
-                  </Box>
-
-                  {/* Requestor */}
-                  <Box sx={{ minWidth: 0, pr: 1 }}>
-                    <Typography
-                      sx={{
-                        fontSize: 12,
-                        color: "#e4e4e7",
-                        fontFamily: "'Syne', sans-serif",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {approval.requestedBy?.name || "—"}
-                    </Typography>
-                    <Typography
-                      sx={{
-                        fontSize: 11,
-                        color: "rgba(255,255,255,0.25)",
-                        fontFamily: "'DM Mono', monospace",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {approval.requestedBy?.email || ""}
-                    </Typography>
-                  </Box>
-
-                  <Typography
-                    sx={{
-                      fontSize: 11,
-                      color: "rgba(255,255,255,0.28)",
-                      fontFamily: "'DM Mono', monospace",
-                    }}
-                  >
-                    {fmtDate(approval.createdAt)}
-                  </Typography>
-
-                  <Box>
-                    <StatusBadge status={approval.status} />
-                  </Box>
-
-                  {/* Actions */}
-                  <Box
-                    sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}
-                  >
-                    {approval.status === "PENDING" ? (
-                      <>
-                        <ActionBtn
-                          onClick={() => handleApprove(approval)}
-                          color="#4ade80"
-                          hoverBg="rgba(74,222,128,0.1)"
-                          disabled={approveMutation.isPending}
-                          icon={<CheckCheck size={13} />}
-                        >
-                          Approve
-                        </ActionBtn>
-                        <ActionBtn
-                          onClick={() => openReject(approval)}
-                          color="#f87171"
-                          hoverBg="rgba(239,68,68,0.1)"
-                          icon={<X size={13} />}
-                        >
-                          Reject
-                        </ActionBtn>
-                      </>
-                    ) : (
-                      <Typography
-                        sx={{
-                          fontSize: 11,
-                          color: "rgba(255,255,255,0.15)",
-                          fontFamily: "'DM Mono', monospace",
-                        }}
-                      >
-                        {approval.reviewedAt
-                          ? fmtDate(approval.reviewedAt)
-                          : "—"}
-                      </Typography>
-                    )}
-                  </Box>
-                </Box>
-                {idx < filtered.length - 1 && <RowDivider />}
+                ))}
               </Box>
-            ))
+
+              {/* Filters */}
+              <Box sx={{ p: 2, mb: 2, borderRadius: "12px", background: "#0c0c0c", border: "1px solid rgba(255,255,255,0.06)", display: "flex", gap: 1.5, alignItems: "center", flexWrap: "wrap" }}>
+                <Box sx={{ position: "relative", flex: "1 1 200px", minWidth: 180 }}>
+                  <Box sx={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+                    <Search size={13} color="rgba(255,255,255,0.25)" />
+                  </Box>
+                  <input
+                    value={approvalSearch}
+                    onChange={(e) => setApprovalSearch(e.target.value)}
+                    placeholder="Search title, description, requestor…"
+                    style={{ width: "100%", padding: "8px 12px 8px 32px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, color: "rgba(255,255,255,0.75)", fontSize: 13, fontFamily: "'Syne', sans-serif", outline: "none", boxSizing: "border-box" }}
+                  />
+                </Box>
+                <NativeSelect value={statusFilter} onChange={setStatusFilter}>
+                  <option value="all">All Statuses</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="APPROVED">Approved</option>
+                  <option value="REJECTED">Rejected</option>
+                </NativeSelect>
+                <NativeSelect value={typeFilter} onChange={setTypeFilter}>
+                  <option value="all">All Types</option>
+                  <option value="SCORE_LOCK">Score Lock</option>
+                  <option value="EVENT_UPDATE">Event Update</option>
+                  <option value="COMPETITION_EDIT">Competition Update</option>
+                </NativeSelect>
+                <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.18)", fontFamily: "'DM Mono', monospace", ml: "auto" }}>
+                  {filteredApprovals.length} result{filteredApprovals.length !== 1 ? "s" : ""}
+                </Typography>
+              </Box>
+
+              {/* Table */}
+              <Box sx={{ borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)", overflow: "hidden", background: "#0c0c0c" }}>
+                <Box sx={{ display: "grid", gridTemplateColumns: "minmax(180px,1fr) 130px 160px 100px 110px 150px", px: 3, py: 1.5, background: "rgba(255,255,255,0.02)" }}>
+                  {["Request", "Type", "Requested By", "Date", "Status", ""].map((h, i) => (
+                    <Typography key={i} sx={{ fontSize: 9.5, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.2)", fontFamily: "'Syne', sans-serif" }}>{h}</Typography>
+                  ))}
+                </Box>
+                <Box sx={{ maxHeight: "min(60vh,600px)", overflowY: "auto" }}>
+                  <RowDivider />
+                  {filteredApprovals.length === 0 ? (
+                    <EmptyRow message="No approvals found" />
+                  ) : (
+                    filteredApprovals.map((a, idx) => (
+                      <Box key={a.id}>
+                        <Box sx={{ display: "grid", gridTemplateColumns: "minmax(180px,1fr) 130px 160px 100px 110px 150px", alignItems: "center", px: 3, py: 2, transition: "background 0.12s", "&:hover": { background: "rgba(255,255,255,0.02)" } }}>
+                          <Box sx={{ cursor: "pointer", minWidth: 0, pr: 1 }} onClick={() => { setDetailApproval(a); setDetailDialogOpen(true); }}>
+                            <Typography sx={{ fontSize: 13, fontWeight: 500, color: "#e4e4e7", fontFamily: "'Syne', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.title}</Typography>
+                            {a.description && <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.28)", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.description}</Typography>}
+                          </Box>
+                          <Box sx={{ overflow: "hidden" }}><TypePill type={a.type} /></Box>
+                          <Box sx={{ minWidth: 0, pr: 1 }}>
+                            <Typography sx={{ fontSize: 12, color: "#e4e4e7", fontFamily: "'Syne', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.requestedBy?.name || "—"}</Typography>
+                            <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.25)", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.requestedBy?.email || ""}</Typography>
+                          </Box>
+                          <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.28)", fontFamily: "'DM Mono', monospace" }}>{fmtDate(a.createdAt)}</Typography>
+                          <Box><StatusBadge status={a.status} /></Box>
+                          <Box sx={{ display: "flex", gap: 0.75, justifyContent: "flex-end" }}>
+                            {a.status === "PENDING" ? (
+                              <>
+                                <GreenBtn onClick={() => handleApprove(a)} loading={approveMutation.isPending}>
+                                  <CheckCheck size={12} />Approve
+                                </GreenBtn>
+                                <DangerBtn onClick={() => openReject(a)}>Reject</DangerBtn>
+                              </>
+                            ) : (
+                              <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.15)", fontFamily: "'DM Mono', monospace" }}>{a.reviewedAt ? fmtDate(a.reviewedAt) : "—"}</Typography>
+                            )}
+                          </Box>
+                        </Box>
+                        {idx < filteredApprovals.length - 1 && <RowDivider />}
+                      </Box>
+                    ))
+                  )}
+                </Box>
+              </Box>
+            </>
           )}
         </Box>
-      </Box>
+      )}
 
-      {/* Score lock approvals */}
-      <Box sx={{ mt: 4 }}>
-        <Box sx={{ mb: 2 }}>
-          <Box
-            sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 0.5 }}
-          >
-            <Box
-              sx={{
-                width: 32,
-                height: 32,
-                borderRadius: "9px",
-                background: "#111",
-                border: "1px solid rgba(255,255,255,0.1)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Gavel size={15} color="rgba(255,255,255,0.7)" />
+      {/* ── Tab: Score Locks ── */}
+      {tab === "locks" && (
+        <Box>
+          {isLockLoading ? <LoadingState /> : (
+            <Box sx={{ borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)", overflow: "hidden", background: "#0c0c0c" }}>
+              <Box sx={{ display: "grid", gridTemplateColumns: "minmax(200px,1fr) 160px 140px 110px 160px", px: 3, py: 1.5, background: "rgba(255,255,255,0.02)" }}>
+                {["Round", "Requested By", "Submitted", "Status", ""].map((h, i) => (
+                  <Typography key={i} sx={{ fontSize: 9.5, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.2)", fontFamily: "'Syne', sans-serif" }}>{h}</Typography>
+                ))}
+              </Box>
+              <Box sx={{ maxHeight: "min(60vh,600px)", overflowY: "auto" }}>
+                <RowDivider />
+                {lockRequests.length === 0 ? (
+                  <EmptyRow message="No pending score lock requests" />
+                ) : (
+                  lockRequests.map((req, idx) => (
+                    <Box key={req.id}>
+                      <Box sx={{ display: "grid", gridTemplateColumns: "minmax(200px,1fr) 160px 140px 110px 160px", alignItems: "center", px: 3, py: 2, transition: "background 0.12s", "&:hover": { background: "rgba(255,255,255,0.02)" } }}>
+                        <Box sx={{ minWidth: 0, pr: 1 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <Trophy size={13} color="#52525b" />
+                            <Typography sx={{ fontSize: 13, fontWeight: 500, color: "#e4e4e7", fontFamily: "'Syne', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{req.competition?.title || "—"}</Typography>
+                          </Box>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
+                            <Star size={12} color="#71717a" />
+                            <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{req.round?.name || "Round"}</Typography>
+                          </Box>
+                        </Box>
+                        <Box sx={{ minWidth: 0, pr: 1 }}>
+                          <Typography sx={{ fontSize: 12, color: "#e4e4e7", fontFamily: "'Syne', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{req.requestedByUser?.name || "—"}</Typography>
+                          <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.25)", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{req.requestedByUser?.email || ""}</Typography>
+                        </Box>
+                        <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.28)", fontFamily: "'DM Mono', monospace" }}>{fmtDate(req.createdAt)}</Typography>
+                        <Box><StatusBadge status={req.status || "PENDING"} /></Box>
+                        <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                          <PrimaryBtn onClick={() => openLock(req)}>
+                            <Gavel size={12} />Review
+                          </PrimaryBtn>
+                        </Box>
+                      </Box>
+                      {idx < lockRequests.length - 1 && <RowDivider />}
+                    </Box>
+                  ))
+                )}
+              </Box>
             </Box>
-            <Typography
-              sx={{
-                fontSize: 18,
-                fontWeight: 600,
-                color: "#f4f4f5",
-                fontFamily: "'Syne', sans-serif",
-                letterSpacing: "0.01em",
-              }}
-            >
-              Score Approvals
-            </Typography>
-            {lockRequests.length > 0 && (
+          )}
+        </Box>
+      )}
+
+      {/* ── Tab: Reviews ── */}
+      {tab === "reviews" && (
+        <Box>
+          {/* Status filter */}
+          <Box sx={{ display: "flex", gap: 0.5, mb: 2 }}>
+            {["PENDING", "APPROVED", "REJECTED"].map((s) => (
               <Box
-                sx={{
-                  px: 1,
-                  py: 0.25,
-                  borderRadius: "6px",
-                  background: "rgba(251,191,36,0.12)",
-                  border: "1px solid rgba(251,191,36,0.2)",
-                }}
+                key={s}
+                onClick={() => setReviewStatus(s)}
+                sx={{ px: 2, py: 0.75, borderRadius: 2, cursor: "pointer", border: reviewStatus === s ? `1px solid ${STATUS_COLORS[s].border}` : "1px solid rgba(255,255,255,0.07)", background: reviewStatus === s ? STATUS_COLORS[s].bg : "transparent", transition: "all 0.15s" }}
               >
-                <Typography
-                  sx={{
-                    color: "#fbbf24",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    fontFamily: "'DM Mono', monospace",
-                  }}
-                >
-                  {lockRequests.length}
-                </Typography>
+                <Typography sx={{ fontSize: 12, fontFamily: "'Syne', sans-serif", color: reviewStatus === s ? STATUS_COLORS[s].text : "rgba(255,255,255,0.35)", fontWeight: reviewStatus === s ? 600 : 400 }}>{s.charAt(0) + s.slice(1).toLowerCase()}</Typography>
               </Box>
-            )}
+            ))}
           </Box>
-          <Typography
-            sx={{
-              fontSize: 12,
-              color: "rgba(255,255,255,0.3)",
-              fontFamily: "'Syne', sans-serif",
-              letterSpacing: "0.03em",
-              ml: 0.5,
-            }}
-          >
-            Review score-lock requests from head judges
-          </Typography>
-        </Box>
 
-        <Box
-          sx={{
-            borderRadius: "12px",
-            border: "1px solid rgba(255,255,255,0.06)",
-            overflow: "hidden",
-            background: "#0c0c0c",
-          }}
-        >
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: "minmax(200px,1fr) 160px 140px 100px 200px",
-              px: 3,
-              py: 1.5,
-              background: "rgba(255,255,255,0.02)",
-            }}
-          >
-            {["Round", "Requested By", "Submitted", "Status", ""].map(
-              (h, i) => (
-                <Typography
-                  key={i}
-                  sx={{
-                    fontSize: 9.5,
-                    letterSpacing: "0.2em",
-                    textTransform: "uppercase",
-                    color: "rgba(255,255,255,0.2)",
-                    fontFamily: "'Syne', sans-serif",
-                  }}
-                >
-                  {h}
-                </Typography>
-              ),
-            )}
-          </Box>
-          <Box
-            sx={{
-              maxHeight: "min(62vh, 620px)",
-              overflowY: "auto",
-              overflowX: "hidden",
-            }}
-          >
-            <RowDivider />
-
-            {isLockRequestsLoading ? (
-              <Box sx={{ py: 4 }}>
-                <LoadingState message="Loading score lock requests..." />
-              </Box>
-            ) : lockRequests.length === 0 ? (
-              <Box sx={{ py: 6, textAlign: "center" }}>
-                <Typography
-                  sx={{
-                    color: "rgba(255,255,255,0.22)",
-                    fontSize: 13,
-                    fontFamily: "'Syne', sans-serif",
-                  }}
-                >
-                  No pending score lock requests
-                </Typography>
-              </Box>
-            ) : (
-              lockRequests.map((request, idx) => (
-                <Box key={request.id}>
-                  <Box
-                    sx={{
-                      display: "grid",
-                      gridTemplateColumns:
-                        "minmax(200px,1fr) 160px 140px 100px 200px",
-                      alignItems: "center",
-                      px: 3,
-                      py: 2,
-                      transition: "background 0.12s",
-                      "&:hover": { background: "rgba(255,255,255,0.02)" },
-                    }}
-                  >
-                    <Box sx={{ minWidth: 0, pr: 1 }}>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <Trophy size={13} color="#52525b" />
-                        <Typography
-                          sx={{
-                            fontSize: 13,
-                            fontWeight: 500,
-                            color: "#e4e4e7",
-                            fontFamily: "'Syne', sans-serif",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {request.competition?.title || "—"}
-                        </Typography>
+          {isReviewsLoading ? <LoadingState /> : (
+            <Box sx={{ borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)", overflow: "hidden", background: "#0c0c0c" }}>
+              {proposals.length === 0 ? (
+                <EmptyRow message="No proposals found" />
+              ) : (
+                proposals.map((p, idx) => (
+                  <Box key={p.id}>
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, px: 3, py: 2.5, transition: "background 0.12s", "&:hover": { background: "rgba(255,255,255,0.02)" } }}>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 0.5 }}>
+                          <Typography sx={{ fontSize: 13, fontWeight: 500, color: "#e4e4e7", fontFamily: "'Syne', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.competitionTitle || "—"}</Typography>
+                          <StatusPill status={p.status} />
+                        </Box>
+                        {p.summary && <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.35)", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.summary}</Typography>}
                       </Box>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 1,
-                          mt: 0.5,
-                        }}
-                      >
-                        <Star size={12} color="#71717a" />
-                        <Typography
-                          sx={{
-                            fontSize: 11,
-                            color: "rgba(255,255,255,0.35)",
-                            fontFamily: "'DM Mono', monospace",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {request.round?.name || "Round"}
-                        </Typography>
-                      </Box>
+                      <Link href={`/admin/sa/reviews/${p.id}`} style={{ textDecoration: "none", flexShrink: 0 }}>
+                        <PrimaryBtn>
+                          <FileText size={12} />Review
+                        </PrimaryBtn>
+                      </Link>
                     </Box>
-
-                    <Box sx={{ minWidth: 0, pr: 1 }}>
-                      <Typography
-                        sx={{
-                          fontSize: 12,
-                          color: "#e4e4e7",
-                          fontFamily: "'Syne', sans-serif",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {request.requestedByUser?.name || "—"}
-                      </Typography>
-                      <Typography
-                        sx={{
-                          fontSize: 11,
-                          color: "rgba(255,255,255,0.25)",
-                          fontFamily: "'DM Mono', monospace",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {request.requestedByUser?.email || ""}
-                      </Typography>
-                    </Box>
-
-                    <Typography
-                      sx={{
-                        fontSize: 11,
-                        color: "rgba(255,255,255,0.28)",
-                        fontFamily: "'DM Mono', monospace",
-                      }}
-                    >
-                      {request.createdAt ? fmtDate(request.createdAt) : "—"}
-                    </Typography>
-
-                    <StatusBadge status={request.status || "PENDING"} />
-
-                    <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-                      <ActionBtn
-                        onClick={() => openLockReview(request)}
-                        color="#a78bfa"
-                        hoverBg="rgba(168,85,247,0.12)"
-                        disabled={reviewLockRequestMutation.isPending}
-                        icon={<Gavel size={13} />}
-                      >
-                        Review
-                      </ActionBtn>
-                    </Box>
+                    {idx < proposals.length - 1 && <RowDivider />}
                   </Box>
-                  {idx < lockRequests.length - 1 && <RowDivider />}
-                </Box>
-              ))
-            )}
-          </Box>
+                ))
+              )}
+            </Box>
+          )}
         </Box>
-      </Box>
+      )}
 
-      {/* Reject dialog */}
-      <DarkDialog
-        open={rejectDialogOpen}
-        onClose={() => setRejectDialogOpen(false)}
-        title="Reject Request"
-      >
-        <DangerNote>
-          The requestor will be notified that their request was rejected.
-        </DangerNote>
-        <Typography
-          sx={{
-            fontSize: 12,
-            color: "rgba(255,255,255,0.3)",
-            fontFamily: "'DM Mono', monospace",
-            mb: 2,
-          }}
-        >
-          {selectedApproval?.title}
-        </Typography>
-        <DarkTextarea
-          rows={3}
-          value={rejectReason}
-          onChange={(e) => setRejectReason(e.target.value)}
-          placeholder="Reason for rejection…"
-        />
+      {/* ── Tab: Issues ── */}
+      {tab === "issues" && (
+        <Box>
+          {/* Stats */}
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2,1fr)" }, gap: 2, mb: 3 }}>
+            {[
+              { label: "Open", value: issues.filter((i) => !i.resolved).length, color: "#fbbf24" },
+              { label: "Resolved", value: issues.filter((i) => i.resolved).length, color: "#4ade80" },
+            ].map((s) => (
+              <Box key={s.label} sx={{ p: 2.5, borderRadius: "12px", background: "#0c0c0c", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <Typography sx={{ fontSize: 9.5, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.22)", fontFamily: "'Syne', sans-serif", mb: 1 }}>{s.label}</Typography>
+                <Typography sx={{ fontSize: 28, fontWeight: 700, color: s.color, fontFamily: "'Syne', sans-serif", lineHeight: 1 }}>{s.value}</Typography>
+              </Box>
+            ))}
+          </Box>
+
+          {/* Filters */}
+          <Box sx={{ mb: 2, display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr auto" }, gap: 1.5, alignItems: "center" }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 1.5, py: 1, borderRadius: "10px", border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)" }}>
+              <Search size={14} color="rgba(255,255,255,0.35)" />
+              <input
+                value={issueSearch}
+                onChange={(e) => setIssueSearch(e.target.value)}
+                placeholder="Search by message, creator name, or email"
+                style={{ width: "100%", border: "none", outline: "none", background: "transparent", color: "rgba(255,255,255,0.85)", fontSize: 13, fontFamily: "'Syne', sans-serif" }}
+              />
+            </Box>
+            <GhostBtn
+              onClick={() => setShowResolved((v) => !v)}
+              style={{ whiteSpace: "nowrap" }}
+            >
+              {showResolved ? "Hide Resolved" : "Show Resolved"}
+            </GhostBtn>
+          </Box>
+
+          {isIssuesLoading ? <LoadingState /> : (
+            <Box sx={{ borderRadius: "12px", background: "#0c0c0c", border: "1px solid rgba(255,255,255,0.06)", overflow: "hidden" }}>
+              {filteredIssues.length === 0 ? (
+                <EmptyRow message="No issues found" />
+              ) : (
+                filteredIssues.map((issue, idx) => {
+                  const status = issue.resolved ? "RESOLVED" : "OPEN";
+                  return (
+                    <Box key={issue.id} sx={{ p: 2.5, borderBottom: idx < filteredIssues.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1.5, mb: 1.25 }}>
+                        <StatusPill status={status} />
+                        {!issue.resolved && (
+                          <GreenBtn onClick={() => handleResolve(issue.id)} loading={resolveMutation.isPending}>
+                            <CheckCircle2 size={12} />Resolve
+                          </GreenBtn>
+                        )}
+                      </Box>
+                      <Typography sx={{ color: "rgba(255,255,255,0.82)", fontSize: 13, fontFamily: "'Syne', sans-serif", mb: 1.25, whiteSpace: "pre-wrap" }}>{issue.message}</Typography>
+                      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3,1fr)" }, gap: 1 }}>
+                        <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'DM Mono', monospace" }}>Creator: {issue.creator?.name || "Unknown"}</Typography>
+                        <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'DM Mono', monospace" }}>Email: {issue.creator?.email || "—"}</Typography>
+                        <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'DM Mono', monospace", textAlign: { xs: "left", md: "right" } }}>Created: {fmtDateTime(issue.createdAt)}</Typography>
+                      </Box>
+                    </Box>
+                  );
+                })
+              )}
+            </Box>
+          )}
+        </Box>
+      )}
+
+      {/* ── Dialogs ── */}
+
+      {/* Reject approval */}
+      <DarkDialog open={rejectDialogOpen} onClose={() => setRejectDialogOpen(false)} title="Reject Request">
+        <DangerNote>The requestor will be notified that their request was rejected.</DangerNote>
+        <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.3)", fontFamily: "'DM Mono', monospace", mb: 2 }}>{selectedApproval?.title}</Typography>
+        <DarkTextarea rows={3} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Reason for rejection…" />
         <BtnRow>
           <GhostBtn onClick={() => setRejectDialogOpen(false)}>Cancel</GhostBtn>
-          <DangerBtn
-            onClick={handleReject}
-            disabled={rejectMutation.isPending || !rejectReason.trim()}
-          >
+          <DangerBtn onClick={handleReject} disabled={!rejectReason.trim()} loading={rejectMutation.isPending}>
             {rejectMutation.isPending ? "Rejecting…" : "Reject"}
           </DangerBtn>
         </BtnRow>
       </DarkDialog>
 
       {/* Detail dialog */}
-      <DarkDialog
-        open={detailDialogOpen}
-        onClose={() => setDetailDialogOpen(false)}
-        title={detailApproval?.title || "Request Details"}
-      >
+      <DarkDialog open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} title={detailApproval?.title || "Request Details"}>
         {detailApproval && (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
+            <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
               <TypePill type={detailApproval.type} />
-              {detailActionLabel && (
-                <Box
-                  component="span"
-                  sx={{
-                    px: 1.5,
-                    py: 0.4,
-                    borderRadius: "6px",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    fontFamily: "'DM Mono', monospace",
-                    letterSpacing: "0.04em",
-                    textTransform: "uppercase",
-                    background: "rgba(168,85,247,0.1)",
-                    color: "#c084fc",
-                    border: "1px solid rgba(168,85,247,0.2)",
-                    display: "inline-block",
-                    lineHeight: 1.6,
-                  }}
-                >
-                  {detailActionLabel}
-                </Box>
-              )}
               <StatusBadge status={detailApproval.status} />
             </Box>
-
             {detailApproval.description && (
               <Box>
                 <Label>Description</Label>
-                <Typography
-                  sx={{
-                    fontSize: 13,
-                    color: "rgba(255,255,255,0.6)",
-                    fontFamily: "'Syne', sans-serif",
-                    lineHeight: 1.6,
-                  }}
-                >
-                  {detailApproval.description}
-                </Typography>
+                <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.6)", fontFamily: "'Syne', sans-serif", lineHeight: 1.6 }}>{detailApproval.description}</Typography>
               </Box>
             )}
-
-            <Box
-              sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}
-            >
+            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
               <Box>
                 <Label>Requested By</Label>
-                <Typography
-                  sx={{
-                    fontSize: 13,
-                    color: "#e4e4e7",
-                    fontFamily: "'Syne', sans-serif",
-                  }}
-                >
-                  {detailApproval.requestedBy?.name || "—"}
-                </Typography>
-                <Typography
-                  sx={{
-                    fontSize: 11,
-                    color: "rgba(255,255,255,0.28)",
-                    fontFamily: "'DM Mono', monospace",
-                  }}
-                >
-                  {detailApproval.requestedBy?.email || ""}
-                </Typography>
+                <Typography sx={{ fontSize: 13, color: "#e4e4e7", fontFamily: "'Syne', sans-serif" }}>{detailApproval.requestedBy?.name || "—"}</Typography>
+                <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.28)", fontFamily: "'DM Mono', monospace" }}>{detailApproval.requestedBy?.email || ""}</Typography>
               </Box>
               <Box>
                 <Label>Submitted</Label>
-                <Typography
-                  sx={{
-                    fontSize: 13,
-                    color: "rgba(255,255,255,0.55)",
-                    fontFamily: "'DM Mono', monospace",
-                  }}
-                >
-                  {fmtDate(detailApproval.createdAt)}
-                </Typography>
+                <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.55)", fontFamily: "'DM Mono', monospace" }}>{fmtDate(detailApproval.createdAt)}</Typography>
               </Box>
             </Box>
-
             {detailApproval.requestData && (
               <Box>
                 <Label>Request Data</Label>
-                <Box
-                  sx={{
-                    p: 1.5,
-                    borderRadius: "8px",
-                    background: "rgba(255,255,255,0.03)",
-                    border: "1px solid rgba(255,255,255,0.06)",
-                    fontFamily: "'DM Mono', monospace",
-                    fontSize: 12,
-                    color: "rgba(255,255,255,0.55)",
-                    overflow: "auto",
-                    maxHeight: 200,
-                  }}
-                >
-                  <pre
-                    style={{
-                      margin: 0,
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-all",
-                    }}
-                  >
-                    {JSON.stringify(detailApproval.requestData, null, 2)}
-                  </pre>
+                <Box sx={{ p: 1.5, borderRadius: "8px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", fontFamily: "'DM Mono', monospace", fontSize: 12, color: "rgba(255,255,255,0.55)", overflow: "auto", maxHeight: 200 }}>
+                  <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{JSON.stringify(detailApproval.requestData, null, 2)}</pre>
                 </Box>
               </Box>
             )}
-
             {detailApproval.rejectionReason && (
               <Box>
                 <Label>Rejection Reason</Label>
-                <Box
-                  sx={{
-                    p: 1.5,
-                    borderRadius: "8px",
-                    background: "rgba(239,68,68,0.06)",
-                    border: "1px solid rgba(239,68,68,0.12)",
-                  }}
-                >
-                  <Typography
-                    sx={{
-                      fontSize: 13,
-                      color: "#f87171",
-                      fontFamily: "'Syne', sans-serif",
-                    }}
-                  >
-                    {detailApproval.rejectionReason}
-                  </Typography>
+                <Box sx={{ p: 1.5, borderRadius: "8px", background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.12)" }}>
+                  <Typography sx={{ fontSize: 13, color: "#f87171", fontFamily: "'Syne', sans-serif" }}>{detailApproval.rejectionReason}</Typography>
                 </Box>
               </Box>
             )}
-
-            {detailApproval.status === "PENDING" && (
-              <BtnRow>
-                <GhostBtn onClick={() => setDetailDialogOpen(false)}>
-                  Close
-                </GhostBtn>
-                <ActionBtn
-                  onClick={async () => {
-                    await handleApprove(detailApproval);
-                    setDetailDialogOpen(false);
-                  }}
-                  color="#4ade80"
-                  hoverBg="rgba(74,222,128,0.1)"
-                  disabled={approveMutation.isPending}
-                  icon={<CheckCheck size={13} />}
-                >
-                  Approve
-                </ActionBtn>
-                <DangerBtn
-                  onClick={() => {
-                    setDetailDialogOpen(false);
-                    openReject(detailApproval);
-                  }}
-                >
-                  Reject
-                </DangerBtn>
-              </BtnRow>
-            )}
-            {detailApproval.status !== "PENDING" && (
-              <BtnRow>
-                <GhostBtn onClick={() => setDetailDialogOpen(false)}>
-                  Close
-                </GhostBtn>
-              </BtnRow>
-            )}
+            <BtnRow>
+              <GhostBtn onClick={() => setDetailDialogOpen(false)}>Close</GhostBtn>
+              {detailApproval.status === "PENDING" && (
+                <>
+                  <DangerBtn onClick={() => openReject(detailApproval)}>Reject</DangerBtn>
+                  <GreenBtn onClick={() => handleApprove(detailApproval)} loading={approveMutation.isPending}>
+                    <CheckCheck size={12} />Approve
+                  </GreenBtn>
+                </>
+              )}
+            </BtnRow>
           </Box>
         )}
       </DarkDialog>
 
-      <DarkDialog
-        open={lockReviewDialogOpen}
-        onClose={() => setLockReviewDialogOpen(false)}
-        title="Review Score Lock Request"
-      >
-        <Typography
-          sx={{
-            fontSize: 12,
-            color: "rgba(255,255,255,0.3)",
-            fontFamily: "'DM Mono', monospace",
-            mb: 2,
-          }}
-        >
-          {selectedLockRequest
-            ? `${selectedLockRequest.competition?.title || "Competition"} • ${selectedLockRequest.round?.name || "Round"}`
-            : ""}
+      {/* Score lock review */}
+      <DarkDialog open={lockDialogOpen} onClose={() => setLockDialogOpen(false)} title="Review Score Lock">
+        <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.3)", fontFamily: "'DM Mono', monospace", mb: 2 }}>
+          {selectedLock ? `${selectedLock.competition?.title || "Competition"} · ${selectedLock.round?.name || "Round"}` : ""}
         </Typography>
-
-        <DarkTextarea
-          rows={3}
-          value={lockReviewNotes}
-          onChange={(e) => setLockReviewNotes(e.target.value)}
-          placeholder="Optional review notes…"
-        />
-
+        <DarkTextarea rows={3} value={lockNotes} onChange={(e) => setLockNotes(e.target.value)} placeholder="Optional review notes…" />
         <BtnRow>
-          <GhostBtn onClick={() => setLockReviewDialogOpen(false)}>
-            Cancel
-          </GhostBtn>
-          <DangerBtn
-            onClick={() => handleReviewLockRequest("REJECTED")}
-            disabled={reviewLockRequestMutation.isPending}
-          >
-            {reviewLockRequestMutation.isPending ? "Submitting…" : "Reject"}
+          <GhostBtn onClick={() => setLockDialogOpen(false)}>Cancel</GhostBtn>
+          <DangerBtn onClick={() => handleLockReview("REJECTED")} loading={reviewLockMutation.isPending}>
+            {reviewLockMutation.isPending ? "Submitting…" : "Reject"}
           </DangerBtn>
-          <ActionBtn
-            onClick={() => handleReviewLockRequest("APPROVED")}
-            color="#4ade80"
-            hoverBg="rgba(74,222,128,0.1)"
-            disabled={reviewLockRequestMutation.isPending}
-            icon={<CheckCheck size={13} />}
-          >
-            {reviewLockRequestMutation.isPending ? "Submitting…" : "Approve"}
-          </ActionBtn>
+          <GreenBtn onClick={() => handleLockReview("APPROVED")} loading={reviewLockMutation.isPending}>
+            <CheckCheck size={12} />{reviewLockMutation.isPending ? "Submitting…" : "Approve"}
+          </GreenBtn>
         </BtnRow>
       </DarkDialog>
     </Box>
@@ -1164,16 +673,7 @@ export default function ApprovalsPage() {
 
 function Label({ children }) {
   return (
-    <Typography
-      sx={{
-        fontSize: 9.5,
-        letterSpacing: "0.18em",
-        textTransform: "uppercase",
-        color: "rgba(255,255,255,0.2)",
-        fontFamily: "'Syne', sans-serif",
-        mb: 0.5,
-      }}
-    >
+    <Typography sx={{ fontSize: 9.5, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(255,255,255,0.2)", fontFamily: "'Syne', sans-serif", mb: 0.5 }}>
       {children}
     </Typography>
   );
@@ -1181,38 +681,9 @@ function Label({ children }) {
 
 function DarkDialog({ open, onClose, title, children }) {
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="sm"
-      fullWidth
-      PaperProps={{
-        sx: {
-          background: "#0e0e0e",
-          border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: "14px",
-          boxShadow: "0 24px 64px rgba(0,0,0,0.7)",
-          p: 0,
-        },
-      }}
-    >
-      <Box
-        sx={{
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
-          px: 3,
-          py: 2.5,
-        }}
-      >
-        <Typography
-          sx={{
-            fontSize: 15,
-            fontWeight: 600,
-            color: "#f4f4f5",
-            fontFamily: "'Syne', sans-serif",
-          }}
-        >
-          {title}
-        </Typography>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { background: "#0e0e0e", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "14px", boxShadow: "0 24px 64px rgba(0,0,0,0.7)", p: 0 } }}>
+      <Box sx={{ borderBottom: "1px solid rgba(255,255,255,0.06)", px: 3, py: 2.5 }}>
+        <Typography sx={{ fontSize: 15, fontWeight: 600, color: "#f4f4f5", fontFamily: "'Syne', sans-serif" }}>{title}</Typography>
       </Box>
       <Box sx={{ px: 3, py: 3 }}>{children}</Box>
     </Dialog>
@@ -1221,21 +692,7 @@ function DarkDialog({ open, onClose, title, children }) {
 
 function NativeSelect({ value, onChange, children }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      style={{
-        padding: "8px 12px",
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        borderRadius: 8,
-        color: "rgba(255,255,255,0.65)",
-        fontSize: 13,
-        fontFamily: "'Syne', sans-serif",
-        outline: "none",
-        cursor: "pointer",
-      }}
-    >
+    <select value={value} onChange={(e) => onChange(e.target.value)} style={{ padding: "8px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, color: "rgba(255,255,255,0.65)", fontSize: 13, fontFamily: "'Syne', sans-serif", outline: "none", cursor: "pointer" }}>
       {children}
     </select>
   );
@@ -1243,152 +700,82 @@ function NativeSelect({ value, onChange, children }) {
 
 function DarkTextarea({ rows = 3, value, onChange, placeholder }) {
   return (
-    <textarea
-      rows={rows}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      style={{
-        width: "100%",
-        padding: "10px 12px",
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.1)",
-        borderRadius: 8,
-        color: "rgba(255,255,255,0.75)",
-        fontSize: 13,
-        fontFamily: "'Syne', sans-serif",
-        outline: "none",
-        resize: "vertical",
-        boxSizing: "border-box",
-      }}
-    />
+    <textarea rows={rows} value={value} onChange={onChange} placeholder={placeholder} style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "rgba(255,255,255,0.75)", fontSize: 13, fontFamily: "'Syne', sans-serif", outline: "none", resize: "vertical", boxSizing: "border-box" }} />
   );
 }
 
 function DangerNote({ children }) {
   return (
-    <Box
-      sx={{
-        p: 1.5,
-        borderRadius: 2,
-        background: "rgba(239,68,68,0.08)",
-        border: "1px solid rgba(239,68,68,0.15)",
-        mb: 2,
-      }}
-    >
-      <Typography
-        sx={{
-          fontSize: 12,
-          color: "#f87171",
-          fontFamily: "'Syne', sans-serif",
-        }}
-      >
-        {children}
-      </Typography>
+    <Box sx={{ p: 1.5, borderRadius: 2, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)", mb: 2 }}>
+      <Typography sx={{ fontSize: 12, color: "#f87171", fontFamily: "'Syne', sans-serif" }}>{children}</Typography>
     </Box>
   );
 }
 
 function BtnRow({ children }) {
+  return <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", mt: 3 }}>{children}</Box>;
+}
+
+function BtnSpinner({ color = "currentColor" }) {
   return (
-    <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", mt: 3 }}>
-      {children}
-    </Box>
+    <>
+      <style>{`@keyframes _btnSpin { to { transform: rotate(360deg); } }`}</style>
+      <Loader2 size={13} color={color} style={{ animation: "_btnSpin 0.7s linear infinite", flexShrink: 0 }} />
+    </>
   );
 }
 
 const btnBase = {
-  border: "none",
-  borderRadius: 8,
-  cursor: "pointer",
-  fontSize: 13,
-  fontFamily: "'Syne', sans-serif",
-  fontWeight: 500,
-  padding: "9px 18px",
-  letterSpacing: "0.02em",
-  transition: "all 0.15s",
+  border: "none", borderRadius: 8, cursor: "pointer",
+  fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 500,
+  padding: "7px 14px", letterSpacing: "0.02em", transition: "all 0.15s",
+  display: "flex", alignItems: "center", gap: 5,
 };
 
-function GhostBtn({ onClick, children }) {
+function GhostBtn({ onClick, children, loading, disabled, style }) {
+  const isDisabled = disabled || loading;
   return (
-    <button
-      onClick={onClick}
-      style={{
-        ...btnBase,
-        background: "transparent",
-        border: "1px solid rgba(255,255,255,0.08)",
-        color: "rgba(255,255,255,0.45)",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = "rgba(255,255,255,0.18)";
-        e.currentTarget.style.color = "rgba(255,255,255,0.7)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
-        e.currentTarget.style.color = "rgba(255,255,255,0.45)";
-      }}
+    <button onClick={onClick} disabled={isDisabled} style={{ ...btnBase, background: "transparent", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.45)", opacity: isDisabled ? 0.5 : 1, cursor: isDisabled ? "not-allowed" : "pointer", ...style }}
+      onMouseEnter={(e) => { if (!isDisabled) { e.currentTarget.style.borderColor = "rgba(255,255,255,0.18)"; e.currentTarget.style.color = "rgba(255,255,255,0.7)"; } }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "rgba(255,255,255,0.45)"; }}
     >
-      {children}
+      {loading && <BtnSpinner />}{children}
     </button>
   );
 }
 
-function DangerBtn({ onClick, children, disabled }) {
+function PrimaryBtn({ onClick, children, loading, disabled }) {
+  const isDisabled = disabled || loading;
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        ...btnBase,
-        background: "rgba(239,68,68,0.1)",
-        border: "1px solid rgba(239,68,68,0.2)",
-        color: "#f87171",
-        opacity: disabled ? 0.5 : 1,
-        cursor: disabled ? "not-allowed" : "pointer",
-      }}
-      onMouseEnter={(e) => {
-        if (!disabled)
-          e.currentTarget.style.background = "rgba(239,68,68,0.15)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = "rgba(239,68,68,0.1)";
-      }}
+    <button onClick={onClick} disabled={isDisabled} style={{ ...btnBase, background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.75)", opacity: isDisabled ? 0.5 : 1, cursor: isDisabled ? "not-allowed" : "pointer" }}
+      onMouseEnter={(e) => { if (!isDisabled) e.currentTarget.style.background = "rgba(255,255,255,0.11)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; }}
     >
-      {children}
+      {loading && <BtnSpinner />}{children}
     </button>
   );
 }
 
-function ActionBtn({ onClick, children, color, hoverBg, disabled, icon }) {
+function GreenBtn({ onClick, children, loading, disabled }) {
+  const isDisabled = disabled || loading;
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        ...btnBase,
-        display: "flex",
-        alignItems: "center",
-        gap: 5,
-        padding: "7px 12px",
-        background: "transparent",
-        border: `1px solid ${color}30`,
-        color,
-        opacity: disabled ? 0.4 : 1,
-        cursor: disabled ? "not-allowed" : "pointer",
-      }}
-      onMouseEnter={(e) => {
-        if (!disabled) {
-          e.currentTarget.style.background = hoverBg;
-          e.currentTarget.style.borderColor = `${color}60`;
-        }
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = "transparent";
-        e.currentTarget.style.borderColor = `${color}30`;
-      }}
+    <button onClick={onClick} disabled={isDisabled} style={{ ...btnBase, background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.2)", color: "#4ade80", opacity: isDisabled ? 0.5 : 1, cursor: isDisabled ? "not-allowed" : "pointer" }}
+      onMouseEnter={(e) => { if (!isDisabled) e.currentTarget.style.background = "rgba(74,222,128,0.14)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(74,222,128,0.08)"; }}
     >
-      {icon}
-      {children}
+      {loading && <BtnSpinner color="#4ade80" />}{children}
+    </button>
+  );
+}
+
+function DangerBtn({ onClick, children, loading, disabled }) {
+  const isDisabled = disabled || loading;
+  return (
+    <button onClick={onClick} disabled={isDisabled} style={{ ...btnBase, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)", color: "#f87171", opacity: isDisabled ? 0.5 : 1, cursor: isDisabled ? "not-allowed" : "pointer" }}
+      onMouseEnter={(e) => { if (!isDisabled) e.currentTarget.style.background = "rgba(239,68,68,0.14)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; }}
+    >
+      {loading && <BtnSpinner color="#f87171" />}{children}
     </button>
   );
 }

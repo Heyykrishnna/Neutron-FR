@@ -27,8 +27,10 @@ export default function ClubLayout({ children }) {
   const { data: myClubs = [], isLoading: clubsLoading } = useMyClubs();
 
   const hasRole =
-    user?.role === "SA" || user?.role === "DH" || user?.role === "JUDGE";
-  const hasClubAccess = hasRole && myClubs.length > 0;
+    user?.role === "SA" || user?.role === "DH" || user?.role === "JUDGE" || user?.role === "CH";
+  // CH users get access by role alone; others need at least one club assigned
+  const hasClubAccess =
+    user?.role === "CH" ? hasRole : hasRole && myClubs.length > 0;
 
   useEffect(() => {
     if (!loading && !user) {

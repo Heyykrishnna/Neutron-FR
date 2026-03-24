@@ -28,6 +28,7 @@ import {
   UserPlus2,
   Pencil,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import { useSnackbar } from "notistack";
 import { LoadingState } from "@/src/components/LoadingState";
@@ -138,6 +139,7 @@ export default function DepartmentsPage() {
     setSelectedDepartmentId(null);
     setRemovingUserId(null);
     setVolunteerSearch("");
+    setDeptHeadSearch("");
   };
 
   const handleCreate = async () => {
@@ -276,6 +278,7 @@ export default function DepartmentsPage() {
   }, [selectedVolunteerIds, volunteers]);
 
   const [volunteerSearch, setVolunteerSearch] = useState("");
+  const [deptHeadSearch, setDeptHeadSearch] = useState("");
 
   const existingMemberIds = useMemo(() => {
     const members = selectedDepartment?.members || [];
@@ -298,6 +301,16 @@ export default function DepartmentsPage() {
         (v.email || "").toLowerCase().includes(q),
     );
   }, [availableVolunteers, volunteerSearch]);
+
+  const filteredDeptHeads = useMemo(() => {
+    if (!deptHeadSearch) return departmentHeads;
+    const q = deptHeadSearch.toLowerCase();
+    return departmentHeads.filter(
+      (h) =>
+        (h.name || "").toLowerCase().includes(q) ||
+        (h.email || "").toLowerCase().includes(q),
+    );
+  }, [departmentHeads, deptHeadSearch]);
 
   if (isLoading) return <LoadingState />;
 
@@ -792,39 +805,193 @@ export default function DepartmentsPage() {
         >
           Department Heads
         </Typography>
-        <MultiNativeSelect
-          values={deptHeadIds}
-          onChange={setDeptHeadIds}
-          options={departmentHeads.map((head) => ({
-            value: head.id,
-            label: head.name || head.email,
-          }))}
-          fullWidth
-          disabled={isDeptHeadsLoading}
-        />
-        <Typography
+        {/* DH search */}
+        <Box sx={{ position: "relative", mb: 1.5 }}>
+          <Box
+            sx={{
+              position: "absolute",
+              left: 11,
+              top: "50%",
+              transform: "translateY(-50%)",
+              pointerEvents: "none",
+            }}
+          >
+            <Search size={12} color="rgba(255,255,255,0.25)" />
+          </Box>
+          <input
+            value={deptHeadSearch}
+            onChange={(e) => setDeptHeadSearch(e.target.value)}
+            placeholder="Filter department heads…"
+            style={{
+              width: "100%",
+              padding: "8px 12px 8px 30px",
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 8,
+              color: "rgba(255,255,255,0.75)",
+              fontSize: 13,
+              fontFamily: "'Syne', sans-serif",
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
+        </Box>
+        {/* DH checklist */}
+        <Box
           sx={{
-            mt: 0.75,
-            fontSize: 11,
-            color: "rgba(255,255,255,0.25)",
-            fontFamily: "'DM Mono', monospace",
+            maxHeight: 200,
+            overflowY: "auto",
+            border: "1px solid rgba(255,255,255,0.06)",
+            borderRadius: "10px",
           }}
         >
-          Hold Ctrl/Cmd to select multiple heads.
-        </Typography>
+          {isDeptHeadsLoading ? (
+            <Box sx={{ py: 4, textAlign: "center" }}>
+              <Typography
+                sx={{
+                  fontSize: 12,
+                  color: "rgba(255,255,255,0.25)",
+                  fontFamily: "'Syne', sans-serif",
+                }}
+              >
+                Loading…
+              </Typography>
+            </Box>
+          ) : filteredDeptHeads.length === 0 ? (
+            <Box sx={{ py: 4, textAlign: "center" }}>
+              <Typography
+                sx={{
+                  fontSize: 12,
+                  color: "rgba(255,255,255,0.2)",
+                  fontFamily: "'Syne', sans-serif",
+                }}
+              >
+                No department heads found
+              </Typography>
+            </Box>
+          ) : (
+            filteredDeptHeads.map((h, idx) => {
+              const checked = deptHeadIds.includes(h.id);
+              return (
+                <Box key={h.id}>
+                  <Box
+                    onClick={() =>
+                      setDeptHeadIds((prev) =>
+                        checked
+                          ? prev.filter((id) => id !== h.id)
+                          : [...prev, h.id],
+                      )
+                    }
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1.5,
+                      px: 2,
+                      py: 1.5,
+                      cursor: "pointer",
+                      transition: "background 0.1s",
+                      background: checked
+                        ? "rgba(168,85,247,0.06)"
+                        : "transparent",
+                      "&:hover": {
+                        background: checked
+                          ? "rgba(168,85,247,0.09)"
+                          : "rgba(255,255,255,0.02)",
+                      },
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 16,
+                        height: 16,
+                        borderRadius: "4px",
+                        flexShrink: 0,
+                        border: checked
+                          ? "1px solid rgba(168,85,247,0.6)"
+                          : "1px solid rgba(255,255,255,0.15)",
+                        background: checked
+                          ? "rgba(168,85,247,0.25)"
+                          : "transparent",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {checked && (
+                        <Box
+                          sx={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: "2px",
+                            background: "#c084fc",
+                          }}
+                        />
+                      )}
+                    </Box>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography
+                        sx={{
+                          fontSize: 13,
+                          color: "#e4e4e7",
+                          fontFamily: "'Syne', sans-serif",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {h.name || "—"}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: 11,
+                          color: "rgba(255,255,255,0.28)",
+                          fontFamily: "'DM Mono', monospace",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {h.email}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  {idx < filteredDeptHeads.length - 1 && (
+                    <Box
+                      sx={{ height: "1px", background: "rgba(255,255,255,0.04)" }}
+                    />
+                  )}
+                </Box>
+              );
+            })
+          )}
+        </Box>
+        {deptHeadIds.length > 0 && (
+          <Typography
+            sx={{
+              fontSize: 11,
+              color: "rgba(255,255,255,0.25)",
+              fontFamily: "'DM Mono', monospace",
+              mt: 1,
+            }}
+          >
+            {deptHeadIds.length} selected
+          </Typography>
+        )}
         <BtnRow>
           <GhostBtn onClick={closeDialog}>Cancel</GhostBtn>
           {dialogType === "create" ? (
             <PrimaryBtn
               onClick={handleCreate}
-              disabled={createMutation.isPending || !name.trim()}
+              disabled={!name.trim()}
+              loading={createMutation.isPending}
             >
               {createMutation.isPending ? "Creating…" : "Create"}
             </PrimaryBtn>
           ) : (
             <PrimaryBtn
               onClick={handleUpdate}
-              disabled={updateMutation.isPending || !name.trim()}
+              disabled={!name.trim()}
+              loading={updateMutation.isPending}
             >
               {updateMutation.isPending ? "Updating…" : "Update"}
             </PrimaryBtn>
@@ -852,7 +1019,8 @@ export default function DepartmentsPage() {
           <GhostBtn onClick={closeDialog}>Cancel</GhostBtn>
           <DangerBtn
             onClick={handleDelete}
-            disabled={deleteMutation.isPending || !menuDept?.id}
+            disabled={!menuDept?.id}
+            loading={deleteMutation.isPending}
           >
             {deleteMutation.isPending ? "Deleting…" : "Delete"}
           </DangerBtn>
@@ -1056,11 +1224,8 @@ export default function DepartmentsPage() {
           <GhostBtn onClick={closeDialog}>Cancel</GhostBtn>
           <PrimaryBtn
             onClick={handleAssignMembers}
-            disabled={
-              assignMemberMutation.isPending ||
-              !menuDept?.id ||
-              selectedVolunteerIds.length === 0
-            }
+            disabled={!menuDept?.id || selectedVolunteerIds.length === 0}
+            loading={assignMemberMutation.isPending}
           >
             {assignMemberMutation.isPending
               ? "Adding…"
@@ -1109,64 +1274,126 @@ export default function DepartmentsPage() {
               borderRadius: "10px",
             }}
           >
-            {selectedDepartment.members.map((member, idx) => (
-              <Box key={member.id}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 2,
-                    px: 2,
-                    py: 1.75,
-                  }}
-                >
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography
+            {(() => {
+              const dhIdSet = new Set(
+                (selectedDepartment.deptHeads || []).map((h) => h.id),
+              );
+              const sorted = [...selectedDepartment.members].sort(
+                (a, b) =>
+                  (dhIdSet.has(b.userId) ? 1 : 0) -
+                  (dhIdSet.has(a.userId) ? 1 : 0),
+              );
+              const roleLabel = {
+                SA: "Super Admin",
+                BOARD: "Board",
+                DH: "Dept Head",
+                JUDGE: "Judge",
+                VOLUNTEER: "Volunteer",
+                USER: "User",
+              };
+              return sorted.map((member, idx) => {
+                const isDH = dhIdSet.has(member.userId);
+                const role = member.user?.role;
+                return (
+                  <Box key={member.id}>
+                    <Box
                       sx={{
-                        fontSize: 13,
-                        color: "#e4e4e7",
-                        fontFamily: "'Syne', sans-serif",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 2,
+                        px: 2,
+                        py: 1.75,
+                        background: isDH
+                          ? "rgba(168,85,247,0.04)"
+                          : "transparent",
                       }}
                     >
-                      {member.user?.name || member.user?.email || "Unknown"}
-                    </Typography>
-                    <Typography
-                      sx={{
-                        fontSize: 11,
-                        color: "rgba(255,255,255,0.28)",
-                        fontFamily: "'DM Mono', monospace",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {member.user?.email || "—"}
-                    </Typography>
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography
+                          sx={{
+                            fontSize: 13,
+                            color: "#e4e4e7",
+                            fontFamily: "'Syne', sans-serif",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {member.user?.name || member.user?.email || "Unknown"}
+                        </Typography>
+                        <Typography
+                          sx={{
+                            fontSize: 11,
+                            color: "rgba(255,255,255,0.28)",
+                            fontFamily: "'DM Mono', monospace",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {member.user?.email || "—"}
+                        </Typography>
+                      </Box>
+                      {role && (
+                        <Box
+                          sx={{
+                            flexShrink: 0,
+                            px: 1,
+                            py: 0.3,
+                            borderRadius: "5px",
+                            border: isDH
+                              ? "1px solid rgba(168,85,247,0.35)"
+                              : "1px solid rgba(255,255,255,0.08)",
+                            background: isDH
+                              ? "rgba(168,85,247,0.12)"
+                              : "rgba(255,255,255,0.04)",
+                          }}
+                        >
+                          <Typography
+                            sx={{
+                              fontSize: 10,
+                              fontFamily: "'DM Mono', monospace",
+                              color: isDH
+                                ? "#c084fc"
+                                : "rgba(255,255,255,0.35)",
+                              letterSpacing: "0.03em",
+                              lineHeight: 1,
+                            }}
+                          >
+                            {roleLabel[role] ?? role}
+                          </Typography>
+                        </Box>
+                      )}
+                      <DangerBtn
+                        onClick={() => handleRemoveMember(member)}
+                        loading={
+                          removeMemberMutation.isPending &&
+                          removingUserId === member.userId
+                        }
+                        disabled={
+                          removeMemberMutation.isPending &&
+                          removingUserId !== member.userId
+                        }
+                      >
+                        {removeMemberMutation.isPending &&
+                        removingUserId === member.userId
+                          ? "Removing…"
+                          : "Remove"}
+                      </DangerBtn>
+                    </Box>
+                    {idx < sorted.length - 1 && (
+                      <Box
+                        sx={{
+                          height: "1px",
+                          background: "rgba(255,255,255,0.04)",
+                        }}
+                      />
+                    )}
                   </Box>
-                  <DangerBtn
-                    onClick={() => handleRemoveMember(member)}
-                    disabled={
-                      removeMemberMutation.isPending &&
-                      removingUserId === member.userId
-                    }
-                  >
-                    {removeMemberMutation.isPending &&
-                    removingUserId === member.userId
-                      ? "Removing…"
-                      : "Remove"}
-                  </DangerBtn>
-                </Box>
-                {idx < selectedDepartment.members.length - 1 && (
-                  <Box
-                    sx={{ height: "1px", background: "rgba(255,255,255,0.04)" }}
-                  />
-                )}
-              </Box>
-            ))}
+                );
+              });
+            })()}
           </Box>
         )}
         <BtnRow>
@@ -1415,77 +1642,104 @@ const btnBase = {
   padding: "9px 18px",
   letterSpacing: "0.02em",
   transition: "all 0.15s",
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
 };
 
-function GhostBtn({ onClick, children }) {
+function BtnSpinner({ color = "currentColor" }) {
+  return (
+    <>
+      <style>{`@keyframes _btnSpin { to { transform: rotate(360deg); } }`}</style>
+      <Loader2
+        size={13}
+        color={color}
+        style={{ animation: "_btnSpin 0.7s linear infinite", flexShrink: 0 }}
+      />
+    </>
+  );
+}
+
+function GhostBtn({ onClick, children, loading, disabled }) {
+  const isDisabled = disabled || loading;
   return (
     <button
       onClick={onClick}
+      disabled={isDisabled}
       style={{
         ...btnBase,
         background: "transparent",
         border: "1px solid rgba(255,255,255,0.08)",
         color: "rgba(255,255,255,0.45)",
+        opacity: isDisabled ? 0.5 : 1,
+        cursor: isDisabled ? "not-allowed" : "pointer",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = "rgba(255,255,255,0.18)";
-        e.currentTarget.style.color = "rgba(255,255,255,0.7)";
+        if (!isDisabled) {
+          e.currentTarget.style.borderColor = "rgba(255,255,255,0.18)";
+          e.currentTarget.style.color = "rgba(255,255,255,0.7)";
+        }
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
         e.currentTarget.style.color = "rgba(255,255,255,0.45)";
       }}
     >
+      {loading && <BtnSpinner />}
       {children}
     </button>
   );
 }
-function PrimaryBtn({ onClick, children, disabled }) {
+function PrimaryBtn({ onClick, children, disabled, loading }) {
+  const isDisabled = disabled || loading;
   return (
     <button
       onClick={onClick}
-      disabled={disabled}
+      disabled={isDisabled}
       style={{
         ...btnBase,
         background: "rgba(255,255,255,0.1)",
         border: "1px solid rgba(255,255,255,0.15)",
         color: "#f4f4f5",
-        opacity: disabled ? 0.5 : 1,
-        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: isDisabled ? 0.5 : 1,
+        cursor: isDisabled ? "not-allowed" : "pointer",
       }}
       onMouseEnter={(e) => {
-        if (!disabled)
+        if (!isDisabled)
           e.currentTarget.style.background = "rgba(255,255,255,0.15)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "rgba(255,255,255,0.1)";
       }}
     >
+      {loading && <BtnSpinner />}
       {children}
     </button>
   );
 }
-function DangerBtn({ onClick, children, disabled }) {
+function DangerBtn({ onClick, children, disabled, loading }) {
+  const isDisabled = disabled || loading;
   return (
     <button
       onClick={onClick}
-      disabled={disabled}
+      disabled={isDisabled}
       style={{
         ...btnBase,
         background: "rgba(239,68,68,0.1)",
         border: "1px solid rgba(239,68,68,0.2)",
         color: "#f87171",
-        opacity: disabled ? 0.5 : 1,
-        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: isDisabled ? 0.5 : 1,
+        cursor: isDisabled ? "not-allowed" : "pointer",
       }}
       onMouseEnter={(e) => {
-        if (!disabled)
+        if (!isDisabled)
           e.currentTarget.style.background = "rgba(239,68,68,0.15)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "rgba(239,68,68,0.1)";
       }}
     >
+      {loading && <BtnSpinner color="#f87171" />}
       {children}
     </button>
   );
