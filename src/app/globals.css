@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: var(--font-sora), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
 @keyframes drift-stars {
   from { transform: translate3d(0, 0, 0); }
   to   { transform: translate3d(-2%, 2%, 0); }

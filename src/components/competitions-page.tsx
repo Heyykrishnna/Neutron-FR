@@ -4,6 +4,7 @@ import React, { useRef, useEffect } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import Lenis from "lenis";
 import Link from "next/link";
+import BlurHeading from "./blur-heading";
 
 type CardProps = {
   title: string;
@@ -124,14 +125,10 @@ export default function CompetitionsPage() {
 
       <main className="max-w-[1400px] mx-auto px-6 md:px-12 lg:px-20 pt-32 pb-40">
         <div className="mb-24 mt-10 max-w-4xl relative z-10">
-          <motion.h1 
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+          <BlurHeading
+            text={"Enter the\ncosmic arena\nat neutron"}
             className="text-6xl md:text-[5.5rem] lg:text-[7rem] font-bold uppercase tracking-[-0.03em] leading-[0.92]"
-          >
-            Enter the<br />cosmic arena<br />at neutron
-          </motion.h1>
+          />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 relative z-10 items-start">
