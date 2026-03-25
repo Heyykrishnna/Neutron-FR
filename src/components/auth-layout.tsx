@@ -20,11 +20,11 @@ export default function AuthLayout({ children, title, subtitle }: AuthLayoutProp
             color1="#ad18f2"
             color2="#3a0bf4"
             color3="#07001f"
-            timeSpeed={0.35}
+            timeSpeed={0.8}
             colorBalance={0}
             warpStrength={1}
             warpFrequency={5}
-            warpSpeed={2}
+            warpSpeed={1}
             warpAmplitude={50}
             blendAngle={0}
             blendSoftness={0.05}

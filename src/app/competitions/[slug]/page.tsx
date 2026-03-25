@@ -17,7 +17,7 @@ export default async function CompetitionSlugPage({ params }: { params: Promise<
 
   return (
     <SmoothScroll>
-      <div className="min-h-screen bg-[#030303] text-white selection:bg-white/20 relative font-sans text-pretty">
+      <div className="min-h-screen bg-[#b70000] text-white selection:bg-white/20 relative font-sans text-pretty">
         
         <div 
           className="fixed top-0 left-0 w-full h-screen z-0 overflow-hidden pointer-events-none" 

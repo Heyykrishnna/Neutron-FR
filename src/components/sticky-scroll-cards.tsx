@@ -76,7 +76,7 @@ export const StickyScrollCards: React.FC<StickyScrollCardsProps> = ({
 
   const rawRotation = useTransform(progress, [0, 1], [0, 1440]);
   const rotateY = useSpring(rawRotation, { 
-    stiffness: 30, 
+    stiffness: 30,
     damping: 25, 
     mass: 0.8,
     restDelta: 0.001 

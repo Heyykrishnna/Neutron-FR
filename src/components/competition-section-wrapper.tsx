@@ -26,7 +26,7 @@ export default function SectionWrapper({ competition }: { competition: any }) {
               WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 60%, transparent 100%)',
             }}
           />
-          <div className="absolute inset-0 bg-linear-to-t from-[#030303] via-transparent to-transparent z-10"></div>
+          <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent z-10"></div>
         </div>
 
         <div className="absolute -inset-12 bg-white/5 border border-white/10 blur-3xl rounded-[4rem] -z-10 opacity-30"></div>
@@ -81,7 +81,7 @@ export default function SectionWrapper({ competition }: { competition: any }) {
                  className="flex flex-col space-y-12"
                >
                 <div className="flex items-center space-x-4 mb-8">
-                  <div className="w-12 h-px bg-white/30"></div>
+                  <div className="w-12 h-px"></div>
                   <h2 className="text-3xl tracking-wide uppercase font-semibold text-white/90">Mission Briefing</h2>
                 </div>
                 <div className="flex flex-col space-y-12 pr-12">
