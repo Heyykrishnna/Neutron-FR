@@ -51,7 +51,6 @@ import {
 import { useUsers } from "@/src/hooks/api/useUsers";
 import { useClubs } from "@/src/hooks/api/useClubs";
 import { LoadingState } from "@/src/components/LoadingState";
-import CompetitionFormModal from "@/src/components/forms/CompetitionFormModal";
 import PromoCodeApprovalModal from "@/src/components/forms/PromoCodeApprovalModal";
 import { useCompetitionForms } from "@/src/hooks/api/useCompetitionForms";
 
@@ -1281,8 +1280,6 @@ export default function CompetitionsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [eventTypeFilter, setEventTypeFilter] = useState("all");
   const [manageTarget, setManageTarget] = useState(null);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [promoCodeTarget, setPromoCodeTarget] = useState(null);
   const [menuAnchor, setMenuAnchor] = useState(null);
@@ -1428,7 +1425,9 @@ export default function CompetitionsPage() {
             </Typography>
           </Box>
           <Box sx={{ display: "flex", gap: 1 }}>
-            <PurpleBtn onClick={() => setCreateOpen(true)}>
+            <PurpleBtn
+              onClick={() => router.push("/admin/dh/competitions/builder")}
+            >
               <Plus size={14} />
               New Competition
             </PurpleBtn>
@@ -1844,7 +1843,14 @@ export default function CompetitionsPage() {
         )}
         <MenuItem
           onClick={() => {
-            setEditTarget(menuComp);
+            if (menuComp?.id) {
+              const params = new URLSearchParams({
+                competitionId: menuComp.id,
+              });
+              router.push(
+                `/admin/dh/competitions/builder?${params.toString()}`,
+              );
+            }
             setMenuAnchor(null);
             setMenuComp(null);
           }}
@@ -1964,16 +1970,6 @@ export default function CompetitionsPage() {
         open={!!promoCodeTarget}
         onClose={() => setPromoCodeTarget(null)}
         registrationFee={promoCodeTarget?.registrationFee || 0}
-      />
-      <CompetitionFormModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        competition={null}
-      />
-      <CompetitionFormModal
-        open={!!editTarget}
-        onClose={() => setEditTarget(null)}
-        competition={editTarget}
       />
 
       <Dialog

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Box, CircularProgress, Dialog, Typography } from "@mui/material";
-import { Check, ChevronLeft, ChevronRight, Trophy } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, AlertCircle, Trophy } from "lucide-react";
 import { useSnackbar } from "notistack";
 
 import {
@@ -27,21 +27,18 @@ import {
 } from "@/src/hooks/api/useCompetitions";
 import { useAuth } from "@/contexts/AuthContext";
 
-const STEP_LABELS = [
-  "Basic Info",
-  "Schedule & Venue",
-  "Rules",
-  "Registration",
-  "Poster & Review",
-];
+// ─── Step config ──────────────────────────────────────────────────────────────
 
+const STEP_LABELS = ["Basic Info", "Schedule & Venue", "Rules", "Registration", "Review"];
 const STEP_DESCRIPTIONS = [
-  "Core event identity and structure",
-  "Timeline and location details",
-  "Rules and participant instructions",
-  "Registration logic, team limits, pricing, and incentives",
+  "Core identity and structure",
+  "Timeline and location",
+  "Rules and participant guidelines",
+  "Limits, settings, prizes, and promo codes",
   "Poster upload and final review",
 ];
+
+// ─── Backend error mapping ────────────────────────────────────────────────────
 
 const BACKEND_FIELD_TOKEN_TO_FORM_FIELD = {
   TITLE: "title",
@@ -59,8 +56,8 @@ const BACKEND_FIELD_TOKEN_TO_FORM_FIELD = {
   REGISTRATIONFEE: "registrationFee",
   MAXREGISTRATIONS: "maxRegistrations",
   MAXTEAMSPERCOLLEGE: "maxTeamsPerCollege",
-  MINTEAMSIZE: "minTeamSize",
   MAXTEAMSIZE: "maxTeamSize",
+  MINTEAMSIZE: "minTeamSize",
   PROMOCODES: "promoCodes",
   PROMOCO: "promoCodes",
   PRIZEPOO: "prizePool",
@@ -73,24 +70,18 @@ const BACKEND_FIELD_TOKEN_TO_FORM_FIELD = {
 
 const ERROR_MESSAGE_MAP = {
   INVALID_SCHEDULE_RANGE: "Event end time must be after start time",
-  INVALID_REGISTRATION_DEADLINE:
-    "Registration deadline must be before event start time",
+  INVALID_REGISTRATION_DEADLINE: "Registration deadline must be before event start time",
   INVALID_PROMO_CODES_FORMAT: "Promo codes have invalid format or values",
   INVALID_MIN_TEAM_SIZE_VALUE: "Minimum team size must be a positive number",
   INVALID_MAX_TEAM_SIZE_VALUE: "Maximum team size must be greater than minimum",
   INVALID_COMPETITION_TYPE_VALUE: "Invalid competition type",
-  PENDING_PROPOSAL_ALREADY_EXISTS:
-    "A pending edit proposal already exists for this competition",
+  PENDING_PROPOSAL_ALREADY_EXISTS: "A pending edit proposal already exists for this competition",
   PROMO_PERCENT_EXCEEDS_100: "Promo code discount cannot exceed 100%",
-  PROMO_FLAT_EXCEEDS_REGISTRATION_FEE:
-    "Flat discount cannot exceed registration fee",
+  PROMO_FLAT_EXCEEDS_REGISTRATION_FEE: "Flat discount cannot exceed registration fee",
 };
 
 const findStepIndexForField = (fieldName) => {
-  if (fieldName === "poster") {
-    return STEP_LABELS.length - 1;
-  }
-
+  if (fieldName === "poster") return STEP_LABELS.length - 1;
   const index = STEP_FIELDS.findIndex((fields) => fields.includes(fieldName));
   return index >= 0 ? index : 0;
 };
@@ -98,90 +89,53 @@ const findStepIndexForField = (fieldName) => {
 const parseBackendValidationCode = (code) => {
   if (typeof code !== "string") return null;
 
-  // Check direct error message map first
   if (ERROR_MESSAGE_MAP[code]) {
     const parts = code.match(/^INVALID_([A-Z_]+)/) || code.match(/^([A-Z_]+)/);
     const token = parts ? parts[1].replaceAll("_", "") : "";
     const fieldName = BACKEND_FIELD_TOKEN_TO_FORM_FIELD[token] || "title";
-
-    return {
-      field: fieldName,
-      stepIndex: findStepIndexForField(fieldName),
-      message: ERROR_MESSAGE_MAP[code],
-    };
+    return { field: fieldName, stepIndex: findStepIndexForField(fieldName), message: ERROR_MESSAGE_MAP[code] };
   }
 
-  // Pattern: INVALID_SOMETHING_VALUE
   const invalidValueMatch = code.match(/^INVALID_([A-Z_]+)_VALUE$/);
   if (invalidValueMatch) {
     const token = invalidValueMatch[1].replaceAll("_", "");
     const fieldName = BACKEND_FIELD_TOKEN_TO_FORM_FIELD[token];
     if (!fieldName) return null;
-
-    return {
-      field: fieldName,
-      stepIndex: findStepIndexForField(fieldName),
-      message: "Please enter a valid value for this field.",
-    };
+    return { field: fieldName, stepIndex: findStepIndexForField(fieldName), message: "Please enter a valid value for this field." };
   }
 
-  // Pattern: INVALID_SOMETHING_AT_INDEX_N (for complex fields)
   const indexMatch = code.match(/^INVALID_([A-Z_]+)_AT_INDEX_\d+/);
   if (indexMatch) {
     const token = indexMatch[1].replaceAll("_", "");
     const fieldName = BACKEND_FIELD_TOKEN_TO_FORM_FIELD[token];
     if (!fieldName) return null;
-
-    return {
-      field: fieldName,
-      stepIndex: findStepIndexForField(fieldName),
-      message: `Invalid entry in ${fieldName}. Please review and correct.`,
-    };
+    return { field: fieldName, stepIndex: findStepIndexForField(fieldName), message: `Invalid entry in ${fieldName}. Please review and correct.` };
   }
 
-  // Pattern: PROMO_* (for promo code errors)
   if (code.startsWith("PROMO_")) {
-    return {
-      field: "promoCodes",
-      stepIndex: findStepIndexForField("promoCodes"),
-      message: ERROR_MESSAGE_MAP[code] || "Promo code validation failed",
-    };
-  }
-
-  // Pattern: PENDING_PROPOSAL_ALREADY_EXISTS
-  if (code.includes("PENDING_PROPOSAL")) {
-    return null; // This is a global error, not field-specific
+    return { field: "promoCodes", stepIndex: findStepIndexForField("promoCodes"), message: ERROR_MESSAGE_MAP[code] || "Promo code validation failed" };
   }
 
   return null;
 };
 
-const getFirstErrorMessage = (errorNode) => {
-  if (!errorNode) return null;
-
-  if (typeof errorNode?.message === "string" && errorNode.message.trim()) {
-    return errorNode.message;
-  }
-
-  if (Array.isArray(errorNode)) {
-    for (const item of errorNode) {
-      const nested = getFirstErrorMessage(item);
-      if (nested) return nested;
-    }
-    return null;
-  }
-
-  if (typeof errorNode === "object") {
-    for (const value of Object.values(errorNode)) {
-      const nested = getFirstErrorMessage(value);
-      if (nested) return nested;
-    }
-  }
-
-  return null;
-};
+// ─── Error collection helpers ─────────────────────────────────────────────────
 
 const FIELD_LABELS = {
+  title: "Title",
+  shortDescription: "Short Description",
+  category: "Category",
+  eventType: "Event Type",
+  type: "Participation Type",
+  status: "Status",
+  startTime: "Start Time",
+  endTime: "End Time",
+  registrationDeadline: "Registration Deadline",
+  venueName: "Venue Name",
+  venueRoom: "Room",
+  venueFloor: "Floor",
+  subVenues: "Sub Venues",
+  rulesRichText: "Rules",
   registrationFee: "Registration Fee",
   maxRegistrations: "Max Registrations",
   maxTeamsPerCollege: "Max Teams Per College",
@@ -189,7 +143,7 @@ const FIELD_LABELS = {
   maxTeamSize: "Max Team Size",
   registrationsOpen: "Registrations Open",
   requiresApproval: "Requires Approval",
-  autoApproveTeams: "Auto-Approve Teams",
+  autoApproveTeams: "Auto-Approve",
   attendanceRequired: "Attendance Required",
   isPaid: "Paid Event",
   perPerson: "Fee Per Person",
@@ -197,71 +151,46 @@ const FIELD_LABELS = {
   promoCodes: "Promo Codes",
 };
 
-const formatFieldPathLabel = (pathParts = []) => {
-  if (!pathParts.length) return "Form";
-
-  const [root, second, third] = pathParts;
-  const rootLabel = FIELD_LABELS[root] || root;
-
-  if (typeof second === "number") {
-    const rowIndex = second + 1;
-
-    if (root === "prizePool") {
-      const nested = third ? ` · ${FIELD_LABELS[third] || third}` : "";
-      return `${rootLabel} #${rowIndex}${nested}`;
-    }
-
-    if (root === "promoCodes") {
-      const nested = third ? ` · ${FIELD_LABELS[third] || third}` : "";
-      return `${rootLabel} #${rowIndex}${nested}`;
-    }
-  }
-
-  return rootLabel;
-};
-
 const collectErrorMessages = (node, path = [], bag = []) => {
   if (!node) return bag;
-
   if (typeof node?.message === "string" && node.message.trim()) {
-    bag.push({
-      field: formatFieldPathLabel(path),
-      message: node.message.trim(),
-    });
+    const [root, second, third] = path;
+    const rootLabel = FIELD_LABELS[root] || root;
+    let fieldLabel = rootLabel;
+    if (typeof second === "number") {
+      const nested = third ? ` · ${FIELD_LABELS[third] || third}` : "";
+      fieldLabel = `${rootLabel} #${second + 1}${nested}`;
+    }
+    bag.push({ field: fieldLabel, message: node.message.trim() });
   }
-
   if (Array.isArray(node)) {
-    node.forEach((item, index) =>
-      collectErrorMessages(item, [...path, index], bag),
-    );
+    node.forEach((item, i) => collectErrorMessages(item, [...path, i], bag));
     return bag;
   }
-
   if (typeof node === "object") {
-    Object.entries(node).forEach(([key, value]) => {
+    Object.entries(node).forEach(([key, val]) => {
       if (key === "message" || key === "type" || key === "ref") return;
-      collectErrorMessages(value, [...path, key], bag);
+      collectErrorMessages(val, [...path, key], bag);
     });
   }
-
   return bag;
 };
 
-const getStepValidationMessages = (errors, fields = []) => {
+const getStepErrorMessages = (errors, fields = []) => {
   const messages = [];
-
-  fields.forEach((fieldName) => {
-    collectErrorMessages(errors?.[fieldName], [fieldName], messages);
-  });
-
-  const unique = new Set();
-  return messages.filter((item) => {
-    const key = `${item.field}:${item.message}`;
-    if (unique.has(key)) return false;
-    unique.add(key);
+  fields.forEach((f) => collectErrorMessages(errors?.[f], [f], messages));
+  const seen = new Set();
+  return messages.filter(({ field, message }) => {
+    const key = `${field}:${message}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
     return true;
   });
 };
+
+const countStepErrors = (errors, fields = []) => getStepErrorMessages(errors, fields).length;
+
+// ─── Buttons ──────────────────────────────────────────────────────────────────
 
 const btnBase = {
   border: "none",
@@ -306,11 +235,9 @@ function PurpleBtn({ children, disabled, onClick }) {
       onClick={onClick}
       style={{
         ...btnBase,
-        background: disabled
-          ? "rgba(168,85,247,0.25)"
-          : "rgba(168,85,247,0.85)",
+        background: disabled ? "rgba(168,85,247,0.2)" : "rgba(168,85,247,0.85)",
         border: "1px solid rgba(168,85,247,0.4)",
-        color: disabled ? "rgba(255,255,255,0.35)" : "#fff",
+        color: disabled ? "rgba(255,255,255,0.3)" : "#fff",
         cursor: disabled ? "not-allowed" : "pointer",
       }}
     >
@@ -319,124 +246,196 @@ function PurpleBtn({ children, disabled, onClick }) {
   );
 }
 
-function StepIndicator({ activeStep }) {
+// ─── Step indicator ───────────────────────────────────────────────────────────
+
+function StepIndicator({ activeStep, visitedUpTo, stepErrorCounts, onStepClick }) {
   return (
     <Box
       sx={{
         display: "flex",
         alignItems: "center",
         px: 4,
-        py: 2.5,
+        py: 2,
         borderBottom: "1px solid rgba(255,255,255,0.06)",
         overflowX: "auto",
       }}
     >
-      {STEP_LABELS.map((label, index) => (
-        <Box
-          key={label}
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            flex: index < STEP_LABELS.length - 1 ? "1 1 auto" : undefined,
-          }}
-        >
+      {STEP_LABELS.map((label, index) => {
+        const isActive = index === activeStep;
+        const isDone = index < activeStep;
+        const isVisited = index <= visitedUpTo;
+        const canClick = isVisited && index !== activeStep;
+        const errCount = stepErrorCounts[index] || 0;
+        const hasErrors = errCount > 0 && isVisited && !isActive;
+
+        return (
           <Box
+            key={label}
             sx={{
               display: "flex",
-              flexDirection: "column",
               alignItems: "center",
-              gap: 0.5,
+              flex: index < STEP_LABELS.length - 1 ? "1 1 auto" : undefined,
             }}
           >
             <Box
+              onClick={() => canClick && onStepClick(index)}
               sx={{
-                width: 28,
-                height: 28,
-                borderRadius: "50%",
-                background:
-                  index < activeStep
-                    ? "rgba(168,85,247,0.9)"
-                    : index === activeStep
-                      ? "rgba(168,85,247,0.15)"
-                      : "rgba(255,255,255,0.05)",
-                border:
-                  index === activeStep
-                    ? "2px solid rgba(168,85,247,0.8)"
-                    : index < activeStep
-                      ? "2px solid rgba(168,85,247,0.9)"
-                      : "2px solid rgba(255,255,255,0.08)",
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
-                justifyContent: "center",
+                gap: 0.5,
+                cursor: canClick ? "pointer" : "default",
+                "&:hover .step-label": canClick ? { color: "rgba(255,255,255,0.7)" } : {},
               }}
             >
-              {index < activeStep ? (
-                <Check size={13} color="#fff" />
-              ) : (
-                <Typography
-                  sx={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color:
-                      index === activeStep
-                        ? "#c084fc"
-                        : "rgba(255,255,255,0.25)",
-                    fontFamily: "'Syne', sans-serif",
-                  }}
-                >
-                  {index + 1}
-                </Typography>
-              )}
-            </Box>
-            <Typography
-              sx={{
-                fontSize: 9.5,
-                letterSpacing: "0.06em",
-                color:
-                  index === activeStep
+              <Box
+                sx={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: "50%",
+                  position: "relative",
+                  background: hasErrors
+                    ? "rgba(239,68,68,0.12)"
+                    : isDone
+                    ? "rgba(168,85,247,0.9)"
+                    : isActive
+                    ? "rgba(168,85,247,0.12)"
+                    : "rgba(255,255,255,0.04)",
+                  border: hasErrors
+                    ? "2px solid rgba(239,68,68,0.5)"
+                    : isDone
+                    ? "2px solid rgba(168,85,247,0.9)"
+                    : isActive
+                    ? "2px solid rgba(168,85,247,0.8)"
+                    : "2px solid rgba(255,255,255,0.07)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {hasErrors ? (
+                  <AlertCircle size={12} color="#f87171" />
+                ) : isDone ? (
+                  <Check size={13} color="#fff" />
+                ) : (
+                  <Typography
+                    sx={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: isActive ? "#c084fc" : "rgba(255,255,255,0.22)",
+                      fontFamily: "'Syne', sans-serif",
+                    }}
+                  >
+                    {index + 1}
+                  </Typography>
+                )}
+              </Box>
+              <Typography
+                className="step-label"
+                sx={{
+                  fontSize: 9.5,
+                  letterSpacing: "0.06em",
+                  transition: "color 0.12s",
+                  color: hasErrors
+                    ? "#f87171"
+                    : isActive
                     ? "rgba(255,255,255,0.8)"
-                    : index < activeStep
-                      ? "rgba(168,85,247,0.8)"
-                      : "rgba(255,255,255,0.2)",
-                fontFamily: "'Syne', sans-serif",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {label}
-            </Typography>
-          </Box>
+                    : isDone
+                    ? "rgba(168,85,247,0.75)"
+                    : "rgba(255,255,255,0.2)",
+                  fontFamily: "'Syne', sans-serif",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {label}
+              </Typography>
+            </Box>
 
-          {index < STEP_LABELS.length - 1 && (
-            <Box
-              sx={{
-                flex: 1,
-                height: "1px",
-                mx: 1,
-                mb: 2.25,
-                background:
-                  index < activeStep
-                    ? "rgba(168,85,247,0.5)"
-                    : "rgba(255,255,255,0.06)",
-              }}
-            />
-          )}
-        </Box>
-      ))}
+            {index < STEP_LABELS.length - 1 && (
+              <Box
+                sx={{
+                  flex: 1,
+                  height: "1px",
+                  mx: 1,
+                  mb: 2.25,
+                  background:
+                    index < activeStep
+                      ? "rgba(168,85,247,0.45)"
+                      : "rgba(255,255,255,0.05)",
+                }}
+              />
+            )}
+          </Box>
+        );
+      })}
     </Box>
   );
 }
 
-export default function CompetitionFormModal({ open, onClose, competition }) {
+// ─── Inline step error banner ─────────────────────────────────────────────────
+
+function StepErrorBanner({ messages }) {
+  if (!messages.length) return null;
+  return (
+    <Box
+      sx={{
+        mb: 2.5,
+        px: 2,
+        py: 1.5,
+        borderRadius: "8px",
+        background: "rgba(239,68,68,0.07)",
+        border: "1px solid rgba(239,68,68,0.18)",
+      }}
+    >
+      <Typography
+        sx={{
+          fontSize: 10,
+          textTransform: "uppercase",
+          letterSpacing: "0.1em",
+          color: "#f87171",
+          fontFamily: "'DM Mono', monospace",
+          mb: 0.75,
+        }}
+      >
+        Fix the following before continuing
+      </Typography>
+      <Box component="ul" sx={{ m: 0, pl: 2.25 }}>
+        {messages.map((item, i) => (
+          <Typography
+            key={`${item.field}-${i}`}
+            component="li"
+            sx={{
+              fontSize: 12,
+              color: "#fecaca",
+              fontFamily: "'Syne', sans-serif",
+              lineHeight: 1.6,
+              mt: 0.25,
+            }}
+          >
+            <strong style={{ color: "#fca5a5" }}>{item.field}:</strong> {item.message}
+          </Typography>
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+export default function CompetitionFormModal({ open, onClose, competition, mode = "modal" }) {
+  const isPageMode = mode === "page";
+  const isVisible = isPageMode ? true : Boolean(open);
   const isEdit = Boolean(competition);
   const { user } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
 
   const [activeStep, setActiveStep] = useState(0);
+  const [visitedUpTo, setVisitedUpTo] = useState(0);
   const [poster, setPoster] = useState(null);
-  const [showStep4BlockReason, setShowStep4BlockReason] = useState(false);
+  const [showErrorBanner, setShowErrorBanner] = useState(false);
 
   const { data: fetchedCompetition, isLoading: isCompetitionLoading } =
-    useCompetition(open && competition?.id ? competition.id : null);
+    useCompetition(isVisible && competition?.id ? competition.id : null);
 
   const currentCompetition = useMemo(
     () => fetchedCompetition || competition || null,
@@ -447,7 +446,7 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
     const isDH = user?.role === "DH";
     if (!isDH) return STATUS_OPTS;
     if (currentCompetition?.status === "OPEN") return STATUS_OPTS;
-    return STATUS_OPTS.filter((status) => status !== "OPEN");
+    return STATUS_OPTS.filter((s) => s !== "OPEN");
   }, [user?.role, currentCompetition?.status]);
 
   const createMutation = useCreateCompetition();
@@ -471,99 +470,103 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
   });
 
   useEffect(() => {
-    if (!open) return;
-
+    if (!isVisible) return;
     if (isEdit) {
-      if (currentCompetition) {
-        reset(getEditDefaults(currentCompetition));
-      }
+      if (currentCompetition) reset(getEditDefaults(currentCompetition));
     } else {
       reset(DEFAULT_VALUES);
     }
-
     setActiveStep(0);
+    setVisitedUpTo(0);
     setPoster(null);
-  }, [open, isEdit, currentCompetition, reset]);
+    setShowErrorBanner(false);
+  }, [isVisible, isEdit, currentCompetition, reset]);
 
   const closeModal = () => {
     reset(DEFAULT_VALUES);
     setPoster(null);
     setActiveStep(0);
-    setShowStep4BlockReason(false);
-    onClose();
+    setVisitedUpTo(0);
+    setShowErrorBanner(false);
+    if (typeof onClose === "function") onClose();
   };
 
-  const step4Reasons = useMemo(() => {
-    if (activeStep !== 3) return [];
-    return getStepValidationMessages(errors, STEP_FIELDS[3]);
-  }, [activeStep, errors]);
+  // Compute per-step error counts for the indicator
+  const stepErrorCounts = useMemo(
+    () => STEP_FIELDS.map((fields) => countStepErrors(errors, fields)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(errors)], // eslint avoidance — errors is a deep object
+  );
+
+  const currentStepErrors = useMemo(
+    () => (showErrorBanner ? getStepErrorMessages(errors, STEP_FIELDS[activeStep] || []) : []),
+    [showErrorBanner, errors, activeStep],
+  );
 
   const goNext = async () => {
     const fields = STEP_FIELDS[activeStep] || [];
     if (!fields.length) {
-      setShowStep4BlockReason(false);
-      setActiveStep((prev) => Math.min(prev + 1, STEP_LABELS.length - 1));
+      setShowErrorBanner(false);
+      const next = Math.min(activeStep + 1, STEP_LABELS.length - 1);
+      setActiveStep(next);
+      setVisitedUpTo((v) => Math.max(v, next));
       return;
     }
 
-    const isStepValid = await trigger(fields);
-    if (!isStepValid) {
-      if (activeStep === 3) {
-        setShowStep4BlockReason(true);
-      }
+    const valid = await trigger(fields);
+    if (!valid) {
+      setShowErrorBanner(true);
       return;
     }
 
-    setShowStep4BlockReason(false);
-    setActiveStep((prev) => Math.min(prev + 1, STEP_LABELS.length - 1));
+    setShowErrorBanner(false);
+    const next = Math.min(activeStep + 1, STEP_LABELS.length - 1);
+    setActiveStep(next);
+    setVisitedUpTo((v) => Math.max(v, next));
   };
 
   const goBack = () => {
-    setShowStep4BlockReason(false);
+    setShowErrorBanner(false);
     setActiveStep((prev) => Math.max(prev - 1, 0));
+  };
+
+  const goToStep = (index) => {
+    setShowErrorBanner(false);
+    setActiveStep(index);
   };
 
   const onSubmit = async (values) => {
     const formData = buildCompetitionPayloadFormData(values, poster);
+
+    const handleError = (error) => {
+      const backendCode = error?.response?.data?.error || error?.response?.data?.message;
+      const mapped = parseBackendValidationCode(backendCode);
+      if (mapped) {
+        setError(mapped.field, { type: "server", message: mapped.message });
+        setActiveStep(mapped.stepIndex);
+        setVisitedUpTo((v) => Math.max(v, mapped.stepIndex));
+        setShowErrorBanner(true);
+      }
+      enqueueSnackbar(
+        mapped?.message || error?.response?.data?.message || (isEdit ? "Failed to update competition" : "Failed to create competition"),
+        { variant: "error" },
+      );
+    };
 
     if (isEdit) {
       updateMutation.mutate(
         { competitionId: currentCompetition.id, formData },
         {
           onSuccess: (response) => {
-            if (response?.pendingApproval) {
-              enqueueSnackbar(
-                response?.message ||
-                  "Competition change submitted for SA approval.",
-                { variant: "info", autoHideDuration: 6000 },
-              );
-            } else {
-              enqueueSnackbar("Competition updated successfully", {
-                variant: "success",
-              });
-            }
+            enqueueSnackbar(
+              response?.pendingApproval
+                ? (response?.message || "Competition change submitted for SA approval.")
+                : "Competition updated successfully",
+              { variant: response?.pendingApproval ? "info" : "success", autoHideDuration: 6000 },
+            );
             closeModal();
           },
-          onError: (error) => {
-            const backendCode =
-              error?.response?.data?.error || error?.response?.data?.message;
-            const mappedValidation = parseBackendValidationCode(backendCode);
-
-            if (mappedValidation) {
-              setError(mappedValidation.field, {
-                type: "server",
-                message: mappedValidation.message,
-              });
-              setActiveStep(mappedValidation.stepIndex);
-            }
-
-            enqueueSnackbar(
-              mappedValidation?.message ||
-                error?.response?.data?.message ||
-                "Failed to update competition",
-              { variant: "error" },
-            );
-          },
+          onError: handleError,
         },
       );
       return;
@@ -571,92 +574,31 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
 
     createMutation.mutate(formData, {
       onSuccess: (response) => {
-        if (response?.pendingApproval) {
-          enqueueSnackbar(
-            response?.message ||
-              "Competition creation submitted for SA approval.",
-            { variant: "info", autoHideDuration: 6000 },
-          );
-        } else {
-          enqueueSnackbar("Competition created successfully", {
-            variant: "success",
-          });
-        }
+        enqueueSnackbar(
+          response?.pendingApproval
+            ? (response?.message || "Competition creation submitted for SA approval.")
+            : "Competition created successfully",
+          { variant: response?.pendingApproval ? "info" : "success", autoHideDuration: 6000 },
+        );
         closeModal();
       },
-      onError: (error) => {
-        const backendCode =
-          error?.response?.data?.error || error?.response?.data?.message;
-        const mappedValidation = parseBackendValidationCode(backendCode);
-
-        if (mappedValidation) {
-          setError(mappedValidation.field, {
-            type: "server",
-            message: mappedValidation.message,
-          });
-          setActiveStep(mappedValidation.stepIndex);
-        }
-
-        enqueueSnackbar(
-          mappedValidation?.message ||
-            error?.response?.data?.message ||
-            "Failed to create competition",
-          { variant: "error" },
-        );
-      },
+      onError: handleError,
     });
   };
 
-  const steps = [
-    <CompetitionBasicInfoStep
-      key="basic"
-      control={control}
-      errors={errors}
-      statusOptions={statusOptions}
-    />,
-    <CompetitionScheduleVenueStep
-      key="schedule"
-      control={control}
-      errors={errors}
-    />,
-    <CompetitionRulesStep key="rules" control={control} errors={errors} />,
-    <CompetitionRegistrationConfigStep
-      key="registration"
-      control={control}
-      errors={errors}
-      setValue={setValue}
-    />,
-    <CompetitionPosterReviewStep
-      key="poster"
-      watch={watch}
-      poster={poster}
-      onPosterChange={setPoster}
-      existingPosterPath={currentCompetition?.posterPath}
-    />,
-  ];
-
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
-  return (
-    <Dialog
-      open={open}
-      onClose={closeModal}
-      maxWidth="lg"
-      fullWidth
-      PaperProps={{
-        sx: {
-          background: "#0e0e0e",
-          border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: "16px",
-          boxShadow: "0 32px 80px rgba(0,0,0,0.8)",
-          overflow: "hidden",
-          height: "90vh",
-          maxHeight: "90vh",
-          display: "flex",
-          flexDirection: "column",
-        },
-      }}
-    >
+  const steps = [
+    <CompetitionBasicInfoStep key="basic" control={control} errors={errors} statusOptions={statusOptions} />,
+    <CompetitionScheduleVenueStep key="schedule" control={control} errors={errors} />,
+    <CompetitionRulesStep key="rules" control={control} errors={errors} />,
+    <CompetitionRegistrationConfigStep key="registration" control={control} errors={errors} setValue={setValue} />,
+    <CompetitionPosterReviewStep key="poster" watch={watch} poster={poster} onPosterChange={setPoster} existingPosterPath={currentCompetition?.posterPath} />,
+  ];
+
+  const formContent = (
+    <>
+      {/* ── Header ── */}
       <Box
         sx={{
           px: 4,
@@ -673,8 +615,8 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
             width: 32,
             height: 32,
             borderRadius: "9px",
-            background: "rgba(168,85,247,0.12)",
-            border: "1px solid rgba(168,85,247,0.25)",
+            background: "rgba(168,85,247,0.1)",
+            border: "1px solid rgba(168,85,247,0.22)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -683,7 +625,6 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
         >
           <Trophy size={15} color="#a855f7" />
         </Box>
-
         <Box>
           <Typography
             sx={{
@@ -694,107 +635,44 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
               lineHeight: 1.2,
             }}
           >
-            {isEdit
-              ? `Edit: ${currentCompetition?.title || "Competition"}`
-              : "Create Competition"}
+            {isEdit ? `Edit: ${currentCompetition?.title || "Competition"}` : "Create Competition"}
           </Typography>
           <Typography
             sx={{
               fontSize: 11,
-              color: "rgba(255,255,255,0.28)",
+              color: "rgba(255,255,255,0.25)",
               fontFamily: "'DM Mono', monospace",
             }}
           >
-            Step {activeStep + 1} of {STEP_LABELS.length} ·{" "}
-            {STEP_DESCRIPTIONS[activeStep]}
+            Step {activeStep + 1} of {STEP_LABELS.length} · {STEP_DESCRIPTIONS[activeStep]}
           </Typography>
         </Box>
       </Box>
 
-      <StepIndicator activeStep={activeStep} />
+      {/* ── Step indicator ── */}
+      <StepIndicator
+        activeStep={activeStep}
+        visitedUpTo={visitedUpTo}
+        stepErrorCounts={stepErrorCounts}
+        onStepClick={goToStep}
+      />
 
+      {/* ── Form body ── */}
       <Box
         component="form"
-        onSubmit={(event) => event.preventDefault()}
+        onSubmit={(e) => e.preventDefault()}
         sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}
       >
         <Box sx={{ px: 4, py: 3, flex: 1, minHeight: 0, overflowY: "auto" }}>
-          {activeStep === 3 &&
-            showStep4BlockReason &&
-            step4Reasons.length > 0 && (
-              <Box
-                sx={{
-                  mb: 2,
-                  px: 1.5,
-                  py: 1.25,
-                  borderRadius: "8px",
-                  background: "rgba(239,68,68,0.08)",
-                  border: "1px solid rgba(239,68,68,0.2)",
-                }}
-              >
-                <Typography
-                  sx={{
-                    fontSize: 11,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                    color: "#f87171",
-                    fontFamily: "'DM Mono', monospace",
-                    mb: 0.35,
-                  }}
-                >
-                  Cannot move to next step
-                </Typography>
-                <Typography
-                  sx={{
-                    fontSize: 13,
-                    color: "#fca5a5",
-                    fontFamily: "'Syne', sans-serif",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  Fix the following:
-                </Typography>
-                <Box component="ul" sx={{ mt: 1, mb: 0, pl: 2.25 }}>
-                  {step4Reasons.map((reason, index) => (
-                    <Typography
-                      key={`${reason.field}-${reason.message}-${index}`}
-                      component="li"
-                      sx={{
-                        mt: 0.4,
-                        fontSize: 12,
-                        color: "#fecaca",
-                        fontFamily: "'Syne', sans-serif",
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      {reason.field}: {reason.message}
-                    </Typography>
-                  ))}
-                </Box>
-              </Box>
-            )}
+          {/* Error banner */}
+          <StepErrorBanner messages={currentStepErrors} />
 
+          {/* Loading state (edit mode) */}
           {isEdit && isCompetitionLoading ? (
-            <Box
-              sx={{
-                height: "100%",
-                minHeight: 260,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexDirection: "column",
-                gap: 1,
-              }}
-            >
+            <Box sx={{ height: "100%", minHeight: 240, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 1 }}>
               <CircularProgress size={22} sx={{ color: "#a855f7" }} />
-              <Typography
-                sx={{
-                  fontSize: 12,
-                  color: "rgba(255,255,255,0.35)",
-                  fontFamily: "'DM Mono', monospace",
-                }}
-              >
-                Loading competition details…
+              <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.3)", fontFamily: "'DM Mono', monospace" }}>
+                Loading competition…
               </Typography>
             </Box>
           ) : (
@@ -802,6 +680,7 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
           )}
         </Box>
 
+        {/* ── Footer ── */}
         <Box
           sx={{
             px: 4,
@@ -830,10 +709,7 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
                 <ChevronRight size={14} />
               </PurpleBtn>
             ) : (
-              <PurpleBtn
-                onClick={handleSubmit(onSubmit)}
-                disabled={isSubmitting}
-              >
+              <PurpleBtn onClick={handleSubmit(onSubmit)} disabled={isSubmitting}>
                 {isSubmitting ? (
                   <>
                     <CircularProgress size={13} sx={{ color: "#fff" }} />
@@ -849,6 +725,49 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
           </Box>
         </Box>
       </Box>
+    </>
+  );
+
+  if (isPageMode) {
+    return (
+      <Box
+        sx={{
+          background: "#0e0e0e",
+          border: "1px solid rgba(255,255,255,0.07)",
+          borderRadius: "16px",
+          boxShadow: "0 32px 80px rgba(0,0,0,0.75)",
+          overflow: "hidden",
+          minHeight: "85vh",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {formContent}
+      </Box>
+    );
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onClose={closeModal}
+      maxWidth="lg"
+      fullWidth
+      PaperProps={{
+        sx: {
+          background: "#0e0e0e",
+          border: "1px solid rgba(255,255,255,0.07)",
+          borderRadius: "16px",
+          boxShadow: "0 32px 80px rgba(0,0,0,0.75)",
+          overflow: "hidden",
+          height: "90vh",
+          maxHeight: "90vh",
+          display: "flex",
+          flexDirection: "column",
+        },
+      }}
+    >
+      {formContent}
     </Dialog>
   );
 }
