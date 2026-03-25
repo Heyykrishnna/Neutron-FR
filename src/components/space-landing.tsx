@@ -15,6 +15,7 @@ import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 
 import { PLANET_RECORDS } from "@/lib/planet-data";
 import NebulaStar from "./nebula-star";
+import Noise from "./Noise";
 
 type PlanetRuntimeEntry = {
   slug: string;
@@ -147,11 +148,16 @@ export default function SpaceLanding() {
     }
   }, []);
 
+  const [handsProgress, setHandsProgress] = useState(0);
+
   useEffect(() => {
     const onScroll = () => {
       const scrolledVH = (window.scrollY / window.innerHeight) * 100;
       setVideoOpacity(Math.max(0, 1 - scrolledVH / 150));
       setIsScrolled(scrolledVH > 50);
+      const rawProgress = Math.min(1, scrolledVH / 220);
+      const fadeOut = scrolledVH > 200 ? Math.max(0, 1 - (scrolledVH - 200) / 150) : 1;
+      setHandsProgress(rawProgress * fadeOut);
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
@@ -333,31 +339,160 @@ export default function SpaceLanding() {
             loop
             playsInline
             className="absolute inset-0 w-full h-full object-cover"
-            style={{ filter: "brightness(0.55) saturate(1.1) contrast(1)" }}
+            style={{
+              filter: "brightness(0.48) saturate(0.78) sepia(0.62) contrast(1.12) hue-rotate(-10deg)",
+            }}
           >
             <source src="https://res.cloudinary.com/dpod2sj9t/video/upload/v1774324189/Neu_edaxyz.mp4" type="video/mp4" />
           </video>
 
           <div
-            className="absolute inset-[-20%] opacity-[0.4]"
+            className="absolute inset-0 pointer-events-none"
             style={{
-              backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23grain)' opacity='0.22'/%3E%3C/svg%3E\")",
-              backgroundSize: "200px 200px",
+              background: "linear-gradient(180deg,rgba(50,18,2,0.42) 0%,rgba(20,6,0,0.62) 100%)",
               mixBlendMode: "multiply",
-              animation: "grain-shift 1.8s steps(1) infinite",
             }}
-          />
-
-          <div
-            className="absolute inset-0"
-            style={{ background: "radial-gradient(ellipse at center,transparent 30%,rgba(0,0,0,0.85) 85%,rgba(0,0,0,0.98) 100%)" }}
           />
 
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
-              background: "repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.1) 2px,rgba(0,0,0,0.1) 4px)",
+              background: "radial-gradient(ellipse 55% 42% at 50% 38%, rgba(160,80,20,0.18) 0%, transparent 70%)",
+              mixBlendMode: "screen",
+            }}
+          />
+
+          <div
+            className="absolute inset-0"
+            style={{
+              background: [
+                "radial-gradient(ellipse 70% 65% at 50% 38%, transparent 35%, rgba(0,0,0,0.78) 75%, rgba(0,0,0,0.97) 100%)",
+                "linear-gradient(180deg, rgba(0,0,0,0.65) 0%, transparent 20%, transparent 72%, rgba(0,0,0,0.92) 100%)",
+                "linear-gradient(90deg, rgba(0,0,0,0.60) 0%, transparent 18%, transparent 82%, rgba(0,0,0,0.60) 100%)",
+              ].join(","),
+            }}
+          />
+
+          <Noise patternAlpha={18} patternRefreshInterval={2} />
+
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: "repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.06) 2px,rgba(0,0,0,0.06) 4px)",
               mixBlendMode: "multiply",
+            }}
+          />
+        </div>
+
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 overflow-hidden"
+          style={{ opacity: videoOpacity, zIndex: 3, transition: "opacity 0.3s ease" }}
+        >
+          <Image
+            src="/Landing/ASTR-INS.png"
+            alt=""
+            fill
+            className="object-cover object-center"
+            style={{ mixBlendMode: "screen", opacity: 0.88 }}
+            priority
+          />
+
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: "radial-gradient(ellipse 48% 36% at 50% 36%, rgba(200,110,20,0.22) 0%, rgba(150,70,10,0.08) 55%, transparent 75%)",
+              mixBlendMode: "screen",
+            }}
+          />
+
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: "radial-gradient(ellipse 52% 40% at 50% 36%, transparent 55%, rgba(0,0,0,0.55) 72%, transparent 82%)",
+            }}
+          />
+
+          <div
+            className="absolute inset-0"
+            style={{
+              background: [
+                "radial-gradient(ellipse 74% 68% at 50% 38%, transparent 38%, rgba(0,0,0,0.80) 78%, rgba(0,0,0,0.98) 100%)",
+                "linear-gradient(180deg, rgba(0,0,0,0.78) 0%, transparent 15%, transparent 78%, rgba(0,0,0,0.92) 100%)",
+                "linear-gradient(90deg, rgba(0,0,0,0.68) 0%, transparent 12%, transparent 88%, rgba(0,0,0,0.68) 100%)",
+              ].join(","),
+            }}
+          />
+        </div>
+
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-x-0 bottom-0 overflow-visible"
+          style={{
+            zIndex: 4,
+            height: "100vh",
+            opacity: videoOpacity,
+            transition: "opacity 0.3s ease",
+          }}
+        >
+          <div
+            className="absolute bottom-0 left-0"
+            style={{
+              transform: `translateY(${handsProgress * 72 + 22}%) rotate(${18 * (1 - handsProgress)}deg)`,
+              transformOrigin: "bottom left",
+              transition: "transform 0.06s linear",
+              width: "clamp(220px, 36vw, 520px)",
+            }}
+          >
+            <Image
+              src="/Landing/ASTR-BC-L.png"
+              alt=""
+              width={520}
+              height={760}
+              className="w-full h-auto object-contain object-bottom"
+              style={{
+                filter: [
+                  "drop-shadow(0 -18px 50px rgba(200,120,30,0.5))",
+                  "drop-shadow(0 8px 30px rgba(0,0,0,0.75))",
+                  "drop-shadow(0 0 100px rgba(140,70,10,0.32))",
+                ].join(" "),
+              }}
+              priority
+            />
+          </div>
+
+          <div
+            className="absolute bottom-0 right-0"
+            style={{
+              transform: `translateY(${handsProgress * 72 + 22}%) rotate(${-18 * (1 - handsProgress)}deg)`,
+              transformOrigin: "bottom right",
+              transition: "transform 0.06s linear",
+              width: "clamp(220px, 36vw, 520px)",
+            }}
+          >
+            <Image
+              src="/Landing/ASTR-BC-R.png"
+              alt=""
+              width={520}
+              height={760}
+              className="w-full h-auto object-contain object-bottom"
+              style={{
+                filter: [
+                  "drop-shadow(0 -18px 50px rgba(200,120,30,0.5))",
+                  "drop-shadow(0 8px 30px rgba(0,0,0,0.75))",
+                  "drop-shadow(0 0 100px rgba(140,70,10,0.32))",
+                ].join(" "),
+              }}
+              priority
+            />
+          </div>
+
+          <div
+            className="absolute bottom-0 inset-x-0 h-40 pointer-events-none"
+            style={{
+              background: "linear-gradient(0deg, rgba(120,55,8,0.28) 0%, transparent 100%)",
+              transform: `translateY(${handsProgress * 72 + 22}%)`,
+              transition: "transform 0.06s linear",
             }}
           />
         </div>
@@ -783,7 +918,7 @@ async function createScene({
 
       entry.pivot.position.x = THREE.MathUtils.lerp(entry.basePosition.x * 0.08, entry.basePosition.x, spread);
       entry.pivot.position.y = THREE.MathUtils.lerp(
-        entry.basePosition.y + 5.4 + index * 0.25,
+        entry.basePosition.y - 5.4 - index * 0.25,
         entry.basePosition.y + Math.sin(elapsed * 0.66 + index * 1.28) * 0.13 + Math.sin(elapsed * 0.38 + index * 0.72) * 0.048 + Math.cos(elapsed * 0.22 + index * 1.05) * 0.022,
         revealIn,
       );
