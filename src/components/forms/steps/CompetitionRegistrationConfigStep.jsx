@@ -1,10 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Controller, useWatch, useFieldArray } from "react-hook-form";
 import { Box, Typography } from "@mui/material";
 import { Plus, Trash2, RefreshCw } from "lucide-react";
-import { FieldGroup, FieldLabel, FieldError, inputCss, selectCss } from "./CompetitionBasicInfoStep";
+import {
+  FieldGroup,
+  FieldLabel,
+  FieldError,
+  inputCss,
+  selectCss,
+} from "./CompetitionBasicInfoStep";
 
 // ─── Section heading ─────────────────────────────────────────────────────────
 
@@ -24,7 +30,14 @@ function SectionHeading({ title, subtitle }) {
         {title}
       </Typography>
       {subtitle && (
-        <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.22)", fontFamily: "'DM Mono', monospace", mt: 0.25 }}>
+        <Typography
+          sx={{
+            fontSize: 11,
+            color: "rgba(255,255,255,0.22)",
+            fontFamily: "'DM Mono', monospace",
+            mt: 0.25,
+          }}
+        >
           {subtitle}
         </Typography>
       )}
@@ -51,11 +64,25 @@ function ToggleRow({ label, description, checked, onChange, disabled, error }) {
         }}
       >
         <Box>
-          <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontFamily: "'Syne', sans-serif", fontWeight: 500 }}>
+          <Typography
+            sx={{
+              fontSize: 13,
+              color: "rgba(255,255,255,0.8)",
+              fontFamily: "'Syne', sans-serif",
+              fontWeight: 500,
+            }}
+          >
             {label}
           </Typography>
           {description && (
-            <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.28)", fontFamily: "'DM Mono', monospace", mt: 0.2 }}>
+            <Typography
+              sx={{
+                fontSize: 11,
+                color: "rgba(255,255,255,0.28)",
+                fontFamily: "'DM Mono', monospace",
+                mt: 0.2,
+              }}
+            >
               {description}
             </Typography>
           )}
@@ -69,7 +96,9 @@ function ToggleRow({ label, description, checked, onChange, disabled, error }) {
             height: 22,
             borderRadius: 11,
             border: "none",
-            background: checked ? "rgba(168,85,247,0.75)" : "rgba(255,255,255,0.1)",
+            background: checked
+              ? "rgba(168,85,247,0.75)"
+              : "rgba(255,255,255,0.1)",
             position: "relative",
             cursor: disabled ? "not-allowed" : "pointer",
             transition: "background 0.2s",
@@ -148,8 +177,21 @@ function Card({ children }) {
 
 function CardHeader({ label, index, onRemove, extra }) {
   return (
-    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-      <Typography sx={{ fontSize: 11, color: "rgba(168,85,247,0.7)", fontFamily: "'DM Mono', monospace", letterSpacing: "0.08em" }}>
+    <Box
+      sx={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}
+    >
+      <Typography
+        sx={{
+          fontSize: 11,
+          color: "rgba(168,85,247,0.7)",
+          fontFamily: "'DM Mono', monospace",
+          letterSpacing: "0.08em",
+        }}
+      >
         {label} #{index + 1}
       </Typography>
       <Box sx={{ display: "flex", gap: 1 }}>
@@ -157,7 +199,15 @@ function CardHeader({ label, index, onRemove, extra }) {
         <button
           type="button"
           onClick={onRemove}
-          style={{ background: "transparent", border: "none", cursor: "pointer", color: "rgba(239,68,68,0.55)", padding: 4, display: "flex", alignItems: "center" }}
+          style={{
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            color: "rgba(239,68,68,0.55)",
+            padding: 4,
+            display: "flex",
+            alignItems: "center",
+          }}
         >
           <Trash2 size={13} />
         </button>
@@ -168,11 +218,16 @@ function CardHeader({ label, index, onRemove, extra }) {
 
 // ─── Promo code generator ─────────────────────────────────────────────────────
 
-const generatePromoCode = () => `NEUTRON-${Math.random().toString(36).toUpperCase().slice(2, 8)}`;
+const generatePromoCode = () =>
+  `NEUTRON-${Math.random().toString(36).toUpperCase().slice(2, 8)}`;
 
 // ─── Main step ────────────────────────────────────────────────────────────────
 
-export default function CompetitionRegistrationConfigStep({ control, errors, setValue }) {
+export default function CompetitionRegistrationConfigStep({
+  control,
+  errors,
+  setValue,
+}) {
   const competitionType = useWatch({ control, name: "type" });
   const registrationFee = useWatch({ control, name: "registrationFee" });
   const isPaid = useWatch({ control, name: "isPaid" });
@@ -181,11 +236,21 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
 
   const isTeam = competitionType === "TEAM";
   const normalizedFee = Number(registrationFee || 0);
-  const promoDisabled = !isPaid || !Number.isFinite(normalizedFee) || normalizedFee <= 0;
+  const promoDisabled =
+    !isPaid || !Number.isFinite(normalizedFee) || normalizedFee <= 0;
   const perPersonDisabled = !isPaid || !isTeam;
 
-  const { fields: prizeFields, append: appendPrize, remove: removePrize } = useFieldArray({ control, name: "prizePool" });
-  const { fields: promoFields, append: appendPromo, remove: removePromo, update: updatePromo } = useFieldArray({ control, name: "promoCodes" });
+  const {
+    fields: prizeFields,
+    append: appendPrize,
+    remove: removePrize,
+  } = useFieldArray({ control, name: "prizePool" });
+  const {
+    fields: promoFields,
+    append: appendPromo,
+    remove: removePromo,
+    update: updatePromo,
+  } = useFieldArray({ control, name: "promoCodes" });
 
   // Auto-sync: fee > 0 → isPaid
   useEffect(() => {
@@ -216,25 +281,40 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
     if (requiresApproval === autoApproveTeams) {
       // Flip the one that changed
       if (requiresApproval !== prevRequiresApproval.current) {
-        setValue("autoApproveTeams", !requiresApproval, { shouldDirty: true, shouldValidate: true });
+        setValue("autoApproveTeams", !requiresApproval, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       } else {
-        setValue("requiresApproval", !autoApproveTeams, { shouldDirty: true, shouldValidate: true });
+        setValue("requiresApproval", !autoApproveTeams, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       }
     }
     prevRequiresApproval.current = requiresApproval;
   }, [requiresApproval, autoApproveTeams, setValue]);
 
-  const prizePoolError = typeof errors?.prizePool?.message === "string" ? errors.prizePool.message : null;
-  const promoCodesError = typeof errors?.promoCodes?.message === "string" ? errors.promoCodes.message : null;
+  const prizePoolError =
+    typeof errors?.prizePool?.message === "string"
+      ? errors.prizePool.message
+      : null;
+  const promoCodesError =
+    typeof errors?.promoCodes?.message === "string"
+      ? errors.promoCodes.message
+      : null;
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3.5 }}>
-
       {/* ── Limits ─────────────────────────────────────────────────────────── */}
       <Box>
         <SectionHeading title="Limits & Caps" />
         <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
-          <FieldGroup label="Registration Fee (₹)" error={errors.registrationFee} span={2}>
+          <FieldGroup
+            label="Registration Fee (₹)"
+            error={errors.registrationFee}
+            span={2}
+          >
             <Controller
               name="registrationFee"
               control={control}
@@ -247,7 +327,9 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
                   placeholder="0"
                   style={{
                     ...inputCss,
-                    borderColor: errors.registrationFee ? "rgba(248,113,113,0.5)" : undefined,
+                    borderColor: errors.registrationFee
+                      ? "rgba(248,113,113,0.5)"
+                      : undefined,
                   }}
                 />
               )}
@@ -259,17 +341,32 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
               name="maxRegistrations"
               control={control}
               render={({ field }) => (
-                <input {...field} type="number" min="1" placeholder="Unlimited" style={inputCss} />
+                <input
+                  {...field}
+                  type="number"
+                  min="1"
+                  placeholder="Unlimited"
+                  style={inputCss}
+                />
               )}
             />
           </FieldGroup>
 
-          <FieldGroup label="Max Teams Per College" error={errors.maxTeamsPerCollege}>
+          <FieldGroup
+            label="Max Teams Per College"
+            error={errors.maxTeamsPerCollege}
+          >
             <Controller
               name="maxTeamsPerCollege"
               control={control}
               render={({ field }) => (
-                <input {...field} type="number" min="1" placeholder="Unlimited" style={inputCss} />
+                <input
+                  {...field}
+                  type="number"
+                  min="1"
+                  placeholder="Unlimited"
+                  style={inputCss}
+                />
               )}
             />
           </FieldGroup>
@@ -288,7 +385,9 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
                       placeholder="e.g. 2"
                       style={{
                         ...inputCss,
-                        borderColor: errors.minTeamSize ? "rgba(248,113,113,0.5)" : undefined,
+                        borderColor: errors.minTeamSize
+                          ? "rgba(248,113,113,0.5)"
+                          : undefined,
                       }}
                     />
                   )}
@@ -307,7 +406,9 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
                       placeholder="e.g. 5"
                       style={{
                         ...inputCss,
-                        borderColor: errors.maxTeamSize ? "rgba(248,113,113,0.5)" : undefined,
+                        borderColor: errors.maxTeamSize
+                          ? "rgba(248,113,113,0.5)"
+                          : undefined,
                       }}
                     />
                   )}
@@ -320,7 +421,10 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
 
       {/* ── Toggles ─────────────────────────────────────────────────────────── */}
       <Box>
-        <SectionHeading title="Settings" subtitle="Control registration behavior and access" />
+        <SectionHeading
+          title="Settings"
+          subtitle="Control registration behavior and access"
+        />
         <Box
           sx={{
             borderRadius: "10px",
@@ -340,7 +444,9 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
               />
             )}
           />
-          <Box sx={{ height: "1px", background: "rgba(255,255,255,0.04)", mx: 2 }} />
+          <Box
+            sx={{ height: "1px", background: "rgba(255,255,255,0.04)", mx: 2 }}
+          />
 
           <Controller
             name="requiresApproval"
@@ -352,13 +458,18 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
                 checked={!!field.value}
                 onChange={(v) => {
                   field.onChange(v);
-                  setValue("autoApproveTeams", !v, { shouldDirty: true, shouldValidate: true });
+                  setValue("autoApproveTeams", !v, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  });
                 }}
                 error={errors.requiresApproval}
               />
             )}
           />
-          <Box sx={{ height: "1px", background: "rgba(255,255,255,0.04)", mx: 2 }} />
+          <Box
+            sx={{ height: "1px", background: "rgba(255,255,255,0.04)", mx: 2 }}
+          />
 
           <Controller
             name="autoApproveTeams"
@@ -370,12 +481,17 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
                 checked={!!field.value}
                 onChange={(v) => {
                   field.onChange(v);
-                  setValue("requiresApproval", !v, { shouldDirty: true, shouldValidate: true });
+                  setValue("requiresApproval", !v, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  });
                 }}
               />
             )}
           />
-          <Box sx={{ height: "1px", background: "rgba(255,255,255,0.04)", mx: 2 }} />
+          <Box
+            sx={{ height: "1px", background: "rgba(255,255,255,0.04)", mx: 2 }}
+          />
 
           <Controller
             name="isPaid"
@@ -389,7 +505,9 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
               />
             )}
           />
-          <Box sx={{ height: "1px", background: "rgba(255,255,255,0.04)", mx: 2 }} />
+          <Box
+            sx={{ height: "1px", background: "rgba(255,255,255,0.04)", mx: 2 }}
+          />
 
           <Controller
             name="perPerson"
@@ -401,8 +519,8 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
                   !isTeam
                     ? "Only applicable for team competitions"
                     : !isPaid
-                    ? "Enable paid event first"
-                    : "Fee is charged per team member, not per team"
+                      ? "Enable paid event first"
+                      : "Fee is charged per team member, not per team"
                 }
                 checked={!!field.value}
                 onChange={field.onChange}
@@ -410,7 +528,9 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
               />
             )}
           />
-          <Box sx={{ height: "1px", background: "rgba(255,255,255,0.04)", mx: 2 }} />
+          <Box
+            sx={{ height: "1px", background: "rgba(255,255,255,0.04)", mx: 2 }}
+          />
 
           <Controller
             name="attendanceRequired"
@@ -429,12 +549,26 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
 
       {/* ── Prize Pool ──────────────────────────────────────────────────────── */}
       <Box>
-        <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 1.5 }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            mb: 1.5,
+          }}
+        >
           <Box>
-            <SectionHeading title="Prize Pool *" subtitle="At least one prize entry is required" />
+            <SectionHeading
+              title="Prize Pool *"
+              subtitle="At least one prize entry is required"
+            />
             {prizePoolError && <FieldError message={prizePoolError} />}
           </Box>
-          <AddBtn onClick={() => appendPrize({ rank: "", label: "", cash: "", inkind: "" })}>
+          <AddBtn
+            onClick={() =>
+              appendPrize({ rank: "", label: "", cash: "", inkind: "" })
+            }
+          >
             <Plus size={12} />
             Add Prize
           </AddBtn>
@@ -449,16 +583,32 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
               textAlign: "center",
             }}
           >
-            <Typography sx={{ fontSize: 12, color: prizePoolError ? "#fca5a5" : "rgba(255,255,255,0.2)", fontFamily: "'DM Mono', monospace" }}>
+            <Typography
+              sx={{
+                fontSize: 12,
+                color: prizePoolError ? "#fca5a5" : "rgba(255,255,255,0.2)",
+                fontFamily: "'DM Mono', monospace",
+              }}
+            >
               No prizes added — click "Add Prize" to start
             </Typography>
           </Box>
         ) : (
           prizeFields.map((field, index) => (
             <Card key={field.id}>
-              <CardHeader label="Prize" index={index} onRemove={() => removePrize(index)} />
+              <CardHeader
+                label="Prize"
+                index={index}
+                onRemove={() => removePrize(index)}
+              />
 
-              <Box sx={{ display: "grid", gridTemplateColumns: "100px 1fr", gap: 1.5 }}>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "100px 1fr",
+                  gap: 1.5,
+                }}
+              >
                 <FieldGroup label="Rank">
                   <Controller
                     name={`prizePool.${index}.rank`}
@@ -469,7 +619,10 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
                   />
                 </FieldGroup>
 
-                <FieldGroup label="Label *" error={errors.prizePool?.[index]?.label}>
+                <FieldGroup
+                  label="Label *"
+                  error={errors.prizePool?.[index]?.label}
+                >
                   <Controller
                     name={`prizePool.${index}.label`}
                     control={control}
@@ -479,7 +632,9 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
                         placeholder="e.g. First Place, Best UI Design…"
                         style={{
                           ...inputCss,
-                          borderColor: errors.prizePool?.[index]?.label ? "rgba(248,113,113,0.5)" : undefined,
+                          borderColor: errors.prizePool?.[index]?.label
+                            ? "rgba(248,113,113,0.5)"
+                            : undefined,
                         }}
                       />
                     )}
@@ -487,8 +642,17 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
                 </FieldGroup>
               </Box>
 
-              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
-                <FieldGroup label="Cash Prize (₹)" error={errors.prizePool?.[index]?.cash}>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 1.5,
+                }}
+              >
+                <FieldGroup
+                  label="Cash Prize (₹)"
+                  error={errors.prizePool?.[index]?.cash}
+                >
                   <Controller
                     name={`prizePool.${index}.cash`}
                     control={control}
@@ -500,7 +664,9 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
                         placeholder="e.g. 5000"
                         style={{
                           ...inputCss,
-                          borderColor: errors.prizePool?.[index]?.cash ? "rgba(248,113,113,0.5)" : undefined,
+                          borderColor: errors.prizePool?.[index]?.cash
+                            ? "rgba(248,113,113,0.5)"
+                            : undefined,
                         }}
                       />
                     )}
@@ -512,7 +678,11 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
                     name={`prizePool.${index}.inkind`}
                     control={control}
                     render={({ field: f }) => (
-                      <input {...f} placeholder="Trophy, Certificate, Goodies…" style={inputCss} />
+                      <input
+                        {...f}
+                        placeholder="Trophy, Certificate, Goodies…"
+                        style={inputCss}
+                      />
                     )}
                   />
                 </FieldGroup>
@@ -529,7 +699,14 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
 
       {/* ── Promo Codes ─────────────────────────────────────────────────────── */}
       <Box>
-        <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 1.5 }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            mb: 1.5,
+          }}
+        >
           <Box>
             <SectionHeading
               title="Promo Codes"
@@ -571,8 +748,16 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
               textAlign: "center",
             }}
           >
-            <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.18)", fontFamily: "'DM Mono', monospace" }}>
-              {promoDisabled ? "Promo codes require a paid event with a fee" : "No promo codes added yet"}
+            <Typography
+              sx={{
+                fontSize: 12,
+                color: "rgba(255,255,255,0.18)",
+                fontFamily: "'DM Mono', monospace",
+              }}
+            >
+              {promoDisabled
+                ? "Promo codes require a paid event with a fee"
+                : "No promo codes added yet"}
             </Typography>
           </Box>
         )}
@@ -588,7 +773,10 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
                   type="button"
                   title="Regenerate code"
                   onClick={() =>
-                    updatePromo(index, { ...promoFields[index], code: generatePromoCode() })
+                    updatePromo(index, {
+                      ...promoFields[index],
+                      code: generatePromoCode(),
+                    })
                   }
                   style={{
                     display: "flex",
@@ -610,8 +798,17 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
               }
             />
 
-            <Box sx={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 1.5 }}>
-              <FieldGroup label="Code *" error={errors.promoCodes?.[index]?.code}>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "2fr 1fr 1fr",
+                gap: 1.5,
+              }}
+            >
+              <FieldGroup
+                label="Code *"
+                error={errors.promoCodes?.[index]?.code}
+              >
                 <Controller
                   name={`promoCodes.${index}.code`}
                   control={control}
@@ -624,7 +821,9 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
                         fontFamily: "'DM Mono', monospace",
                         letterSpacing: "0.05em",
                         textTransform: "uppercase",
-                        borderColor: errors.promoCodes?.[index]?.code ? "rgba(248,113,113,0.5)" : undefined,
+                        borderColor: errors.promoCodes?.[index]?.code
+                          ? "rgba(248,113,113,0.5)"
+                          : undefined,
                       }}
                     />
                   )}
@@ -637,14 +836,21 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
                   control={control}
                   render={({ field: f }) => (
                     <select {...f} style={selectCss}>
-                      <option value="PERCENT" style={{ background: "#0e0e0e" }}>% Percent</option>
-                      <option value="FLAT" style={{ background: "#0e0e0e" }}>₹ Flat</option>
+                      <option value="PERCENT" style={{ background: "#0e0e0e" }}>
+                        % Percent
+                      </option>
+                      <option value="FLAT" style={{ background: "#0e0e0e" }}>
+                        ₹ Flat
+                      </option>
                     </select>
                   )}
                 />
               </FieldGroup>
 
-              <FieldGroup label="Value *" error={errors.promoCodes?.[index]?.discountValue}>
+              <FieldGroup
+                label="Value *"
+                error={errors.promoCodes?.[index]?.discountValue}
+              >
                 <Controller
                   name={`promoCodes.${index}.discountValue`}
                   control={control}
@@ -656,7 +862,9 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
                       placeholder="e.g. 20"
                       style={{
                         ...inputCss,
-                        borderColor: errors.promoCodes?.[index]?.discountValue ? "rgba(248,113,113,0.5)" : undefined,
+                        borderColor: errors.promoCodes?.[index]?.discountValue
+                          ? "rgba(248,113,113,0.5)"
+                          : undefined,
                       }}
                     />
                   )}
@@ -664,13 +872,21 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
               </FieldGroup>
             </Box>
 
-            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
+            <Box
+              sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}
+            >
               <FieldGroup label="Max Uses">
                 <Controller
                   name={`promoCodes.${index}.maxUses`}
                   control={control}
                   render={({ field: f }) => (
-                    <input {...f} type="number" min="1" placeholder="Unlimited" style={inputCss} />
+                    <input
+                      {...f}
+                      type="number"
+                      min="1"
+                      placeholder="Unlimited"
+                      style={inputCss}
+                    />
                   )}
                 />
               </FieldGroup>
@@ -680,13 +896,24 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
                   name={`promoCodes.${index}.description`}
                   control={control}
                   render={({ field: f }) => (
-                    <input {...f} placeholder="Early bird, Ambassador…" style={inputCss} />
+                    <input
+                      {...f}
+                      placeholder="Early bird, Ambassador…"
+                      style={inputCss}
+                    />
                   )}
                 />
               </FieldGroup>
             </Box>
 
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 0.5 }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                px: 0.5,
+              }}
+            >
               <FieldLabel>Active</FieldLabel>
               <Controller
                 name={`promoCodes.${index}.isActive`}
@@ -700,7 +927,9 @@ export default function CompetitionRegistrationConfigStep({ control, errors, set
                       height: 22,
                       borderRadius: 11,
                       border: "none",
-                      background: f.value ? "rgba(168,85,247,0.75)" : "rgba(255,255,255,0.1)",
+                      background: f.value
+                        ? "rgba(168,85,247,0.75)"
+                        : "rgba(255,255,255,0.1)",
                       position: "relative",
                       cursor: "pointer",
                       transition: "background 0.2s",

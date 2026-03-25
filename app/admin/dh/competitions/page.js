@@ -52,6 +52,7 @@ import { useUsers } from "@/src/hooks/api/useUsers";
 import { useClubs } from "@/src/hooks/api/useClubs";
 import { LoadingState } from "@/src/components/LoadingState";
 import PromoCodeApprovalModal from "@/src/components/forms/PromoCodeApprovalModal";
+import CompetitionFormModal from "@/src/components/forms/CompetitionFormModal";
 import { useCompetitionForms } from "@/src/hooks/api/useCompetitionForms";
 
 // ── Status / type config ──────────────────────────────────────────────────────
@@ -1280,6 +1281,8 @@ export default function CompetitionsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [eventTypeFilter, setEventTypeFilter] = useState("all");
   const [manageTarget, setManageTarget] = useState(null);
+  const [formTarget, setFormTarget] = useState(null);
+  const [formOpen, setFormOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [promoCodeTarget, setPromoCodeTarget] = useState(null);
   const [menuAnchor, setMenuAnchor] = useState(null);
@@ -1426,7 +1429,10 @@ export default function CompetitionsPage() {
           </Box>
           <Box sx={{ display: "flex", gap: 1 }}>
             <PurpleBtn
-              onClick={() => router.push("/admin/dh/competitions/builder")}
+              onClick={() => {
+                setFormTarget(null);
+                setFormOpen(true);
+              }}
             >
               <Plus size={14} />
               New Competition
@@ -1843,14 +1849,8 @@ export default function CompetitionsPage() {
         )}
         <MenuItem
           onClick={() => {
-            if (menuComp?.id) {
-              const params = new URLSearchParams({
-                competitionId: menuComp.id,
-              });
-              router.push(
-                `/admin/dh/competitions/builder?${params.toString()}`,
-              );
-            }
+            setFormTarget(menuComp || null);
+            setFormOpen(true);
             setMenuAnchor(null);
             setMenuComp(null);
           }}
@@ -1960,6 +1960,14 @@ export default function CompetitionsPage() {
       </Menu>
 
       {/* Dialogs */}
+      <CompetitionFormModal
+        open={formOpen}
+        onClose={() => {
+          setFormOpen(false);
+          setFormTarget(null);
+        }}
+        competition={formTarget}
+      />
       <ManageDialog
         competition={manageTarget}
         open={!!manageTarget}
