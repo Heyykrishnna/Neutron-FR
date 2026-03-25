@@ -13,6 +13,7 @@ import {
 } from "@mui/material";
 import {
   Search,
+  FileText,
   Plus,
   Send,
   Users,
@@ -507,7 +508,9 @@ function ManageDialog({ competition, open, onClose }) {
   const assignedVolIds = new Set(volunteers.map((v) => v.userId || v.user?.id));
   const availableVols = volunteerUsers.filter((u) => !assignedVolIds.has(u.id));
 
-  const assignedClubIds = new Set(competitionClubs.map((c) => c.clubId || c.id));
+  const assignedClubIds = new Set(
+    competitionClubs.map((c) => c.clubId || c.id),
+  );
   const availableClubs = allClubs.filter((c) => !assignedClubIds.has(c.id));
 
   const tabList = [
@@ -1109,7 +1112,11 @@ function ManageDialog({ competition, open, onClose }) {
               >
                 <option value="">Select a club…</option>
                 {availableClubs.map((c) => (
-                  <option key={c.id} value={c.id} style={{ background: "#0e0e0e" }}>
+                  <option
+                    key={c.id}
+                    value={c.id}
+                    style={{ background: "#0e0e0e" }}
+                  >
                     {c.name}
                   </option>
                 ))}
@@ -1121,7 +1128,9 @@ function ManageDialog({ competition, open, onClose }) {
                     { competitionId: competition.id, clubId: selectedClubId },
                     {
                       onSuccess: () => {
-                        enqueueSnackbar("Club assigned", { variant: "success" });
+                        enqueueSnackbar("Club assigned", {
+                          variant: "success",
+                        });
                         setSelectedClubId("");
                       },
                       onError: (err) =>
@@ -1747,7 +1756,10 @@ export default function CompetitionsPage() {
       <Menu
         anchorEl={menuAnchor}
         open={!!menuAnchor}
-        onClose={() => { setMenuAnchor(null); setMenuComp(null); }}
+        onClose={() => {
+          setMenuAnchor(null);
+          setMenuComp(null);
+        }}
         PaperProps={{
           sx: {
             background: "#111",
@@ -1783,7 +1795,11 @@ export default function CompetitionsPage() {
               : "Publish"}
         </MenuItem>
         <MenuItem
-          onClick={() => { setEditTarget(menuComp); setMenuAnchor(null); setMenuComp(null); }}
+          onClick={() => {
+            setEditTarget(menuComp);
+            setMenuAnchor(null);
+            setMenuComp(null);
+          }}
           sx={{
             fontSize: 13,
             fontFamily: "'Syne', sans-serif",
@@ -1798,7 +1814,11 @@ export default function CompetitionsPage() {
           Edit
         </MenuItem>
         <MenuItem
-          onClick={() => { setManageTarget(menuComp); setMenuAnchor(null); setMenuComp(null); }}
+          onClick={() => {
+            setManageTarget(menuComp);
+            setMenuAnchor(null);
+            setMenuComp(null);
+          }}
           sx={{
             fontSize: 13,
             fontFamily: "'Syne', sans-serif",
@@ -1813,7 +1833,36 @@ export default function CompetitionsPage() {
           Manage
         </MenuItem>
         <MenuItem
-          onClick={() => { setPromoCodeTarget(menuComp); setMenuAnchor(null); setMenuComp(null); }}
+          onClick={() => {
+            if (menuComp?.id) {
+              const params = new URLSearchParams({
+                openForm: "true",
+                competitionId: menuComp.id,
+              });
+              router.push(`/admin/dh/competitions/forms?${params.toString()}`);
+            }
+            setMenuAnchor(null);
+            setMenuComp(null);
+          }}
+          sx={{
+            fontSize: 13,
+            fontFamily: "'Syne', sans-serif",
+            color: "rgba(255,255,255,0.7)",
+            gap: 1.5,
+            px: 2,
+            py: 1,
+            "&:hover": { background: "rgba(255,255,255,0.04)" },
+          }}
+        >
+          <FileText size={13} />
+          Create Form
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setPromoCodeTarget(menuComp);
+            setMenuAnchor(null);
+            setMenuComp(null);
+          }}
           sx={{
             fontSize: 13,
             fontFamily: "'Syne', sans-serif",
@@ -1827,9 +1876,20 @@ export default function CompetitionsPage() {
           <Send size={13} />
           Promo Codes
         </MenuItem>
-        <Box sx={{ height: "1px", background: "rgba(255,255,255,0.05)", mx: 1, my: 0.5 }} />
+        <Box
+          sx={{
+            height: "1px",
+            background: "rgba(255,255,255,0.05)",
+            mx: 1,
+            my: 0.5,
+          }}
+        />
         <MenuItem
-          onClick={() => { handleDeleteCompetition(menuComp); setMenuAnchor(null); setMenuComp(null); }}
+          onClick={() => {
+            handleDeleteCompetition(menuComp);
+            setMenuAnchor(null);
+            setMenuComp(null);
+          }}
           sx={{
             fontSize: 13,
             fontFamily: "'Syne', sans-serif",

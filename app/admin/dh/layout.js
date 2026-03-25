@@ -17,6 +17,7 @@ import {
   SIDEBAR_WIDTH,
   getAdminNavigation,
 } from "@/src/components/navigation/Sidebar";
+import { useDHDepartmentMembers } from "@/src/hooks/api/useUsers";
 
 export default function DHLayout({ children }) {
   const { user, loading, logout } = useAuth();
@@ -25,6 +26,13 @@ export default function DHLayout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const hasAccess = user?.role === "DH" || user?.role === "SA";
+  const isDH = user?.role === "DH";
+
+  const {
+    isLoading: departmentLoading,
+    isError: departmentError,
+    error: departmentErrorObject,
+  } = useDHDepartmentMembers(mounted && !!user && isDH);
 
   useEffect(() => {
     setMounted(true);
@@ -36,11 +44,34 @@ export default function DHLayout({ children }) {
     }
   }, [user, loading, router, hasAccess]);
 
+  useEffect(() => {
+    if (!mounted || !isDH || departmentLoading) return;
+
+    if (departmentError) {
+      const errorCode = departmentErrorObject?.response?.data?.error;
+      const errorMessage = departmentErrorObject?.response?.data?.message || "";
+      const isNoDepartmentAssigned =
+        errorCode === "NO_DEPARTMENT_ASSIGNED" ||
+        /no department/i.test(errorMessage);
+
+      if (isNoDepartmentAssigned) {
+        router.replace("/admin/auth");
+      }
+    }
+  }, [
+    mounted,
+    isDH,
+    departmentLoading,
+    departmentError,
+    departmentErrorObject,
+    router,
+  ]);
+
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
-  if (!mounted || loading) {
+  if (!mounted || loading || (isDH && departmentLoading)) {
     return (
       <Box
         sx={{
@@ -56,7 +87,7 @@ export default function DHLayout({ children }) {
     );
   }
 
-  if (!user || !hasAccess) {
+  if (!user || !hasAccess || (isDH && departmentError)) {
     return null;
   }
 

@@ -31,6 +31,7 @@ const AUTH_REJECTION_ERRORS = new Set([
   "USER_NOT_FOUND",
   "ACCOUNT_SUSPENDED",
   "ACCOUNT_REVOKED",
+  "NO_DEPARTMENT_ASSIGNED",
 ]);
 
 const isExplicitAuthRejection = (error) => {

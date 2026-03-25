@@ -43,6 +43,56 @@ const STEP_DESCRIPTIONS = [
   "Poster upload and final review",
 ];
 
+const BACKEND_FIELD_TOKEN_TO_FORM_FIELD = {
+  TITLE: "title",
+  SHORTDESCRIPTION: "shortDescription",
+  CATEGORY: "category",
+  RULESRICHTEXT: "rulesRichText",
+  STARTTIME: "startTime",
+  ENDTIME: "endTime",
+  REGISTRATIONDEADLINE: "registrationDeadline",
+  VENUENAME: "venueName",
+  VENUEROOM: "venueRoom",
+  VENUEFLOOR: "venueFloor",
+  REGISTRATIONFEE: "registrationFee",
+  MAXREGISTRATIONS: "maxRegistrations",
+  MAXTEAMSPERCOLLEGE: "maxTeamsPerCollege",
+  MINTEAMSIZE: "minTeamSize",
+  MAXTEAMSIZE: "maxTeamSize",
+  POSTERSIZEBYTES: "poster",
+  POSTERPATH: "poster",
+  POSTERMIMETYPE: "poster",
+  POSTERORIGINALNAME: "poster",
+};
+
+const findStepIndexForField = (fieldName) => {
+  if (fieldName === "poster") {
+    return STEP_LABELS.length - 1;
+  }
+
+  const index = STEP_FIELDS.findIndex((fields) => fields.includes(fieldName));
+  return index >= 0 ? index : 0;
+};
+
+const parseBackendValidationCode = (code) => {
+  if (typeof code !== "string") return null;
+
+  const invalidValueMatch = code.match(/^INVALID_([A-Z_]+)_VALUE$/);
+  if (invalidValueMatch) {
+    const token = invalidValueMatch[1].replaceAll("_", "");
+    const fieldName = BACKEND_FIELD_TOKEN_TO_FORM_FIELD[token];
+    if (!fieldName) return null;
+
+    return {
+      field: fieldName,
+      stepIndex: findStepIndexForField(fieldName),
+      message: "Please enter a valid value for this field.",
+    };
+  }
+
+  return null;
+};
+
 const btnBase = {
   border: "none",
   borderRadius: 8,
@@ -238,6 +288,7 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
     trigger,
     watch,
     setValue,
+    setError,
     handleSubmit,
     formState: { errors },
   } = useForm({
@@ -309,8 +360,22 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
             closeModal();
           },
           onError: (error) => {
+            const backendCode =
+              error?.response?.data?.error || error?.response?.data?.message;
+            const mappedValidation = parseBackendValidationCode(backendCode);
+
+            if (mappedValidation) {
+              setError(mappedValidation.field, {
+                type: "server",
+                message: mappedValidation.message,
+              });
+              setActiveStep(mappedValidation.stepIndex);
+            }
+
             enqueueSnackbar(
-              error?.response?.data?.message || "Failed to update competition",
+              mappedValidation?.message ||
+                error?.response?.data?.message ||
+                "Failed to update competition",
               { variant: "error" },
             );
           },
@@ -335,8 +400,22 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
         closeModal();
       },
       onError: (error) => {
+        const backendCode =
+          error?.response?.data?.error || error?.response?.data?.message;
+        const mappedValidation = parseBackendValidationCode(backendCode);
+
+        if (mappedValidation) {
+          setError(mappedValidation.field, {
+            type: "server",
+            message: mappedValidation.message,
+          });
+          setActiveStep(mappedValidation.stepIndex);
+        }
+
         enqueueSnackbar(
-          error?.response?.data?.message || "Failed to create competition",
+          mappedValidation?.message ||
+            error?.response?.data?.message ||
+            "Failed to create competition",
           { variant: "error" },
         );
       },

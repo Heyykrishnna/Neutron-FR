@@ -37,7 +37,19 @@ export function useCreateCompetitionForm() {
   return useMutation({
     mutationFn: async (payload) => {
       const { data } = await apiClient.post("/forms", payload);
-      return normalizeOne(data);
+      const normalized = normalizeOne(data);
+      if (normalized && typeof normalized === "object") {
+        return {
+          ...normalized,
+          pendingApproval: Boolean(data?.pendingApproval),
+          message: data?.message,
+        };
+      }
+      return {
+        data: normalized,
+        pendingApproval: Boolean(data?.pendingApproval),
+        message: data?.message,
+      };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.forms.all });
@@ -52,7 +64,19 @@ export function useUpdateCompetitionForm() {
   return useMutation({
     mutationFn: async ({ formId, ...payload }) => {
       const { data } = await apiClient.put(`/forms/${formId}`, payload);
-      return normalizeOne(data);
+      const normalized = normalizeOne(data);
+      if (normalized && typeof normalized === "object") {
+        return {
+          ...normalized,
+          pendingApproval: Boolean(data?.pendingApproval),
+          message: data?.message,
+        };
+      }
+      return {
+        data: normalized,
+        pendingApproval: Boolean(data?.pendingApproval),
+        message: data?.message,
+      };
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.forms.all });
@@ -69,7 +93,19 @@ export function useDeleteCompetitionForm() {
   return useMutation({
     mutationFn: async (formId) => {
       const { data } = await apiClient.delete(`/forms/${formId}`);
-      return normalizeOne(data);
+      const normalized = normalizeOne(data);
+      if (normalized && typeof normalized === "object") {
+        return {
+          ...normalized,
+          pendingApproval: Boolean(data?.pendingApproval),
+          message: data?.message,
+        };
+      }
+      return {
+        data: normalized,
+        pendingApproval: Boolean(data?.pendingApproval),
+        message: data?.message,
+      };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.forms.all });

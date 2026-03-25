@@ -1,18 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Box, Typography, CircularProgress, Paper } from "@mui/material";
 import { LoginForm } from "@/src/components/forms/LoginForm";
 import { useSnackbar } from "notistack";
 import { useRef } from "react";
 export default function AdminAuthPage() {
-  const { user, loading, login } = useAuth();
+  const { user, loading, login, checkAuth } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { enqueueSnackbar } = useSnackbar();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState("");
+  const handledOAuthRef = useRef(false);
 
   useEffect(() => {
     if (!loading && user) {
@@ -25,12 +27,32 @@ export default function AdminAuthPage() {
     }
   }, [user, loading, router]);
 
+  useEffect(() => {
+    const authStatus = searchParams.get("auth");
+    if (!authStatus || handledOAuthRef.current) return;
+
+    handledOAuthRef.current = true;
+
+    if (authStatus === "success") {
+      checkAuth();
+      return;
+    }
+
+    if (authStatus === "failed") {
+      const rawReason = searchParams.get("reason");
+      const reason = rawReason
+        ? decodeURIComponent(rawReason).replace(/_/g, " ")
+        : "Google login failed";
+      setLoginError(reason);
+      enqueueSnackbar(reason, { variant: "error" });
+    }
+  }, [checkAuth, enqueueSnackbar, searchParams]);
+
   const handleLogin = async (credentials) => {
     setLoginError("");
     setIsLoggingIn(true);
     try {
       const result = await login(credentials);
-      console.log(result);
       if (!result.success) {
         const errorMessage = result.error || "Invalid email or password";
         setLoginError(errorMessage);
@@ -50,10 +72,14 @@ export default function AdminAuthPage() {
   const handleGoogleLogin = () => {
     const backendUrl =
       process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001";
+    const normalizedBackendUrl = backendUrl.replace(/\/+$/, "");
+    const oauthBaseUrl = normalizedBackendUrl.endsWith("/api/v1")
+      ? normalizedBackendUrl
+      : `${normalizedBackendUrl}/api/v1`;
     const redirectUrl = encodeURIComponent(
       window.location.origin + "/admin/auth",
     );
-    window.location.href = `${backendUrl}/auth/google?redirect=${redirectUrl}`;
+    window.location.href = `${oauthBaseUrl}/auth/google?redirect=${redirectUrl}`;
   };
 
   if (loading) {

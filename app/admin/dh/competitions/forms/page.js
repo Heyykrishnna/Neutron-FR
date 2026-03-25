@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useSnackbar } from "notistack";
 import {
   Box,
   Typography,
@@ -37,6 +39,7 @@ import {
   useDeleteCompetitionFormField,
   useReorderCompetitionFormFields,
 } from "@/src/hooks/api/useCompetitionForms";
+import { useAuth } from "@/contexts/AuthContext";
 
 const FIELD_TYPES = [
   "TEXT",
@@ -540,6 +543,9 @@ function FormBuilderDialog({
   formId,
   competitions,
   competitionNameById,
+  preselectedCompetitionId,
+  currentUserRole,
+  enqueueSnackbar,
 }) {
   const isEdit = Boolean(formId);
   const { data: formDetails, isLoading: loadingForm } = useCompetitionForm(
@@ -586,7 +592,7 @@ function FormBuilderDialog({
       }
 
       if (!isEdit) {
-        setCompetitionId("");
+        setCompetitionId(preselectedCompetitionId || "");
         setOpensAt("");
         setClosesAt("");
         setFields([createEmptyField(0)]);
@@ -596,7 +602,7 @@ function FormBuilderDialog({
     });
 
     return () => cancelAnimationFrame(frame);
-  }, [open, isEdit, formDetails]);
+  }, [open, isEdit, formDetails, preselectedCompetitionId]);
 
   const isStepOneValid = useMemo(() => {
     if (!competitionId || !opensAt || !closesAt) {
@@ -683,6 +689,39 @@ function FormBuilderDialog({
       }
 
       let currentFormId = formId;
+
+      if (currentUserRole === "DH") {
+        const dhPayload = {
+          opensAt: toIsoOrNull(opensAt),
+          closesAt: toIsoOrNull(closesAt),
+          status: "PUBLISHED",
+          fields: cleanedFields.map((field, index) => ({
+            ...fieldToApi(field),
+            displayOrder: index + 1,
+          })),
+        };
+
+        const response = isEdit
+          ? await updateFormMutation.mutateAsync({
+              formId,
+              ...dhPayload,
+            })
+          : await createFormMutation.mutateAsync({
+              competitionId,
+              ...dhPayload,
+            });
+
+        if (response?.pendingApproval) {
+          enqueueSnackbar(
+            response?.message ||
+              "Form changes submitted for SA approval successfully.",
+            { variant: "info" },
+          );
+        }
+
+        onClose();
+        return;
+      }
 
       if (isEdit) {
         await updateFormMutation.mutateAsync({
@@ -1282,6 +1321,11 @@ function FormBuilderDialog({
 }
 
 export default function CompetitionFormsPage() {
+  const { user } = useAuth();
+  const { enqueueSnackbar } = useSnackbar();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const { data: forms = [], isLoading: formsLoading } = useCompetitionForms();
   const { data: competitions = [] } = useCompetitions();
   const deleteFormMutation = useDeleteCompetitionForm();
@@ -1290,6 +1334,23 @@ export default function CompetitionFormsPage() {
   const [activeFormId, setActiveFormId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [previewFormId, setPreviewFormId] = useState(null);
+
+  const preselectedCompetitionId = searchParams.get("competitionId") || "";
+  const shouldOpenBuilderFromQuery = searchParams.get("openForm") === "true";
+
+  useEffect(() => {
+    if (!shouldOpenBuilderFromQuery || !preselectedCompetitionId) return;
+    setActiveFormId(null);
+    setBuilderOpen(true);
+  }, [preselectedCompetitionId, shouldOpenBuilderFromQuery]);
+
+  const closeBuilderDialog = () => {
+    setBuilderOpen(false);
+    setActiveFormId(null);
+    if (shouldOpenBuilderFromQuery) {
+      router.replace("/admin/dh/competitions/forms");
+    }
+  };
 
   const { data: previewForm } = useCompetitionForm(
     previewFormId,
@@ -1447,13 +1508,13 @@ export default function CompetitionFormsPage() {
 
       <FormBuilderDialog
         open={builderOpen}
-        onClose={() => {
-          setBuilderOpen(false);
-          setActiveFormId(null);
-        }}
+        onClose={closeBuilderDialog}
         formId={activeFormId}
         competitions={competitions}
         competitionNameById={competitionNameById}
+        preselectedCompetitionId={preselectedCompetitionId}
+        currentUserRole={user?.role}
+        enqueueSnackbar={enqueueSnackbar}
       />
 
       <PreviewDialog
@@ -1472,7 +1533,16 @@ export default function CompetitionFormsPage() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={async () => {
           if (!deleteTarget?.id) return;
-          await deleteFormMutation.mutateAsync(deleteTarget.id);
+          const response = await deleteFormMutation.mutateAsync(
+            deleteTarget.id,
+          );
+          if (response?.pendingApproval) {
+            enqueueSnackbar(
+              response?.message ||
+                "Form deletion submitted for SA approval successfully.",
+              { variant: "info" },
+            );
+          }
           setDeleteTarget(null);
         }}
         loading={deleteFormMutation.isPending}

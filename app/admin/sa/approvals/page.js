@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   useApprovals,
@@ -32,6 +33,7 @@ import {
 } from "lucide-react";
 import { useSnackbar } from "notistack";
 import { LoadingState } from "@/src/components/LoadingState";
+import { queryKeys } from "@/src/lib/queryKeys";
 
 /* ── Constants ── */
 
@@ -43,30 +45,73 @@ const TYPE_LABELS = {
 };
 
 const TYPE_COLORS = {
-  SCORE_LOCK: { bg: "rgba(59,130,246,0.1)", text: "#60a5fa", border: "rgba(59,130,246,0.2)" },
-  EVENT_UPDATE: { bg: "rgba(234,179,8,0.1)", text: "#fbbf24", border: "rgba(234,179,8,0.2)" },
-  COMPETITION_EDIT: { bg: "rgba(168,85,247,0.1)", text: "#c084fc", border: "rgba(168,85,247,0.2)" },
-  PROMO_CODE_ADD: { bg: "rgba(34,197,94,0.1)", text: "#4ade80", border: "rgba(34,197,94,0.2)" },
+  SCORE_LOCK: {
+    bg: "rgba(59,130,246,0.1)",
+    text: "#60a5fa",
+    border: "rgba(59,130,246,0.2)",
+  },
+  EVENT_UPDATE: {
+    bg: "rgba(234,179,8,0.1)",
+    text: "#fbbf24",
+    border: "rgba(234,179,8,0.2)",
+  },
+  COMPETITION_EDIT: {
+    bg: "rgba(168,85,247,0.1)",
+    text: "#c084fc",
+    border: "rgba(168,85,247,0.2)",
+  },
+  PROMO_CODE_ADD: {
+    bg: "rgba(34,197,94,0.1)",
+    text: "#4ade80",
+    border: "rgba(34,197,94,0.2)",
+  },
 };
 
 const STATUS_COLORS = {
-  PENDING: { bg: "rgba(234,179,8,0.1)", text: "#fbbf24", border: "rgba(234,179,8,0.2)" },
-  APPROVED: { bg: "rgba(34,197,94,0.1)", text: "#4ade80", border: "rgba(34,197,94,0.2)" },
-  REJECTED: { bg: "rgba(239,68,68,0.1)", text: "#f87171", border: "rgba(239,68,68,0.2)" },
-  OPEN: { bg: "rgba(234,179,8,0.1)", text: "#fbbf24", border: "rgba(234,179,8,0.2)" },
-  RESOLVED: { bg: "rgba(34,197,94,0.1)", text: "#4ade80", border: "rgba(34,197,94,0.2)" },
+  PENDING: {
+    bg: "rgba(234,179,8,0.1)",
+    text: "#fbbf24",
+    border: "rgba(234,179,8,0.2)",
+  },
+  APPROVED: {
+    bg: "rgba(34,197,94,0.1)",
+    text: "#4ade80",
+    border: "rgba(34,197,94,0.2)",
+  },
+  REJECTED: {
+    bg: "rgba(239,68,68,0.1)",
+    text: "#f87171",
+    border: "rgba(239,68,68,0.2)",
+  },
+  OPEN: {
+    bg: "rgba(234,179,8,0.1)",
+    text: "#fbbf24",
+    border: "rgba(234,179,8,0.2)",
+  },
+  RESOLVED: {
+    bg: "rgba(34,197,94,0.1)",
+    text: "#4ade80",
+    border: "rgba(34,197,94,0.2)",
+  },
 };
 
 const fmtDate = (d) =>
   d
-    ? new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+    ? new Date(d).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
     : "—";
 
 const fmtDateTime = (d) =>
   d
     ? new Date(d).toLocaleString("en-US", {
-        year: "numeric", month: "short", day: "numeric",
-        hour: "2-digit", minute: "2-digit",
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
       })
     : "—";
 
@@ -77,12 +122,19 @@ function Pill({ bg, text, border, children }) {
     <Box
       component="span"
       sx={{
-        px: 1.25, py: 0.35, borderRadius: "6px",
-        fontSize: 10, fontWeight: 600,
+        px: 1.25,
+        py: 0.35,
+        borderRadius: "6px",
+        fontSize: 10,
+        fontWeight: 600,
         fontFamily: "'DM Mono', monospace",
-        letterSpacing: "0.04em", textTransform: "uppercase",
-        background: bg, color: text, border: `1px solid ${border}`,
-        display: "inline-block", lineHeight: 1.6,
+        letterSpacing: "0.04em",
+        textTransform: "uppercase",
+        background: bg,
+        color: text,
+        border: `1px solid ${border}`,
+        display: "inline-block",
+        lineHeight: 1.6,
         whiteSpace: "nowrap",
       }}
     >
@@ -92,7 +144,11 @@ function Pill({ bg, text, border, children }) {
 }
 
 function TypePill({ type }) {
-  const c = TYPE_COLORS[type] || { bg: "rgba(255,255,255,0.06)", text: "rgba(255,255,255,0.4)", border: "rgba(255,255,255,0.1)" };
+  const c = TYPE_COLORS[type] || {
+    bg: "rgba(255,255,255,0.06)",
+    text: "rgba(255,255,255,0.4)",
+    border: "rgba(255,255,255,0.1)",
+  };
   return <Pill {...c}>{TYPE_LABELS[type] || type}</Pill>;
 }
 
@@ -103,22 +159,39 @@ function StatusPill({ status }) {
 
 function StatusBadge({ status }) {
   const c = STATUS_COLORS[status] || STATUS_COLORS.PENDING;
-  const Icon = status === "APPROVED" || status === "RESOLVED" ? CheckCircle2 : status === "REJECTED" ? XCircle : Clock;
+  const Icon =
+    status === "APPROVED" || status === "RESOLVED"
+      ? CheckCircle2
+      : status === "REJECTED"
+        ? XCircle
+        : Clock;
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
       <Icon size={13} color={c.text} />
-      <Typography sx={{ fontSize: 12, color: c.text, fontFamily: "'DM Mono', monospace" }}>
+      <Typography
+        sx={{ fontSize: 12, color: c.text, fontFamily: "'DM Mono', monospace" }}
+      >
         {status}
       </Typography>
     </Box>
   );
 }
 
-const RowDivider = () => <Box sx={{ height: "1px", background: "rgba(255,255,255,0.06)" }} />;
+const RowDivider = () => (
+  <Box sx={{ height: "1px", background: "rgba(255,255,255,0.06)" }} />
+);
 
 function TableHeader({ cols }) {
   return (
-    <Box sx={{ display: "grid", gridTemplateColumns: cols, px: 3, py: 1.5, background: "rgba(255,255,255,0.02)" }}>
+    <Box
+      sx={{
+        display: "grid",
+        gridTemplateColumns: cols,
+        px: 3,
+        py: 1.5,
+        background: "rgba(255,255,255,0.02)",
+      }}
+    >
       {cols.split(" ").map((_, i, arr) => null)}
     </Box>
   );
@@ -128,7 +201,14 @@ function EmptyRow({ message }) {
   return (
     <Box sx={{ py: 8, textAlign: "center" }}>
       <AlertCircle size={16} color="rgba(255,255,255,0.15)" />
-      <Typography sx={{ mt: 1, fontSize: 12, color: "rgba(255,255,255,0.22)", fontFamily: "'Syne', sans-serif" }}>
+      <Typography
+        sx={{
+          mt: 1,
+          fontSize: 12,
+          color: "rgba(255,255,255,0.22)",
+          fontFamily: "'Syne', sans-serif",
+        }}
+      >
         {message}
       </Typography>
     </Box>
@@ -138,6 +218,7 @@ function EmptyRow({ message }) {
 /* ── Main page ── */
 
 export default function RequestsPage() {
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState("approvals");
 
   /* approvals */
@@ -149,7 +230,8 @@ export default function RequestsPage() {
   if (statusFilter !== "all") approvalFilters.status = statusFilter;
   if (typeFilter !== "all") approvalFilters.type = typeFilter;
 
-  const { data: approvalsRes, isLoading: isApprovalsLoading } = useApprovals(approvalFilters);
+  const { data: approvalsRes, isLoading: isApprovalsLoading } =
+    useApprovals(approvalFilters);
   const { data: stats } = useApprovalStats();
   const approveMutation = useApproveRequest();
   const rejectMutation = useRejectRequest();
@@ -159,8 +241,13 @@ export default function RequestsPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [detailApproval, setDetailApproval] = useState(null);
+  const [processingApprovalId, setProcessingApprovalId] = useState(null);
+  const [handledApprovalIds, setHandledApprovalIds] = useState(() => new Set());
 
-  const allApprovals = useMemo(() => approvalsRes?.data?.approvals || [], [approvalsRes]);
+  const allApprovals = useMemo(
+    () => approvalsRes?.data?.approvals || [],
+    [approvalsRes],
+  );
   const filteredApprovals = useMemo(() => {
     if (!approvalSearch) return allApprovals;
     const q = approvalSearch.toLowerCase();
@@ -173,10 +260,13 @@ export default function RequestsPage() {
     );
   }, [allApprovals, approvalSearch]);
 
-  const pendingCount = stats?.pendingCount ?? allApprovals.filter((a) => a.status === "PENDING").length;
+  const pendingCount =
+    stats?.pendingCount ??
+    allApprovals.filter((a) => a.status === "PENDING").length;
 
   /* score locks */
-  const { data: lockRequests = [], isLoading: isLockLoading } = usePendingLockRequests();
+  const { data: lockRequests = [], isLoading: isLockLoading } =
+    usePendingLockRequests();
   const reviewLockMutation = useReviewLockRequest();
   const [lockDialogOpen, setLockDialogOpen] = useState(false);
   const [selectedLock, setSelectedLock] = useState(null);
@@ -184,13 +274,17 @@ export default function RequestsPage() {
 
   /* reviews */
   const [reviewStatus, setReviewStatus] = useState("PENDING");
-  const { data: reviewsData, isLoading: isReviewsLoading } = useReviewProposals({ status: reviewStatus });
+  const { data: reviewsData, isLoading: isReviewsLoading } = useReviewProposals(
+    { status: reviewStatus },
+  );
   const proposals = useMemo(() => reviewsData?.proposals || [], [reviewsData]);
 
   /* issues */
   const [showResolved, setShowResolved] = useState(false);
   const [issueSearch, setIssueSearch] = useState("");
-  const { data: issues = [], isLoading: isIssuesLoading } = useIssues(showResolved ? {} : { resolved: false });
+  const { data: issues = [], isLoading: isIssuesLoading } = useIssues(
+    showResolved ? {} : { resolved: false },
+  );
   const resolveMutation = useResolveIssue();
   const filteredIssues = useMemo(() => {
     if (!issueSearch) return issues;
@@ -206,14 +300,52 @@ export default function RequestsPage() {
 
   const { enqueueSnackbar } = useSnackbar();
 
+  const markApprovalHandled = (approvalId) => {
+    setHandledApprovalIds((previous) => {
+      if (previous.has(approvalId)) return previous;
+      const next = new Set(previous);
+      next.add(approvalId);
+      return next;
+    });
+  };
+
+  const isAlreadyProcessedError = (error) =>
+    error?.response?.data?.error === "APPROVAL_ALREADY_PROCESSED";
+
   /* handlers */
   const handleApprove = async (approval) => {
+    if (!approval?.id || handledApprovalIds.has(approval.id)) {
+      return;
+    }
+
     try {
+      setProcessingApprovalId(approval.id);
       await approveMutation.mutateAsync({ approvalId: approval.id });
+      markApprovalHandled(approval.id);
       enqueueSnackbar("Request approved", { variant: "success" });
       if (detailDialogOpen) setDetailDialogOpen(false);
     } catch (err) {
-      enqueueSnackbar(err?.response?.data?.message || err?.message || "Failed", { variant: "error" });
+      if (isAlreadyProcessedError(err)) {
+        markApprovalHandled(approval.id);
+        enqueueSnackbar(
+          "This request was already processed. Refreshing list…",
+          {
+            variant: "info",
+          },
+        );
+        queryClient.invalidateQueries({ queryKey: queryKeys.approvals.all });
+        if (detailDialogOpen) setDetailDialogOpen(false);
+        return;
+      }
+
+      enqueueSnackbar(
+        err?.response?.data?.message || err?.message || "Failed",
+        {
+          variant: "error",
+        },
+      );
+    } finally {
+      setProcessingApprovalId(null);
     }
   };
 
@@ -226,28 +358,74 @@ export default function RequestsPage() {
 
   const handleReject = async () => {
     if (!rejectReason.trim()) return;
+
+    if (!selectedApproval?.id || handledApprovalIds.has(selectedApproval.id)) {
+      return;
+    }
+
     try {
-      await rejectMutation.mutateAsync({ approvalId: selectedApproval.id, reason: rejectReason });
+      setProcessingApprovalId(selectedApproval.id);
+      await rejectMutation.mutateAsync({
+        approvalId: selectedApproval.id,
+        reason: rejectReason,
+      });
+      markApprovalHandled(selectedApproval.id);
       enqueueSnackbar("Request rejected", { variant: "success" });
       setRejectDialogOpen(false);
       setSelectedApproval(null);
       setRejectReason("");
     } catch (err) {
-      enqueueSnackbar(err?.response?.data?.message || err?.message || "Failed", { variant: "error" });
+      if (isAlreadyProcessedError(err)) {
+        markApprovalHandled(selectedApproval.id);
+        enqueueSnackbar(
+          "This request was already processed. Refreshing list…",
+          {
+            variant: "info",
+          },
+        );
+        queryClient.invalidateQueries({ queryKey: queryKeys.approvals.all });
+        setRejectDialogOpen(false);
+        setSelectedApproval(null);
+        setRejectReason("");
+        return;
+      }
+
+      enqueueSnackbar(
+        err?.response?.data?.message || err?.message || "Failed",
+        {
+          variant: "error",
+        },
+      );
+    } finally {
+      setProcessingApprovalId(null);
     }
   };
 
-  const openLock = (req) => { setSelectedLock(req); setLockNotes(""); setLockDialogOpen(true); };
+  const openLock = (req) => {
+    setSelectedLock(req);
+    setLockNotes("");
+    setLockDialogOpen(true);
+  };
 
   const handleLockReview = async (status) => {
     try {
-      await reviewLockMutation.mutateAsync({ requestId: selectedLock.id, status, reviewNotes: lockNotes.trim() || undefined });
-      enqueueSnackbar(status === "APPROVED" ? "Score lock approved" : "Score lock rejected", {
-        variant: status === "APPROVED" ? "success" : "info",
+      await reviewLockMutation.mutateAsync({
+        requestId: selectedLock.id,
+        status,
+        reviewNotes: lockNotes.trim() || undefined,
       });
+      enqueueSnackbar(
+        status === "APPROVED" ? "Score lock approved" : "Score lock rejected",
+        {
+          variant: status === "APPROVED" ? "success" : "info",
+        },
+      );
       setLockDialogOpen(false);
     } catch (err) {
-      enqueueSnackbar(err?.response?.data?.message || err?.message || "Failed", { variant: "error" });
+      enqueueSnackbar(
+        err?.response?.data?.message || err?.message || "Failed",
+        { variant: "error" },
+      );
     }
   };
 
@@ -256,14 +434,21 @@ export default function RequestsPage() {
       await resolveMutation.mutateAsync({ issueId });
       enqueueSnackbar("Issue resolved", { variant: "success" });
     } catch (err) {
-      enqueueSnackbar(err?.response?.data?.message || err?.message || "Failed", { variant: "error" });
+      enqueueSnackbar(
+        err?.response?.data?.message || err?.message || "Failed",
+        { variant: "error" },
+      );
     }
   };
 
   const TABS = [
     { id: "approvals", label: "Approvals", badge: pendingCount || null },
     { id: "locks", label: "Score Locks", badge: lockRequests.length || null },
-    { id: "reviews", label: "Reviews", badge: proposals.filter((p) => p.status === "PENDING").length || null },
+    {
+      id: "reviews",
+      label: "Reviews",
+      badge: proposals.filter((p) => p.status === "PENDING").length || null,
+    },
     { id: "issues", label: "Issues", badge: openIssues || null },
   ];
 
@@ -272,38 +457,109 @@ export default function RequestsPage() {
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 0.5 }}>
-          <Box sx={{ width: 32, height: 32, borderRadius: "9px", background: "#111", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Box
+            sx={{
+              width: 32,
+              height: 32,
+              borderRadius: "9px",
+              background: "#111",
+              border: "1px solid rgba(255,255,255,0.1)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
             <ShieldCheck size={15} color="rgba(255,255,255,0.7)" />
           </Box>
-          <Typography sx={{ fontSize: 18, fontWeight: 600, color: "#f4f4f5", fontFamily: "'Syne', sans-serif", letterSpacing: "0.01em" }}>
+          <Typography
+            sx={{
+              fontSize: 18,
+              fontWeight: 600,
+              color: "#f4f4f5",
+              fontFamily: "'Syne', sans-serif",
+              letterSpacing: "0.01em",
+            }}
+          >
             Requests
           </Typography>
         </Box>
-        <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.3)", fontFamily: "'Syne', sans-serif", letterSpacing: "0.03em", ml: 0.5 }}>
+        <Typography
+          sx={{
+            fontSize: 12,
+            color: "rgba(255,255,255,0.3)",
+            fontFamily: "'Syne', sans-serif",
+            letterSpacing: "0.03em",
+            ml: 0.5,
+          }}
+        >
           Approvals, score locks, competition reviews, and support issues
         </Typography>
       </Box>
 
       {/* Tab bar */}
-      <Box sx={{ display: "flex", gap: 0.5, mb: 3, p: 0.5, background: "rgba(255,255,255,0.03)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)", width: "fit-content" }}>
+      <Box
+        sx={{
+          display: "flex",
+          gap: 0.5,
+          mb: 3,
+          p: 0.5,
+          background: "rgba(255,255,255,0.03)",
+          borderRadius: "12px",
+          border: "1px solid rgba(255,255,255,0.06)",
+          width: "fit-content",
+        }}
+      >
         {TABS.map((t) => (
           <Box
             key={t.id}
             onClick={() => setTab(t.id)}
             sx={{
-              display: "flex", alignItems: "center", gap: 1,
-              px: 2, py: 0.75, borderRadius: "9px", cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              px: 2,
+              py: 0.75,
+              borderRadius: "9px",
+              cursor: "pointer",
               transition: "all 0.15s",
-              background: tab === t.id ? "rgba(255,255,255,0.08)" : "transparent",
+              background:
+                tab === t.id ? "rgba(255,255,255,0.08)" : "transparent",
               color: tab === t.id ? "#f4f4f5" : "rgba(255,255,255,0.35)",
             }}
           >
-            <Typography sx={{ fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: tab === t.id ? 600 : 400 }}>
+            <Typography
+              sx={{
+                fontSize: 13,
+                fontFamily: "'Syne', sans-serif",
+                fontWeight: tab === t.id ? 600 : 400,
+              }}
+            >
               {t.label}
             </Typography>
             {t.badge > 0 && (
-              <Box sx={{ px: 0.75, py: 0.1, borderRadius: "5px", background: tab === t.id ? "rgba(251,191,36,0.2)" : "rgba(255,255,255,0.06)", border: tab === t.id ? "1px solid rgba(251,191,36,0.3)" : "1px solid rgba(255,255,255,0.08)" }}>
-                <Typography sx={{ fontSize: 10, fontFamily: "'DM Mono', monospace", color: tab === t.id ? "#fbbf24" : "rgba(255,255,255,0.3)", lineHeight: 1.4 }}>
+              <Box
+                sx={{
+                  px: 0.75,
+                  py: 0.1,
+                  borderRadius: "5px",
+                  background:
+                    tab === t.id
+                      ? "rgba(251,191,36,0.2)"
+                      : "rgba(255,255,255,0.06)",
+                  border:
+                    tab === t.id
+                      ? "1px solid rgba(251,191,36,0.3)"
+                      : "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                <Typography
+                  sx={{
+                    fontSize: 10,
+                    fontFamily: "'DM Mono', monospace",
+                    color: tab === t.id ? "#fbbf24" : "rgba(255,255,255,0.3)",
+                    lineHeight: 1.4,
+                  }}
+                >
                   {t.badge}
                 </Typography>
               </Box>
@@ -315,37 +571,134 @@ export default function RequestsPage() {
       {/* ── Tab: Approvals ── */}
       {tab === "approvals" && (
         <Box>
-          {isApprovalsLoading ? <LoadingState /> : (
+          {isApprovalsLoading ? (
+            <LoadingState />
+          ) : (
             <>
               {/* Stats */}
-              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3,1fr)" }, gap: 2, mb: 3 }}>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "repeat(3,1fr)" },
+                  gap: 2,
+                  mb: 3,
+                }}
+              >
                 {[
-                  { label: "Pending", value: pendingCount, color: "#fbbf24", id: "PENDING" },
-                  { label: "Approved", value: allApprovals.filter((a) => a.status === "APPROVED").length, color: "#4ade80", id: "APPROVED" },
-                  { label: "Rejected", value: allApprovals.filter((a) => a.status === "REJECTED").length, color: "#f87171", id: "REJECTED" },
+                  {
+                    label: "Pending",
+                    value: pendingCount,
+                    color: "#fbbf24",
+                    id: "PENDING",
+                  },
+                  {
+                    label: "Approved",
+                    value: allApprovals.filter((a) => a.status === "APPROVED")
+                      .length,
+                    color: "#4ade80",
+                    id: "APPROVED",
+                  },
+                  {
+                    label: "Rejected",
+                    value: allApprovals.filter((a) => a.status === "REJECTED")
+                      .length,
+                    color: "#f87171",
+                    id: "REJECTED",
+                  },
                 ].map((s) => (
                   <Box
                     key={s.label}
-                    onClick={() => setStatusFilter(statusFilter === s.id ? "all" : s.id)}
-                    sx={{ p: 2.5, borderRadius: "12px", background: "#0c0c0c", border: statusFilter === s.id ? `1px solid ${s.color}40` : "1px solid rgba(255,255,255,0.06)", cursor: "pointer", transition: "border-color 0.15s", "&:hover": { borderColor: `${s.color}25` } }}
+                    onClick={() =>
+                      setStatusFilter(statusFilter === s.id ? "all" : s.id)
+                    }
+                    sx={{
+                      p: 2.5,
+                      borderRadius: "12px",
+                      background: "#0c0c0c",
+                      border:
+                        statusFilter === s.id
+                          ? `1px solid ${s.color}40`
+                          : "1px solid rgba(255,255,255,0.06)",
+                      cursor: "pointer",
+                      transition: "border-color 0.15s",
+                      "&:hover": { borderColor: `${s.color}25` },
+                    }}
                   >
-                    <Typography sx={{ fontSize: 9.5, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.22)", fontFamily: "'Syne', sans-serif", mb: 1 }}>{s.label}</Typography>
-                    <Typography sx={{ fontSize: 28, fontWeight: 700, color: s.color, fontFamily: "'Syne', sans-serif", lineHeight: 1 }}>{s.value}</Typography>
+                    <Typography
+                      sx={{
+                        fontSize: 9.5,
+                        letterSpacing: "0.2em",
+                        textTransform: "uppercase",
+                        color: "rgba(255,255,255,0.22)",
+                        fontFamily: "'Syne', sans-serif",
+                        mb: 1,
+                      }}
+                    >
+                      {s.label}
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: 28,
+                        fontWeight: 700,
+                        color: s.color,
+                        fontFamily: "'Syne', sans-serif",
+                        lineHeight: 1,
+                      }}
+                    >
+                      {s.value}
+                    </Typography>
                   </Box>
                 ))}
               </Box>
 
               {/* Filters */}
-              <Box sx={{ p: 2, mb: 2, borderRadius: "12px", background: "#0c0c0c", border: "1px solid rgba(255,255,255,0.06)", display: "flex", gap: 1.5, alignItems: "center", flexWrap: "wrap" }}>
-                <Box sx={{ position: "relative", flex: "1 1 200px", minWidth: 180 }}>
-                  <Box sx={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+              <Box
+                sx={{
+                  p: 2,
+                  mb: 2,
+                  borderRadius: "12px",
+                  background: "#0c0c0c",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  display: "flex",
+                  gap: 1.5,
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                }}
+              >
+                <Box
+                  sx={{
+                    position: "relative",
+                    flex: "1 1 200px",
+                    minWidth: 180,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      left: 11,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      pointerEvents: "none",
+                    }}
+                  >
                     <Search size={13} color="rgba(255,255,255,0.25)" />
                   </Box>
                   <input
                     value={approvalSearch}
                     onChange={(e) => setApprovalSearch(e.target.value)}
                     placeholder="Search title, description, requestor…"
-                    style={{ width: "100%", padding: "8px 12px 8px 32px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, color: "rgba(255,255,255,0.75)", fontSize: 13, fontFamily: "'Syne', sans-serif", outline: "none", boxSizing: "border-box" }}
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px 8px 32px",
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      borderRadius: 8,
+                      color: "rgba(255,255,255,0.75)",
+                      fontSize: 13,
+                      fontFamily: "'Syne', sans-serif",
+                      outline: "none",
+                      boxSizing: "border-box",
+                    }}
                   />
                 </Box>
                 <NativeSelect value={statusFilter} onChange={setStatusFilter}>
@@ -360,16 +713,58 @@ export default function RequestsPage() {
                   <option value="EVENT_UPDATE">Event Update</option>
                   <option value="COMPETITION_EDIT">Competition Update</option>
                 </NativeSelect>
-                <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.18)", fontFamily: "'DM Mono', monospace", ml: "auto" }}>
-                  {filteredApprovals.length} result{filteredApprovals.length !== 1 ? "s" : ""}
+                <Typography
+                  sx={{
+                    fontSize: 11,
+                    color: "rgba(255,255,255,0.18)",
+                    fontFamily: "'DM Mono', monospace",
+                    ml: "auto",
+                  }}
+                >
+                  {filteredApprovals.length} result
+                  {filteredApprovals.length !== 1 ? "s" : ""}
                 </Typography>
               </Box>
 
               {/* Table */}
-              <Box sx={{ borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)", overflow: "hidden", background: "#0c0c0c" }}>
-                <Box sx={{ display: "grid", gridTemplateColumns: "minmax(180px,1fr) 130px 160px 100px 110px 150px", px: 3, py: 1.5, background: "rgba(255,255,255,0.02)" }}>
-                  {["Request", "Type", "Requested By", "Date", "Status", ""].map((h, i) => (
-                    <Typography key={i} sx={{ fontSize: 9.5, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.2)", fontFamily: "'Syne', sans-serif" }}>{h}</Typography>
+              <Box
+                sx={{
+                  borderRadius: "12px",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  overflow: "hidden",
+                  background: "#0c0c0c",
+                }}
+              >
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "minmax(220px,1fr) 140px 160px 110px 110px 120px",
+                    px: 3,
+                    py: 1.5,
+                    background: "rgba(255,255,255,0.02)",
+                  }}
+                >
+                  {[
+                    "Request",
+                    "Type",
+                    "Requested By",
+                    "Date",
+                    "Status",
+                    "",
+                  ].map((h, i) => (
+                    <Typography
+                      key={i}
+                      sx={{
+                        fontSize: 9.5,
+                        letterSpacing: "0.2em",
+                        textTransform: "uppercase",
+                        color: "rgba(255,255,255,0.2)",
+                        fontFamily: "'Syne', sans-serif",
+                      }}
+                    >
+                      {h}
+                    </Typography>
                   ))}
                 </Box>
                 <Box sx={{ maxHeight: "min(60vh,600px)", overflowY: "auto" }}>
@@ -379,31 +774,110 @@ export default function RequestsPage() {
                   ) : (
                     filteredApprovals.map((a, idx) => (
                       <Box key={a.id}>
-                        <Box sx={{ display: "grid", gridTemplateColumns: "minmax(180px,1fr) 130px 160px 100px 110px 150px", alignItems: "center", px: 3, py: 2, transition: "background 0.12s", "&:hover": { background: "rgba(255,255,255,0.02)" } }}>
-                          <Box sx={{ cursor: "pointer", minWidth: 0, pr: 1 }} onClick={() => { setDetailApproval(a); setDetailDialogOpen(true); }}>
-                            <Typography sx={{ fontSize: 13, fontWeight: 500, color: "#e4e4e7", fontFamily: "'Syne', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.title}</Typography>
-                            {a.description && <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.28)", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.description}</Typography>}
-                          </Box>
-                          <Box sx={{ overflow: "hidden" }}><TypePill type={a.type} /></Box>
-                          <Box sx={{ minWidth: 0, pr: 1 }}>
-                            <Typography sx={{ fontSize: 12, color: "#e4e4e7", fontFamily: "'Syne', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.requestedBy?.name || "—"}</Typography>
-                            <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.25)", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.requestedBy?.email || ""}</Typography>
-                          </Box>
-                          <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.28)", fontFamily: "'DM Mono', monospace" }}>{fmtDate(a.createdAt)}</Typography>
-                          <Box><StatusBadge status={a.status} /></Box>
-                          <Box sx={{ display: "flex", gap: 0.75, justifyContent: "flex-end" }}>
-                            {a.status === "PENDING" ? (
-                              <>
-                                <GreenBtn onClick={() => handleApprove(a)} loading={approveMutation.isPending}>
-                                  <CheckCheck size={12} />Approve
-                                </GreenBtn>
-                                <DangerBtn onClick={() => openReject(a)}>Reject</DangerBtn>
-                              </>
-                            ) : (
-                              <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.15)", fontFamily: "'DM Mono', monospace" }}>{a.reviewedAt ? fmtDate(a.reviewedAt) : "—"}</Typography>
-                            )}
-                          </Box>
-                        </Box>
+                        {(() => {
+                          const isLocallyHandled = handledApprovalIds.has(a.id);
+                          const isPending =
+                            a.status === "PENDING" && !isLocallyHandled;
+                          const isProcessing = processingApprovalId === a.id;
+
+                          return (
+                            <Box
+                              sx={{
+                                display: "grid",
+                                gridTemplateColumns:
+                                  "minmax(220px,1fr) 140px 160px 110px 110px 120px",
+                                alignItems: "center",
+                                px: 3,
+                                py: 2,
+                                transition: "background 0.12s",
+                                "&:hover": {
+                                  background: "rgba(255,255,255,0.02)",
+                                },
+                              }}
+                            >
+                              <Box
+                                sx={{ cursor: "pointer", minWidth: 0, pr: 1 }}
+                                onClick={() => {
+                                  setDetailApproval(a);
+                                  setDetailDialogOpen(true);
+                                }}
+                              >
+                                <Typography
+                                  sx={{
+                                    fontSize: 13,
+                                    fontWeight: 500,
+                                    color: "#e4e4e7",
+                                    fontFamily: "'Syne', sans-serif",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {a.title}
+                                </Typography>
+                                <Typography
+                                  sx={{
+                                    fontSize: 11,
+                                    color: "rgba(255,255,255,0.25)",
+                                    fontFamily: "'DM Mono', monospace",
+                                  }}
+                                >
+                                  {TYPE_LABELS[a.type] || a.type}
+                                </Typography>
+                              </Box>
+                              <Box sx={{ overflow: "hidden" }}>
+                                <TypePill type={a.type} />
+                              </Box>
+                              <Box sx={{ minWidth: 0, pr: 1 }}>
+                                <Typography
+                                  sx={{
+                                    fontSize: 12,
+                                    color: "#e4e4e7",
+                                    fontFamily: "'Syne', sans-serif",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {a.requestedBy?.name || "—"}
+                                </Typography>
+                              </Box>
+                              <Typography
+                                sx={{
+                                  fontSize: 11,
+                                  color: "rgba(255,255,255,0.28)",
+                                  fontFamily: "'DM Mono', monospace",
+                                }}
+                              >
+                                {fmtDate(a.createdAt)}
+                              </Typography>
+                              <Box>
+                                <StatusBadge
+                                  status={
+                                    isLocallyHandled ? "APPROVED" : a.status
+                                  }
+                                />
+                              </Box>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  justifyContent: "flex-end",
+                                }}
+                              >
+                                <PrimaryBtn
+                                  onClick={() => {
+                                    setDetailApproval(a);
+                                    setDetailDialogOpen(true);
+                                  }}
+                                  disabled={isProcessing}
+                                >
+                                  <FileText size={12} />
+                                  {isPending ? "Review" : "View"}
+                                </PrimaryBtn>
+                              </Box>
+                            </Box>
+                          );
+                        })()}
                         {idx < filteredApprovals.length - 1 && <RowDivider />}
                       </Box>
                     ))
@@ -418,12 +892,43 @@ export default function RequestsPage() {
       {/* ── Tab: Score Locks ── */}
       {tab === "locks" && (
         <Box>
-          {isLockLoading ? <LoadingState /> : (
-            <Box sx={{ borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)", overflow: "hidden", background: "#0c0c0c" }}>
-              <Box sx={{ display: "grid", gridTemplateColumns: "minmax(200px,1fr) 160px 140px 110px 160px", px: 3, py: 1.5, background: "rgba(255,255,255,0.02)" }}>
-                {["Round", "Requested By", "Submitted", "Status", ""].map((h, i) => (
-                  <Typography key={i} sx={{ fontSize: 9.5, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.2)", fontFamily: "'Syne', sans-serif" }}>{h}</Typography>
-                ))}
+          {isLockLoading ? (
+            <LoadingState />
+          ) : (
+            <Box
+              sx={{
+                borderRadius: "12px",
+                border: "1px solid rgba(255,255,255,0.06)",
+                overflow: "hidden",
+                background: "#0c0c0c",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "minmax(200px,1fr) 160px 140px 110px 160px",
+                  px: 3,
+                  py: 1.5,
+                  background: "rgba(255,255,255,0.02)",
+                }}
+              >
+                {["Round", "Requested By", "Submitted", "Status", ""].map(
+                  (h, i) => (
+                    <Typography
+                      key={i}
+                      sx={{
+                        fontSize: 9.5,
+                        letterSpacing: "0.2em",
+                        textTransform: "uppercase",
+                        color: "rgba(255,255,255,0.2)",
+                        fontFamily: "'Syne', sans-serif",
+                      }}
+                    >
+                      {h}
+                    </Typography>
+                  ),
+                )}
               </Box>
               <Box sx={{ maxHeight: "min(60vh,600px)", overflowY: "auto" }}>
                 <RowDivider />
@@ -432,26 +937,108 @@ export default function RequestsPage() {
                 ) : (
                   lockRequests.map((req, idx) => (
                     <Box key={req.id}>
-                      <Box sx={{ display: "grid", gridTemplateColumns: "minmax(200px,1fr) 160px 140px 110px 160px", alignItems: "center", px: 3, py: 2, transition: "background 0.12s", "&:hover": { background: "rgba(255,255,255,0.02)" } }}>
+                      <Box
+                        sx={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "minmax(200px,1fr) 160px 140px 110px 160px",
+                          alignItems: "center",
+                          px: 3,
+                          py: 2,
+                          transition: "background 0.12s",
+                          "&:hover": { background: "rgba(255,255,255,0.02)" },
+                        }}
+                      >
                         <Box sx={{ minWidth: 0, pr: 1 }}>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                            }}
+                          >
                             <Trophy size={13} color="#52525b" />
-                            <Typography sx={{ fontSize: 13, fontWeight: 500, color: "#e4e4e7", fontFamily: "'Syne', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{req.competition?.title || "—"}</Typography>
+                            <Typography
+                              sx={{
+                                fontSize: 13,
+                                fontWeight: 500,
+                                color: "#e4e4e7",
+                                fontFamily: "'Syne', sans-serif",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {req.competition?.title || "—"}
+                            </Typography>
                           </Box>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                              mt: 0.5,
+                            }}
+                          >
                             <Star size={12} color="#71717a" />
-                            <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{req.round?.name || "Round"}</Typography>
+                            <Typography
+                              sx={{
+                                fontSize: 11,
+                                color: "rgba(255,255,255,0.35)",
+                                fontFamily: "'DM Mono', monospace",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {req.round?.name || "Round"}
+                            </Typography>
                           </Box>
                         </Box>
                         <Box sx={{ minWidth: 0, pr: 1 }}>
-                          <Typography sx={{ fontSize: 12, color: "#e4e4e7", fontFamily: "'Syne', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{req.requestedByUser?.name || "—"}</Typography>
-                          <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.25)", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{req.requestedByUser?.email || ""}</Typography>
+                          <Typography
+                            sx={{
+                              fontSize: 12,
+                              color: "#e4e4e7",
+                              fontFamily: "'Syne', sans-serif",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {req.requestedByUser?.name || "—"}
+                          </Typography>
+                          <Typography
+                            sx={{
+                              fontSize: 11,
+                              color: "rgba(255,255,255,0.25)",
+                              fontFamily: "'DM Mono', monospace",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {req.requestedByUser?.email || ""}
+                          </Typography>
                         </Box>
-                        <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.28)", fontFamily: "'DM Mono', monospace" }}>{fmtDate(req.createdAt)}</Typography>
-                        <Box><StatusBadge status={req.status || "PENDING"} /></Box>
-                        <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                        <Typography
+                          sx={{
+                            fontSize: 11,
+                            color: "rgba(255,255,255,0.28)",
+                            fontFamily: "'DM Mono', monospace",
+                          }}
+                        >
+                          {fmtDate(req.createdAt)}
+                        </Typography>
+                        <Box>
+                          <StatusBadge status={req.status || "PENDING"} />
+                        </Box>
+                        <Box
+                          sx={{ display: "flex", justifyContent: "flex-end" }}
+                        >
                           <PrimaryBtn onClick={() => openLock(req)}>
-                            <Gavel size={12} />Review
+                            <Gavel size={12} />
+                            Review
                           </PrimaryBtn>
                         </Box>
                       </Box>
@@ -474,31 +1061,111 @@ export default function RequestsPage() {
               <Box
                 key={s}
                 onClick={() => setReviewStatus(s)}
-                sx={{ px: 2, py: 0.75, borderRadius: 2, cursor: "pointer", border: reviewStatus === s ? `1px solid ${STATUS_COLORS[s].border}` : "1px solid rgba(255,255,255,0.07)", background: reviewStatus === s ? STATUS_COLORS[s].bg : "transparent", transition: "all 0.15s" }}
+                sx={{
+                  px: 2,
+                  py: 0.75,
+                  borderRadius: 2,
+                  cursor: "pointer",
+                  border:
+                    reviewStatus === s
+                      ? `1px solid ${STATUS_COLORS[s].border}`
+                      : "1px solid rgba(255,255,255,0.07)",
+                  background:
+                    reviewStatus === s ? STATUS_COLORS[s].bg : "transparent",
+                  transition: "all 0.15s",
+                }}
               >
-                <Typography sx={{ fontSize: 12, fontFamily: "'Syne', sans-serif", color: reviewStatus === s ? STATUS_COLORS[s].text : "rgba(255,255,255,0.35)", fontWeight: reviewStatus === s ? 600 : 400 }}>{s.charAt(0) + s.slice(1).toLowerCase()}</Typography>
+                <Typography
+                  sx={{
+                    fontSize: 12,
+                    fontFamily: "'Syne', sans-serif",
+                    color:
+                      reviewStatus === s
+                        ? STATUS_COLORS[s].text
+                        : "rgba(255,255,255,0.35)",
+                    fontWeight: reviewStatus === s ? 600 : 400,
+                  }}
+                >
+                  {s.charAt(0) + s.slice(1).toLowerCase()}
+                </Typography>
               </Box>
             ))}
           </Box>
 
-          {isReviewsLoading ? <LoadingState /> : (
-            <Box sx={{ borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)", overflow: "hidden", background: "#0c0c0c" }}>
+          {isReviewsLoading ? (
+            <LoadingState />
+          ) : (
+            <Box
+              sx={{
+                borderRadius: "12px",
+                border: "1px solid rgba(255,255,255,0.06)",
+                overflow: "hidden",
+                background: "#0c0c0c",
+              }}
+            >
               {proposals.length === 0 ? (
                 <EmptyRow message="No proposals found" />
               ) : (
                 proposals.map((p, idx) => (
                   <Box key={p.id}>
-                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, px: 3, py: 2.5, transition: "background 0.12s", "&:hover": { background: "rgba(255,255,255,0.02)" } }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 2,
+                        px: 3,
+                        py: 2.5,
+                        transition: "background 0.12s",
+                        "&:hover": { background: "rgba(255,255,255,0.02)" },
+                      }}
+                    >
                       <Box sx={{ minWidth: 0 }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 0.5 }}>
-                          <Typography sx={{ fontSize: 13, fontWeight: 500, color: "#e4e4e7", fontFamily: "'Syne', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.competitionTitle || "—"}</Typography>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1.5,
+                            mb: 0.5,
+                          }}
+                        >
+                          <Typography
+                            sx={{
+                              fontSize: 13,
+                              fontWeight: 500,
+                              color: "#e4e4e7",
+                              fontFamily: "'Syne', sans-serif",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {p.competitionTitle || "—"}
+                          </Typography>
                           <StatusPill status={p.status} />
                         </Box>
-                        {p.summary && <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.35)", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.summary}</Typography>}
+                        {p.summary && (
+                          <Typography
+                            sx={{
+                              fontSize: 12,
+                              color: "rgba(255,255,255,0.35)",
+                              fontFamily: "'DM Mono', monospace",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {p.summary}
+                          </Typography>
+                        )}
                       </Box>
-                      <Link href={`/admin/sa/reviews/${p.id}`} style={{ textDecoration: "none", flexShrink: 0 }}>
+                      <Link
+                        href={`/admin/sa/reviews/${p.id}`}
+                        style={{ textDecoration: "none", flexShrink: 0 }}
+                      >
                         <PrimaryBtn>
-                          <FileText size={12} />Review
+                          <FileText size={12} />
+                          Review
                         </PrimaryBtn>
                       </Link>
                     </Box>
@@ -515,27 +1182,98 @@ export default function RequestsPage() {
       {tab === "issues" && (
         <Box>
           {/* Stats */}
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2,1fr)" }, gap: 2, mb: 3 }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "repeat(2,1fr)" },
+              gap: 2,
+              mb: 3,
+            }}
+          >
             {[
-              { label: "Open", value: issues.filter((i) => !i.resolved).length, color: "#fbbf24" },
-              { label: "Resolved", value: issues.filter((i) => i.resolved).length, color: "#4ade80" },
+              {
+                label: "Open",
+                value: issues.filter((i) => !i.resolved).length,
+                color: "#fbbf24",
+              },
+              {
+                label: "Resolved",
+                value: issues.filter((i) => i.resolved).length,
+                color: "#4ade80",
+              },
             ].map((s) => (
-              <Box key={s.label} sx={{ p: 2.5, borderRadius: "12px", background: "#0c0c0c", border: "1px solid rgba(255,255,255,0.06)" }}>
-                <Typography sx={{ fontSize: 9.5, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.22)", fontFamily: "'Syne', sans-serif", mb: 1 }}>{s.label}</Typography>
-                <Typography sx={{ fontSize: 28, fontWeight: 700, color: s.color, fontFamily: "'Syne', sans-serif", lineHeight: 1 }}>{s.value}</Typography>
+              <Box
+                key={s.label}
+                sx={{
+                  p: 2.5,
+                  borderRadius: "12px",
+                  background: "#0c0c0c",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                }}
+              >
+                <Typography
+                  sx={{
+                    fontSize: 9.5,
+                    letterSpacing: "0.2em",
+                    textTransform: "uppercase",
+                    color: "rgba(255,255,255,0.22)",
+                    fontFamily: "'Syne', sans-serif",
+                    mb: 1,
+                  }}
+                >
+                  {s.label}
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: 28,
+                    fontWeight: 700,
+                    color: s.color,
+                    fontFamily: "'Syne', sans-serif",
+                    lineHeight: 1,
+                  }}
+                >
+                  {s.value}
+                </Typography>
               </Box>
             ))}
           </Box>
 
           {/* Filters */}
-          <Box sx={{ mb: 2, display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr auto" }, gap: 1.5, alignItems: "center" }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 1.5, py: 1, borderRadius: "10px", border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)" }}>
+          <Box
+            sx={{
+              mb: 2,
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "1fr auto" },
+              gap: 1.5,
+              alignItems: "center",
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                px: 1.5,
+                py: 1,
+                borderRadius: "10px",
+                border: "1px solid rgba(255,255,255,0.08)",
+                background: "rgba(255,255,255,0.02)",
+              }}
+            >
               <Search size={14} color="rgba(255,255,255,0.35)" />
               <input
                 value={issueSearch}
                 onChange={(e) => setIssueSearch(e.target.value)}
                 placeholder="Search by message, creator name, or email"
-                style={{ width: "100%", border: "none", outline: "none", background: "transparent", color: "rgba(255,255,255,0.85)", fontSize: 13, fontFamily: "'Syne', sans-serif" }}
+                style={{
+                  width: "100%",
+                  border: "none",
+                  outline: "none",
+                  background: "transparent",
+                  color: "rgba(255,255,255,0.85)",
+                  fontSize: 13,
+                  fontFamily: "'Syne', sans-serif",
+                }}
               />
             </Box>
             <GhostBtn
@@ -546,28 +1284,102 @@ export default function RequestsPage() {
             </GhostBtn>
           </Box>
 
-          {isIssuesLoading ? <LoadingState /> : (
-            <Box sx={{ borderRadius: "12px", background: "#0c0c0c", border: "1px solid rgba(255,255,255,0.06)", overflow: "hidden" }}>
+          {isIssuesLoading ? (
+            <LoadingState />
+          ) : (
+            <Box
+              sx={{
+                borderRadius: "12px",
+                background: "#0c0c0c",
+                border: "1px solid rgba(255,255,255,0.06)",
+                overflow: "hidden",
+              }}
+            >
               {filteredIssues.length === 0 ? (
                 <EmptyRow message="No issues found" />
               ) : (
                 filteredIssues.map((issue, idx) => {
                   const status = issue.resolved ? "RESOLVED" : "OPEN";
                   return (
-                    <Box key={issue.id} sx={{ p: 2.5, borderBottom: idx < filteredIssues.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
-                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1.5, mb: 1.25 }}>
+                    <Box
+                      key={issue.id}
+                      sx={{
+                        p: 2.5,
+                        borderBottom:
+                          idx < filteredIssues.length - 1
+                            ? "1px solid rgba(255,255,255,0.06)"
+                            : "none",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 1.5,
+                          mb: 1.25,
+                        }}
+                      >
                         <StatusPill status={status} />
                         {!issue.resolved && (
-                          <GreenBtn onClick={() => handleResolve(issue.id)} loading={resolveMutation.isPending}>
-                            <CheckCircle2 size={12} />Resolve
+                          <GreenBtn
+                            onClick={() => handleResolve(issue.id)}
+                            loading={resolveMutation.isPending}
+                          >
+                            <CheckCircle2 size={12} />
+                            Resolve
                           </GreenBtn>
                         )}
                       </Box>
-                      <Typography sx={{ color: "rgba(255,255,255,0.82)", fontSize: 13, fontFamily: "'Syne', sans-serif", mb: 1.25, whiteSpace: "pre-wrap" }}>{issue.message}</Typography>
-                      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3,1fr)" }, gap: 1 }}>
-                        <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'DM Mono', monospace" }}>Creator: {issue.creator?.name || "Unknown"}</Typography>
-                        <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'DM Mono', monospace" }}>Email: {issue.creator?.email || "—"}</Typography>
-                        <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'DM Mono', monospace", textAlign: { xs: "left", md: "right" } }}>Created: {fmtDateTime(issue.createdAt)}</Typography>
+                      <Typography
+                        sx={{
+                          color: "rgba(255,255,255,0.82)",
+                          fontSize: 13,
+                          fontFamily: "'Syne', sans-serif",
+                          mb: 1.25,
+                          whiteSpace: "pre-wrap",
+                        }}
+                      >
+                        {issue.message}
+                      </Typography>
+                      <Box
+                        sx={{
+                          display: "grid",
+                          gridTemplateColumns: {
+                            xs: "1fr",
+                            md: "repeat(3,1fr)",
+                          },
+                          gap: 1,
+                        }}
+                      >
+                        <Typography
+                          sx={{
+                            fontSize: 11,
+                            color: "rgba(255,255,255,0.35)",
+                            fontFamily: "'DM Mono', monospace",
+                          }}
+                        >
+                          Creator: {issue.creator?.name || "Unknown"}
+                        </Typography>
+                        <Typography
+                          sx={{
+                            fontSize: 11,
+                            color: "rgba(255,255,255,0.35)",
+                            fontFamily: "'DM Mono', monospace",
+                          }}
+                        >
+                          Email: {issue.creator?.email || "—"}
+                        </Typography>
+                        <Typography
+                          sx={{
+                            fontSize: 11,
+                            color: "rgba(255,255,255,0.35)",
+                            fontFamily: "'DM Mono', monospace",
+                            textAlign: { xs: "left", md: "right" },
+                          }}
+                        >
+                          Created: {fmtDateTime(issue.createdAt)}
+                        </Typography>
                       </Box>
                     </Box>
                   );
@@ -581,87 +1393,233 @@ export default function RequestsPage() {
       {/* ── Dialogs ── */}
 
       {/* Reject approval */}
-      <DarkDialog open={rejectDialogOpen} onClose={() => setRejectDialogOpen(false)} title="Reject Request">
-        <DangerNote>The requestor will be notified that their request was rejected.</DangerNote>
-        <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.3)", fontFamily: "'DM Mono', monospace", mb: 2 }}>{selectedApproval?.title}</Typography>
-        <DarkTextarea rows={3} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Reason for rejection…" />
+      <DarkDialog
+        open={rejectDialogOpen}
+        onClose={() => setRejectDialogOpen(false)}
+        title="Reject Request"
+      >
+        <DangerNote>
+          The requestor will be notified that their request was rejected.
+        </DangerNote>
+        <Typography
+          sx={{
+            fontSize: 12,
+            color: "rgba(255,255,255,0.3)",
+            fontFamily: "'DM Mono', monospace",
+            mb: 2,
+          }}
+        >
+          {selectedApproval?.title}
+        </Typography>
+        <DarkTextarea
+          rows={3}
+          value={rejectReason}
+          onChange={(e) => setRejectReason(e.target.value)}
+          placeholder="Reason for rejection…"
+        />
         <BtnRow>
           <GhostBtn onClick={() => setRejectDialogOpen(false)}>Cancel</GhostBtn>
-          <DangerBtn onClick={handleReject} disabled={!rejectReason.trim()} loading={rejectMutation.isPending}>
+          <DangerBtn
+            onClick={handleReject}
+            disabled={!rejectReason.trim()}
+            loading={rejectMutation.isPending}
+          >
             {rejectMutation.isPending ? "Rejecting…" : "Reject"}
           </DangerBtn>
         </BtnRow>
       </DarkDialog>
 
       {/* Detail dialog */}
-      <DarkDialog open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} title={detailApproval?.title || "Request Details"}>
+      <DarkDialog
+        open={detailDialogOpen}
+        onClose={() => setDetailDialogOpen(false)}
+        title={detailApproval?.title || "Request Details"}
+      >
         {detailApproval && (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
+            <Box
+              sx={{
+                display: "flex",
+                gap: 1.5,
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
               <TypePill type={detailApproval.type} />
               <StatusBadge status={detailApproval.status} />
             </Box>
             {detailApproval.description && (
               <Box>
                 <Label>Description</Label>
-                <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.6)", fontFamily: "'Syne', sans-serif", lineHeight: 1.6 }}>{detailApproval.description}</Typography>
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    color: "rgba(255,255,255,0.6)",
+                    fontFamily: "'Syne', sans-serif",
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {detailApproval.description}
+                </Typography>
               </Box>
             )}
-            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+            <Box
+              sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}
+            >
               <Box>
                 <Label>Requested By</Label>
-                <Typography sx={{ fontSize: 13, color: "#e4e4e7", fontFamily: "'Syne', sans-serif" }}>{detailApproval.requestedBy?.name || "—"}</Typography>
-                <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.28)", fontFamily: "'DM Mono', monospace" }}>{detailApproval.requestedBy?.email || ""}</Typography>
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    color: "#e4e4e7",
+                    fontFamily: "'Syne', sans-serif",
+                  }}
+                >
+                  {detailApproval.requestedBy?.name || "—"}
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: 11,
+                    color: "rgba(255,255,255,0.28)",
+                    fontFamily: "'DM Mono', monospace",
+                  }}
+                >
+                  {detailApproval.requestedBy?.email || ""}
+                </Typography>
               </Box>
               <Box>
                 <Label>Submitted</Label>
-                <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.55)", fontFamily: "'DM Mono', monospace" }}>{fmtDate(detailApproval.createdAt)}</Typography>
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    color: "rgba(255,255,255,0.55)",
+                    fontFamily: "'DM Mono', monospace",
+                  }}
+                >
+                  {fmtDate(detailApproval.createdAt)}
+                </Typography>
               </Box>
             </Box>
             {detailApproval.requestData && (
               <Box>
                 <Label>Request Data</Label>
-                <Box sx={{ p: 1.5, borderRadius: "8px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", fontFamily: "'DM Mono', monospace", fontSize: 12, color: "rgba(255,255,255,0.55)", overflow: "auto", maxHeight: 200 }}>
-                  <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{JSON.stringify(detailApproval.requestData, null, 2)}</pre>
+                <Box
+                  sx={{
+                    p: 1.5,
+                    borderRadius: "8px",
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: 12,
+                    color: "rgba(255,255,255,0.55)",
+                    overflow: "auto",
+                    maxHeight: 200,
+                  }}
+                >
+                  <pre
+                    style={{
+                      margin: 0,
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-all",
+                    }}
+                  >
+                    {JSON.stringify(detailApproval.requestData, null, 2)}
+                  </pre>
                 </Box>
               </Box>
             )}
             {detailApproval.rejectionReason && (
               <Box>
                 <Label>Rejection Reason</Label>
-                <Box sx={{ p: 1.5, borderRadius: "8px", background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.12)" }}>
-                  <Typography sx={{ fontSize: 13, color: "#f87171", fontFamily: "'Syne', sans-serif" }}>{detailApproval.rejectionReason}</Typography>
+                <Box
+                  sx={{
+                    p: 1.5,
+                    borderRadius: "8px",
+                    background: "rgba(239,68,68,0.06)",
+                    border: "1px solid rgba(239,68,68,0.12)",
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: 13,
+                      color: "#f87171",
+                      fontFamily: "'Syne', sans-serif",
+                    }}
+                  >
+                    {detailApproval.rejectionReason}
+                  </Typography>
                 </Box>
               </Box>
             )}
             <BtnRow>
-              <GhostBtn onClick={() => setDetailDialogOpen(false)}>Close</GhostBtn>
-              {detailApproval.status === "PENDING" && (
-                <>
-                  <DangerBtn onClick={() => openReject(detailApproval)}>Reject</DangerBtn>
-                  <GreenBtn onClick={() => handleApprove(detailApproval)} loading={approveMutation.isPending}>
-                    <CheckCheck size={12} />Approve
-                  </GreenBtn>
-                </>
-              )}
+              <GhostBtn onClick={() => setDetailDialogOpen(false)}>
+                Close
+              </GhostBtn>
+              {detailApproval.status === "PENDING" &&
+                !handledApprovalIds.has(detailApproval.id) && (
+                  <>
+                    <DangerBtn
+                      onClick={() => openReject(detailApproval)}
+                      disabled={processingApprovalId === detailApproval.id}
+                    >
+                      Reject
+                    </DangerBtn>
+                    <GreenBtn
+                      onClick={() => handleApprove(detailApproval)}
+                      loading={
+                        processingApprovalId === detailApproval.id &&
+                        approveMutation.isPending
+                      }
+                      disabled={processingApprovalId === detailApproval.id}
+                    >
+                      <CheckCheck size={12} />
+                      Approve
+                    </GreenBtn>
+                  </>
+                )}
             </BtnRow>
           </Box>
         )}
       </DarkDialog>
 
       {/* Score lock review */}
-      <DarkDialog open={lockDialogOpen} onClose={() => setLockDialogOpen(false)} title="Review Score Lock">
-        <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.3)", fontFamily: "'DM Mono', monospace", mb: 2 }}>
-          {selectedLock ? `${selectedLock.competition?.title || "Competition"} · ${selectedLock.round?.name || "Round"}` : ""}
+      <DarkDialog
+        open={lockDialogOpen}
+        onClose={() => setLockDialogOpen(false)}
+        title="Review Score Lock"
+      >
+        <Typography
+          sx={{
+            fontSize: 12,
+            color: "rgba(255,255,255,0.3)",
+            fontFamily: "'DM Mono', monospace",
+            mb: 2,
+          }}
+        >
+          {selectedLock
+            ? `${selectedLock.competition?.title || "Competition"} · ${selectedLock.round?.name || "Round"}`
+            : ""}
         </Typography>
-        <DarkTextarea rows={3} value={lockNotes} onChange={(e) => setLockNotes(e.target.value)} placeholder="Optional review notes…" />
+        <DarkTextarea
+          rows={3}
+          value={lockNotes}
+          onChange={(e) => setLockNotes(e.target.value)}
+          placeholder="Optional review notes…"
+        />
         <BtnRow>
           <GhostBtn onClick={() => setLockDialogOpen(false)}>Cancel</GhostBtn>
-          <DangerBtn onClick={() => handleLockReview("REJECTED")} loading={reviewLockMutation.isPending}>
+          <DangerBtn
+            onClick={() => handleLockReview("REJECTED")}
+            loading={reviewLockMutation.isPending}
+          >
             {reviewLockMutation.isPending ? "Submitting…" : "Reject"}
           </DangerBtn>
-          <GreenBtn onClick={() => handleLockReview("APPROVED")} loading={reviewLockMutation.isPending}>
-            <CheckCheck size={12} />{reviewLockMutation.isPending ? "Submitting…" : "Approve"}
+          <GreenBtn
+            onClick={() => handleLockReview("APPROVED")}
+            loading={reviewLockMutation.isPending}
+          >
+            <CheckCheck size={12} />
+            {reviewLockMutation.isPending ? "Submitting…" : "Approve"}
           </GreenBtn>
         </BtnRow>
       </DarkDialog>
@@ -673,7 +1631,16 @@ export default function RequestsPage() {
 
 function Label({ children }) {
   return (
-    <Typography sx={{ fontSize: 9.5, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(255,255,255,0.2)", fontFamily: "'Syne', sans-serif", mb: 0.5 }}>
+    <Typography
+      sx={{
+        fontSize: 9.5,
+        letterSpacing: "0.18em",
+        textTransform: "uppercase",
+        color: "rgba(255,255,255,0.2)",
+        fontFamily: "'Syne', sans-serif",
+        mb: 0.5,
+      }}
+    >
       {children}
     </Typography>
   );
@@ -681,9 +1648,38 @@ function Label({ children }) {
 
 function DarkDialog({ open, onClose, title, children }) {
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { background: "#0e0e0e", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "14px", boxShadow: "0 24px 64px rgba(0,0,0,0.7)", p: 0 } }}>
-      <Box sx={{ borderBottom: "1px solid rgba(255,255,255,0.06)", px: 3, py: 2.5 }}>
-        <Typography sx={{ fontSize: 15, fontWeight: 600, color: "#f4f4f5", fontFamily: "'Syne', sans-serif" }}>{title}</Typography>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{
+        sx: {
+          background: "#0e0e0e",
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: "14px",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.7)",
+          p: 0,
+        },
+      }}
+    >
+      <Box
+        sx={{
+          borderBottom: "1px solid rgba(255,255,255,0.06)",
+          px: 3,
+          py: 2.5,
+        }}
+      >
+        <Typography
+          sx={{
+            fontSize: 15,
+            fontWeight: 600,
+            color: "#f4f4f5",
+            fontFamily: "'Syne', sans-serif",
+          }}
+        >
+          {title}
+        </Typography>
       </Box>
       <Box sx={{ px: 3, py: 3 }}>{children}</Box>
     </Dialog>
@@ -692,7 +1688,21 @@ function DarkDialog({ open, onClose, title, children }) {
 
 function NativeSelect({ value, onChange, children }) {
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} style={{ padding: "8px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, color: "rgba(255,255,255,0.65)", fontSize: 13, fontFamily: "'Syne', sans-serif", outline: "none", cursor: "pointer" }}>
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      style={{
+        padding: "8px 12px",
+        background: "rgba(255,255,255,0.04)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 8,
+        color: "rgba(255,255,255,0.65)",
+        fontSize: 13,
+        fontFamily: "'Syne', sans-serif",
+        outline: "none",
+        cursor: "pointer",
+      }}
+    >
       {children}
     </select>
   );
@@ -700,46 +1710,116 @@ function NativeSelect({ value, onChange, children }) {
 
 function DarkTextarea({ rows = 3, value, onChange, placeholder }) {
   return (
-    <textarea rows={rows} value={value} onChange={onChange} placeholder={placeholder} style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "rgba(255,255,255,0.75)", fontSize: 13, fontFamily: "'Syne', sans-serif", outline: "none", resize: "vertical", boxSizing: "border-box" }} />
+    <textarea
+      rows={rows}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      style={{
+        width: "100%",
+        padding: "10px 12px",
+        background: "rgba(255,255,255,0.04)",
+        border: "1px solid rgba(255,255,255,0.1)",
+        borderRadius: 8,
+        color: "rgba(255,255,255,0.75)",
+        fontSize: 13,
+        fontFamily: "'Syne', sans-serif",
+        outline: "none",
+        resize: "vertical",
+        boxSizing: "border-box",
+      }}
+    />
   );
 }
 
 function DangerNote({ children }) {
   return (
-    <Box sx={{ p: 1.5, borderRadius: 2, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)", mb: 2 }}>
-      <Typography sx={{ fontSize: 12, color: "#f87171", fontFamily: "'Syne', sans-serif" }}>{children}</Typography>
+    <Box
+      sx={{
+        p: 1.5,
+        borderRadius: 2,
+        background: "rgba(239,68,68,0.08)",
+        border: "1px solid rgba(239,68,68,0.15)",
+        mb: 2,
+      }}
+    >
+      <Typography
+        sx={{
+          fontSize: 12,
+          color: "#f87171",
+          fontFamily: "'Syne', sans-serif",
+        }}
+      >
+        {children}
+      </Typography>
     </Box>
   );
 }
 
 function BtnRow({ children }) {
-  return <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", mt: 3 }}>{children}</Box>;
+  return (
+    <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", mt: 3 }}>
+      {children}
+    </Box>
+  );
 }
 
 function BtnSpinner({ color = "currentColor" }) {
   return (
     <>
       <style>{`@keyframes _btnSpin { to { transform: rotate(360deg); } }`}</style>
-      <Loader2 size={13} color={color} style={{ animation: "_btnSpin 0.7s linear infinite", flexShrink: 0 }} />
+      <Loader2
+        size={13}
+        color={color}
+        style={{ animation: "_btnSpin 0.7s linear infinite", flexShrink: 0 }}
+      />
     </>
   );
 }
 
 const btnBase = {
-  border: "none", borderRadius: 8, cursor: "pointer",
-  fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 500,
-  padding: "7px 14px", letterSpacing: "0.02em", transition: "all 0.15s",
-  display: "flex", alignItems: "center", gap: 5,
+  border: "none",
+  borderRadius: 8,
+  cursor: "pointer",
+  fontSize: 13,
+  fontFamily: "'Syne', sans-serif",
+  fontWeight: 500,
+  padding: "7px 14px",
+  letterSpacing: "0.02em",
+  transition: "all 0.15s",
+  display: "flex",
+  alignItems: "center",
+  gap: 5,
 };
 
 function GhostBtn({ onClick, children, loading, disabled, style }) {
   const isDisabled = disabled || loading;
   return (
-    <button onClick={onClick} disabled={isDisabled} style={{ ...btnBase, background: "transparent", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.45)", opacity: isDisabled ? 0.5 : 1, cursor: isDisabled ? "not-allowed" : "pointer", ...style }}
-      onMouseEnter={(e) => { if (!isDisabled) { e.currentTarget.style.borderColor = "rgba(255,255,255,0.18)"; e.currentTarget.style.color = "rgba(255,255,255,0.7)"; } }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "rgba(255,255,255,0.45)"; }}
+    <button
+      onClick={onClick}
+      disabled={isDisabled}
+      style={{
+        ...btnBase,
+        background: "transparent",
+        border: "1px solid rgba(255,255,255,0.08)",
+        color: "rgba(255,255,255,0.45)",
+        opacity: isDisabled ? 0.5 : 1,
+        cursor: isDisabled ? "not-allowed" : "pointer",
+        ...style,
+      }}
+      onMouseEnter={(e) => {
+        if (!isDisabled) {
+          e.currentTarget.style.borderColor = "rgba(255,255,255,0.18)";
+          e.currentTarget.style.color = "rgba(255,255,255,0.7)";
+        }
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
+        e.currentTarget.style.color = "rgba(255,255,255,0.45)";
+      }}
     >
-      {loading && <BtnSpinner />}{children}
+      {loading && <BtnSpinner />}
+      {children}
     </button>
   );
 }
@@ -747,11 +1827,27 @@ function GhostBtn({ onClick, children, loading, disabled, style }) {
 function PrimaryBtn({ onClick, children, loading, disabled }) {
   const isDisabled = disabled || loading;
   return (
-    <button onClick={onClick} disabled={isDisabled} style={{ ...btnBase, background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.75)", opacity: isDisabled ? 0.5 : 1, cursor: isDisabled ? "not-allowed" : "pointer" }}
-      onMouseEnter={(e) => { if (!isDisabled) e.currentTarget.style.background = "rgba(255,255,255,0.11)"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; }}
+    <button
+      onClick={onClick}
+      disabled={isDisabled}
+      style={{
+        ...btnBase,
+        background: "rgba(255,255,255,0.07)",
+        border: "1px solid rgba(255,255,255,0.12)",
+        color: "rgba(255,255,255,0.75)",
+        opacity: isDisabled ? 0.5 : 1,
+        cursor: isDisabled ? "not-allowed" : "pointer",
+      }}
+      onMouseEnter={(e) => {
+        if (!isDisabled)
+          e.currentTarget.style.background = "rgba(255,255,255,0.11)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "rgba(255,255,255,0.07)";
+      }}
     >
-      {loading && <BtnSpinner />}{children}
+      {loading && <BtnSpinner />}
+      {children}
     </button>
   );
 }
@@ -759,11 +1855,27 @@ function PrimaryBtn({ onClick, children, loading, disabled }) {
 function GreenBtn({ onClick, children, loading, disabled }) {
   const isDisabled = disabled || loading;
   return (
-    <button onClick={onClick} disabled={isDisabled} style={{ ...btnBase, background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.2)", color: "#4ade80", opacity: isDisabled ? 0.5 : 1, cursor: isDisabled ? "not-allowed" : "pointer" }}
-      onMouseEnter={(e) => { if (!isDisabled) e.currentTarget.style.background = "rgba(74,222,128,0.14)"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(74,222,128,0.08)"; }}
+    <button
+      onClick={onClick}
+      disabled={isDisabled}
+      style={{
+        ...btnBase,
+        background: "rgba(74,222,128,0.08)",
+        border: "1px solid rgba(74,222,128,0.2)",
+        color: "#4ade80",
+        opacity: isDisabled ? 0.5 : 1,
+        cursor: isDisabled ? "not-allowed" : "pointer",
+      }}
+      onMouseEnter={(e) => {
+        if (!isDisabled)
+          e.currentTarget.style.background = "rgba(74,222,128,0.14)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "rgba(74,222,128,0.08)";
+      }}
     >
-      {loading && <BtnSpinner color="#4ade80" />}{children}
+      {loading && <BtnSpinner color="#4ade80" />}
+      {children}
     </button>
   );
 }
@@ -771,11 +1883,27 @@ function GreenBtn({ onClick, children, loading, disabled }) {
 function DangerBtn({ onClick, children, loading, disabled }) {
   const isDisabled = disabled || loading;
   return (
-    <button onClick={onClick} disabled={isDisabled} style={{ ...btnBase, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)", color: "#f87171", opacity: isDisabled ? 0.5 : 1, cursor: isDisabled ? "not-allowed" : "pointer" }}
-      onMouseEnter={(e) => { if (!isDisabled) e.currentTarget.style.background = "rgba(239,68,68,0.14)"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; }}
+    <button
+      onClick={onClick}
+      disabled={isDisabled}
+      style={{
+        ...btnBase,
+        background: "rgba(239,68,68,0.08)",
+        border: "1px solid rgba(239,68,68,0.18)",
+        color: "#f87171",
+        opacity: isDisabled ? 0.5 : 1,
+        cursor: isDisabled ? "not-allowed" : "pointer",
+      }}
+      onMouseEnter={(e) => {
+        if (!isDisabled)
+          e.currentTarget.style.background = "rgba(239,68,68,0.14)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "rgba(239,68,68,0.08)";
+      }}
     >
-      {loading && <BtnSpinner color="#f87171" />}{children}
+      {loading && <BtnSpinner color="#f87171" />}
+      {children}
     </button>
   );
 }

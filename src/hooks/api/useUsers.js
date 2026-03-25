@@ -331,7 +331,10 @@ export function useBulkInviteUsers() {
 
       const mapped = invites.map(({ email, role }) => {
         const apiRole = roleMap[role] || role;
-        return { email: email.trim(), role: validRoles.has(apiRole) ? apiRole : "USER" };
+        return {
+          email: email.trim(),
+          role: validRoles.has(apiRole) ? apiRole : "USER",
+        };
       });
 
       const { data } = await apiClient.post("/auth/invite/bulk", {
@@ -349,12 +352,13 @@ export function useBulkInviteUsers() {
  * DH: Fetch own department members (backend enforces the scope — DH cannot
  * supply an arbitrary departmentId, the server derives it from their session).
  */
-export function useDHDepartmentMembers() {
+export function useDHDepartmentMembers(enabled = true) {
   return useQuery({
     queryKey: ["dh", "my-department", "members"],
     queryFn: async () => {
       const { data } = await apiClient.get("/dh/my-department/members");
       return data.data; // { department, members }
     },
+    enabled,
   });
 }
