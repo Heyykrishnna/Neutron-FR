@@ -241,6 +241,38 @@ export const competitionSchema = z
       ? new Date(value.registrationDeadline)
       : null;
 
+    if (!value.startTime) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["startTime"],
+        message: "Start time is required",
+      });
+    }
+
+    if (!value.endTime) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["endTime"],
+        message: "End time is required",
+      });
+    }
+
+    if (!value.registrationDeadline) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["registrationDeadline"],
+        message: "Registration deadline is required",
+      });
+    }
+
+    if ((value.prizePool?.length || 0) === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["prizePool"],
+        message: "Add at least one prize",
+      });
+    }
+
     if (
       (value.startTime && !value.endTime) ||
       (!value.startTime && value.endTime)
@@ -333,6 +365,21 @@ export const competitionSchema = z
       });
     }
 
+    if (value.requiresApproval === value.autoApproveTeams) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["requiresApproval"],
+        message:
+          "Requires Approval and Auto-Approve Teams cannot be in the same state",
+      });
+
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["autoApproveTeams"],
+        message: "Auto-Approve Teams must be opposite of Requires Approval",
+      });
+    }
+
     if (!value.isPaid && (value.promoCodes?.length || 0) > 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -362,23 +409,12 @@ export const competitionSchema = z
       }
     });
 
-    if (value.status === "OPEN") {
-      if (!value.startTime || !value.endTime) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["startTime"],
-          message: "Start and end time are required before opening competition",
-        });
-      }
-
-      if (!value.registrationDeadline) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["registrationDeadline"],
-          message:
-            "Registration deadline is required before opening competition",
-        });
-      }
+    if (value.status === "OPEN" && (!value.startTime || !value.endTime)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["startTime"],
+        message: "Start and end time are required before opening competition",
+      });
     }
   });
 

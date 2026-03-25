@@ -3,8 +3,8 @@ import { queryKeys } from "@/src/lib/queryKeys";
 import apiClient from "@/lib/axios";
 
 /**
- * Fetch pending registrations (DH & SA only)
- * GET /api/v1/registration/pending?competitionId=X
+ * Fetch registrations for DH/SA dashboard (defaults to pending)
+ * GET /api/v1/registration/pending?competitionId=X&status=PENDING,REJECTED
  */
 export function usePendingRegistrations(filters = {}) {
   return useQuery({

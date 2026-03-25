@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useMemo } from "react";
 import {
   Box,
@@ -54,6 +53,7 @@ import { useClubs } from "@/src/hooks/api/useClubs";
 import { LoadingState } from "@/src/components/LoadingState";
 import CompetitionFormModal from "@/src/components/forms/CompetitionFormModal";
 import PromoCodeApprovalModal from "@/src/components/forms/PromoCodeApprovalModal";
+import { useCompetitionForms } from "@/src/hooks/api/useCompetitionForms";
 
 // ── Status / type config ──────────────────────────────────────────────────────
 
@@ -392,6 +392,16 @@ function CompetitionToggles({ competition }) {
     useToggleReadOnlyMode();
 
   function handleToggleRegistrations(nextValue) {
+    if (competition.status !== "OPEN") {
+      enqueueSnackbar(
+        "Registrations can only be opened for OPEN competitions",
+        {
+          variant: "info",
+        },
+      );
+      return;
+    }
+
     toggleReg(
       { competitionId: competition.id, registrationsOpen: nextValue },
       {
@@ -436,13 +446,15 @@ function CompetitionToggles({ competition }) {
     );
   }
 
+  const canToggleRegistrations = competition.status === "OPEN";
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
       <InlineToggle
         label="Reg. Open"
-        checked={!!competition.registrationsOpen}
+        checked={canToggleRegistrations && !!competition.registrationsOpen}
         onChange={handleToggleRegistrations}
-        disabled={togglingReg}
+        disabled={togglingReg || !canToggleRegistrations}
       />
       <InlineToggle
         label="Frozen"
@@ -1284,6 +1296,17 @@ export default function CompetitionsPage() {
   const [deletingId, setDeletingId] = useState(null);
 
   const { data: competitions = [], isLoading } = useCompetitions();
+  const { data: competitionForms = [] } = useCompetitionForms();
+
+  const publishedFormCompetitionIds = useMemo(() => {
+    const ids = new Set();
+    competitionForms.forEach((form) => {
+      if (form?.status === "PUBLISHED" && form?.competitionId) {
+        ids.add(form.competitionId);
+      }
+    });
+    return ids;
+  }, [competitionForms]);
 
   function handleTogglePublishCompetition(comp) {
     const isCurrentlyOpen = comp.status === "OPEN";
@@ -1680,30 +1703,37 @@ export default function CompetitionsPage() {
 
                     {/* Registrations */}
                     <Box>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 0.75,
-                        }}
-                      >
-                        {comp.registrationsOpen ? (
-                          <Unlock size={12} color="#4ade80" />
-                        ) : (
-                          <Lock size={12} color="rgba(255,255,255,0.25)" />
-                        )}
-                        <Typography
-                          sx={{
-                            fontSize: 12,
-                            color: comp.registrationsOpen
-                              ? "#4ade80"
-                              : "rgba(255,255,255,0.25)",
-                            fontFamily: "'DM Mono', monospace",
-                          }}
-                        >
-                          {comp.registrationsOpen ? "Open" : "Closed"}
-                        </Typography>
-                      </Box>
+                      {(() => {
+                        const isRegOpen =
+                          comp.status === "OPEN" && !!comp.registrationsOpen;
+
+                        return (
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.75,
+                            }}
+                          >
+                            {isRegOpen ? (
+                              <Unlock size={12} color="#4ade80" />
+                            ) : (
+                              <Lock size={12} color="rgba(255,255,255,0.25)" />
+                            )}
+                            <Typography
+                              sx={{
+                                fontSize: 12,
+                                color: isRegOpen
+                                  ? "#4ade80"
+                                  : "rgba(255,255,255,0.25)",
+                                fontFamily: "'DM Mono', monospace",
+                              }}
+                            >
+                              {isRegOpen ? "Open" : "Closed"}
+                            </Typography>
+                          </Box>
+                        );
+                      })()}
                       {comp.type && (
                         <Typography
                           sx={{
@@ -1771,29 +1801,47 @@ export default function CompetitionsPage() {
           },
         }}
       >
-        <MenuItem
-          onClick={() => {
-            handleTogglePublishCompetition(menuComp);
-            setMenuAnchor(null);
-            setMenuComp(null);
-          }}
-          sx={{
-            fontSize: 13,
-            fontFamily: "'Syne', sans-serif",
-            color: menuComp?.status === "OPEN" ? "#fbbf24" : "#4ade80",
-            gap: 1.5,
-            px: 2,
-            py: 1,
-            "&:hover": { background: "rgba(255,255,255,0.04)" },
-          }}
-        >
-          <Send size={13} />
-          {menuComp?.status === "OPEN"
-            ? "Unpublish"
-            : user?.role === "DH"
-              ? "Request Publish"
-              : "Publish"}
-        </MenuItem>
+        {menuComp?.status === "OPEN" ||
+        (menuComp?.id && publishedFormCompetitionIds.has(menuComp.id)) ? (
+          <MenuItem
+            onClick={() => {
+              handleTogglePublishCompetition(menuComp);
+              setMenuAnchor(null);
+              setMenuComp(null);
+            }}
+            sx={{
+              fontSize: 13,
+              fontFamily: "'Syne', sans-serif",
+              color: menuComp?.status === "OPEN" ? "#fbbf24" : "#4ade80",
+              gap: 1.5,
+              px: 2,
+              py: 1,
+              "&:hover": { background: "rgba(255,255,255,0.04)" },
+            }}
+          >
+            <Send size={13} />
+            {menuComp?.status === "OPEN"
+              ? "Unpublish"
+              : user?.role === "DH"
+                ? "Request Publish"
+                : "Publish"}
+          </MenuItem>
+        ) : (
+          <MenuItem
+            disabled
+            sx={{
+              fontSize: 13,
+              fontFamily: "'Syne', sans-serif",
+              color: "rgba(255,255,255,0.35)",
+              gap: 1.5,
+              px: 2,
+              py: 1,
+            }}
+          >
+            <Send size={13} />
+            Create & Publish Form First
+          </MenuItem>
+        )}
         <MenuItem
           onClick={() => {
             setEditTarget(menuComp);

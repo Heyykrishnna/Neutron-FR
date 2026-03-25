@@ -130,7 +130,9 @@ export default function RegistrationsPage() {
   const { data: competitions = [], isLoading: competitionsLoading } =
     useCompetitions();
   const { data: registrations = [], isLoading } = usePendingRegistrations(
-    competitionId ? { competitionId } : {},
+    competitionId
+      ? { competitionId, status: "PENDING,REJECTED" }
+      : { status: "PENDING,REJECTED" },
   );
 
   const { mutateAsync: approve } = useApproveRegistration();
@@ -313,7 +315,7 @@ export default function RegistrationsPage() {
             ml: 0.5,
           }}
         >
-          Review and approve or reject pending competition registrations
+          Review competition registrations (pending and rejected)
         </Typography>
       </Box>
 
@@ -365,7 +367,7 @@ export default function RegistrationsPage() {
         <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 1 }}>
           {!isLoading && (
             <Chip
-              label={`${filtered.length} pending`}
+              label={`${filtered.length} registration${filtered.length !== 1 ? "s" : ""}`}
               size="small"
               sx={{
                 backgroundColor: "#f59e0b20",
@@ -391,7 +393,7 @@ export default function RegistrationsPage() {
           }}
         >
           <Typography sx={{ color: "#71717a" }}>
-            No pending registrations
+            No registrations found
             {competitionId ? " for this competition" : ""}
           </Typography>
         </Paper>
@@ -471,6 +473,11 @@ export default function RegistrationsPage() {
                       const name = row.user?.name || row.userName || "Unknown";
                       const email = row.user?.email || row.userEmail || "";
                       const registrationId = getRegistrationId(row);
+                      const registrationStatus = String(
+                        row?.status || row?.registration?.status || "PENDING",
+                      ).toUpperCase();
+                      const isPendingRegistration =
+                        registrationStatus === "PENDING";
                       const isApproving = approvingId === registrationId;
                       const readiness = row.readiness || null;
                       const readinessReady = readiness?.ready !== false;
@@ -480,7 +487,10 @@ export default function RegistrationsPage() {
                         ? readiness.missingRequirements
                         : [];
                       const canApprove = Boolean(
-                        readinessReady && !isApproving && registrationId,
+                        isPendingRegistration &&
+                        readinessReady &&
+                        !isApproving &&
+                        registrationId,
                       );
                       const approvalTooltip = readinessReady
                         ? "Approve"
@@ -542,6 +552,24 @@ export default function RegistrationsPage() {
                                 >
                                   {name}
                                 </Typography>
+                                <Chip
+                                  label={registrationStatus}
+                                  size="small"
+                                  sx={{
+                                    mt: 0.5,
+                                    height: 20,
+                                    backgroundColor:
+                                      registrationStatus === "REJECTED"
+                                        ? "rgba(239,68,68,0.14)"
+                                        : "rgba(245,158,11,0.2)",
+                                    color:
+                                      registrationStatus === "REJECTED"
+                                        ? "#fca5a5"
+                                        : "#f59e0b",
+                                    fontWeight: 700,
+                                    fontSize: 10,
+                                  }}
+                                />
                                 <Typography
                                   variant="caption"
                                   sx={{ color: "#71717a" }}
@@ -651,7 +679,9 @@ export default function RegistrationsPage() {
                                   onClick={() =>
                                     openRejectDialog(row, registrationId)
                                   }
-                                  disabled={!registrationId}
+                                  disabled={
+                                    !registrationId || !isPendingRegistration
+                                  }
                                   startIcon={<XCircle size={14} />}
                                   sx={rejectButtonSx}
                                 >

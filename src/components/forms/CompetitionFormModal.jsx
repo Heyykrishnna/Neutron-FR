@@ -50,19 +50,40 @@ const BACKEND_FIELD_TOKEN_TO_FORM_FIELD = {
   RULESRICHTEXT: "rulesRichText",
   STARTTIME: "startTime",
   ENDTIME: "endTime",
+  SCHEDULERANGE: "startTime",
   REGISTRATIONDEADLINE: "registrationDeadline",
   VENUENAME: "venueName",
   VENUEROOM: "venueRoom",
   VENUEFLOOR: "venueFloor",
+  SUBVENUE: "subVenues",
   REGISTRATIONFEE: "registrationFee",
   MAXREGISTRATIONS: "maxRegistrations",
   MAXTEAMSPERCOLLEGE: "maxTeamsPerCollege",
   MINTEAMSIZE: "minTeamSize",
   MAXTEAMSIZE: "maxTeamSize",
+  PROMOCODES: "promoCodes",
+  PROMOCO: "promoCodes",
+  PRIZEPOO: "prizePool",
+  PRIZEPOOL: "prizePool",
   POSTERSIZEBYTES: "poster",
   POSTERPATH: "poster",
   POSTERMIMETYPE: "poster",
   POSTERORIGINALNAME: "poster",
+};
+
+const ERROR_MESSAGE_MAP = {
+  INVALID_SCHEDULE_RANGE: "Event end time must be after start time",
+  INVALID_REGISTRATION_DEADLINE:
+    "Registration deadline must be before event start time",
+  INVALID_PROMO_CODES_FORMAT: "Promo codes have invalid format or values",
+  INVALID_MIN_TEAM_SIZE_VALUE: "Minimum team size must be a positive number",
+  INVALID_MAX_TEAM_SIZE_VALUE: "Maximum team size must be greater than minimum",
+  INVALID_COMPETITION_TYPE_VALUE: "Invalid competition type",
+  PENDING_PROPOSAL_ALREADY_EXISTS:
+    "A pending edit proposal already exists for this competition",
+  PROMO_PERCENT_EXCEEDS_100: "Promo code discount cannot exceed 100%",
+  PROMO_FLAT_EXCEEDS_REGISTRATION_FEE:
+    "Flat discount cannot exceed registration fee",
 };
 
 const findStepIndexForField = (fieldName) => {
@@ -77,6 +98,20 @@ const findStepIndexForField = (fieldName) => {
 const parseBackendValidationCode = (code) => {
   if (typeof code !== "string") return null;
 
+  // Check direct error message map first
+  if (ERROR_MESSAGE_MAP[code]) {
+    const parts = code.match(/^INVALID_([A-Z_]+)/) || code.match(/^([A-Z_]+)/);
+    const token = parts ? parts[1].replaceAll("_", "") : "";
+    const fieldName = BACKEND_FIELD_TOKEN_TO_FORM_FIELD[token] || "title";
+
+    return {
+      field: fieldName,
+      stepIndex: findStepIndexForField(fieldName),
+      message: ERROR_MESSAGE_MAP[code],
+    };
+  }
+
+  // Pattern: INVALID_SOMETHING_VALUE
   const invalidValueMatch = code.match(/^INVALID_([A-Z_]+)_VALUE$/);
   if (invalidValueMatch) {
     const token = invalidValueMatch[1].replaceAll("_", "");
@@ -90,7 +125,142 @@ const parseBackendValidationCode = (code) => {
     };
   }
 
+  // Pattern: INVALID_SOMETHING_AT_INDEX_N (for complex fields)
+  const indexMatch = code.match(/^INVALID_([A-Z_]+)_AT_INDEX_\d+/);
+  if (indexMatch) {
+    const token = indexMatch[1].replaceAll("_", "");
+    const fieldName = BACKEND_FIELD_TOKEN_TO_FORM_FIELD[token];
+    if (!fieldName) return null;
+
+    return {
+      field: fieldName,
+      stepIndex: findStepIndexForField(fieldName),
+      message: `Invalid entry in ${fieldName}. Please review and correct.`,
+    };
+  }
+
+  // Pattern: PROMO_* (for promo code errors)
+  if (code.startsWith("PROMO_")) {
+    return {
+      field: "promoCodes",
+      stepIndex: findStepIndexForField("promoCodes"),
+      message: ERROR_MESSAGE_MAP[code] || "Promo code validation failed",
+    };
+  }
+
+  // Pattern: PENDING_PROPOSAL_ALREADY_EXISTS
+  if (code.includes("PENDING_PROPOSAL")) {
+    return null; // This is a global error, not field-specific
+  }
+
   return null;
+};
+
+const getFirstErrorMessage = (errorNode) => {
+  if (!errorNode) return null;
+
+  if (typeof errorNode?.message === "string" && errorNode.message.trim()) {
+    return errorNode.message;
+  }
+
+  if (Array.isArray(errorNode)) {
+    for (const item of errorNode) {
+      const nested = getFirstErrorMessage(item);
+      if (nested) return nested;
+    }
+    return null;
+  }
+
+  if (typeof errorNode === "object") {
+    for (const value of Object.values(errorNode)) {
+      const nested = getFirstErrorMessage(value);
+      if (nested) return nested;
+    }
+  }
+
+  return null;
+};
+
+const FIELD_LABELS = {
+  registrationFee: "Registration Fee",
+  maxRegistrations: "Max Registrations",
+  maxTeamsPerCollege: "Max Teams Per College",
+  minTeamSize: "Min Team Size",
+  maxTeamSize: "Max Team Size",
+  registrationsOpen: "Registrations Open",
+  requiresApproval: "Requires Approval",
+  autoApproveTeams: "Auto-Approve Teams",
+  attendanceRequired: "Attendance Required",
+  isPaid: "Paid Event",
+  perPerson: "Fee Per Person",
+  prizePool: "Prize Pool",
+  promoCodes: "Promo Codes",
+};
+
+const formatFieldPathLabel = (pathParts = []) => {
+  if (!pathParts.length) return "Form";
+
+  const [root, second, third] = pathParts;
+  const rootLabel = FIELD_LABELS[root] || root;
+
+  if (typeof second === "number") {
+    const rowIndex = second + 1;
+
+    if (root === "prizePool") {
+      const nested = third ? ` · ${FIELD_LABELS[third] || third}` : "";
+      return `${rootLabel} #${rowIndex}${nested}`;
+    }
+
+    if (root === "promoCodes") {
+      const nested = third ? ` · ${FIELD_LABELS[third] || third}` : "";
+      return `${rootLabel} #${rowIndex}${nested}`;
+    }
+  }
+
+  return rootLabel;
+};
+
+const collectErrorMessages = (node, path = [], bag = []) => {
+  if (!node) return bag;
+
+  if (typeof node?.message === "string" && node.message.trim()) {
+    bag.push({
+      field: formatFieldPathLabel(path),
+      message: node.message.trim(),
+    });
+  }
+
+  if (Array.isArray(node)) {
+    node.forEach((item, index) =>
+      collectErrorMessages(item, [...path, index], bag),
+    );
+    return bag;
+  }
+
+  if (typeof node === "object") {
+    Object.entries(node).forEach(([key, value]) => {
+      if (key === "message" || key === "type" || key === "ref") return;
+      collectErrorMessages(value, [...path, key], bag);
+    });
+  }
+
+  return bag;
+};
+
+const getStepValidationMessages = (errors, fields = []) => {
+  const messages = [];
+
+  fields.forEach((fieldName) => {
+    collectErrorMessages(errors?.[fieldName], [fieldName], messages);
+  });
+
+  const unique = new Set();
+  return messages.filter((item) => {
+    const key = `${item.field}:${item.message}`;
+    if (unique.has(key)) return false;
+    unique.add(key);
+    return true;
+  });
 };
 
 const btnBase = {
@@ -263,6 +433,7 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
 
   const [activeStep, setActiveStep] = useState(0);
   const [poster, setPoster] = useState(null);
+  const [showStep4BlockReason, setShowStep4BlockReason] = useState(false);
 
   const { data: fetchedCompetition, isLoading: isCompetitionLoading } =
     useCompetition(open && competition?.id ? competition.id : null);
@@ -318,23 +489,37 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
     reset(DEFAULT_VALUES);
     setPoster(null);
     setActiveStep(0);
+    setShowStep4BlockReason(false);
     onClose();
   };
+
+  const step4Reasons = useMemo(() => {
+    if (activeStep !== 3) return [];
+    return getStepValidationMessages(errors, STEP_FIELDS[3]);
+  }, [activeStep, errors]);
 
   const goNext = async () => {
     const fields = STEP_FIELDS[activeStep] || [];
     if (!fields.length) {
+      setShowStep4BlockReason(false);
       setActiveStep((prev) => Math.min(prev + 1, STEP_LABELS.length - 1));
       return;
     }
 
     const isStepValid = await trigger(fields);
-    if (!isStepValid) return;
+    if (!isStepValid) {
+      if (activeStep === 3) {
+        setShowStep4BlockReason(true);
+      }
+      return;
+    }
 
+    setShowStep4BlockReason(false);
     setActiveStep((prev) => Math.min(prev + 1, STEP_LABELS.length - 1));
   };
 
   const goBack = () => {
+    setShowStep4BlockReason(false);
     setActiveStep((prev) => Math.max(prev - 1, 0));
   };
 
@@ -534,6 +719,61 @@ export default function CompetitionFormModal({ open, onClose, competition }) {
         sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}
       >
         <Box sx={{ px: 4, py: 3, flex: 1, minHeight: 0, overflowY: "auto" }}>
+          {activeStep === 3 &&
+            showStep4BlockReason &&
+            step4Reasons.length > 0 && (
+              <Box
+                sx={{
+                  mb: 2,
+                  px: 1.5,
+                  py: 1.25,
+                  borderRadius: "8px",
+                  background: "rgba(239,68,68,0.08)",
+                  border: "1px solid rgba(239,68,68,0.2)",
+                }}
+              >
+                <Typography
+                  sx={{
+                    fontSize: 11,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    color: "#f87171",
+                    fontFamily: "'DM Mono', monospace",
+                    mb: 0.35,
+                  }}
+                >
+                  Cannot move to next step
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    color: "#fca5a5",
+                    fontFamily: "'Syne', sans-serif",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Fix the following:
+                </Typography>
+                <Box component="ul" sx={{ mt: 1, mb: 0, pl: 2.25 }}>
+                  {step4Reasons.map((reason, index) => (
+                    <Typography
+                      key={`${reason.field}-${reason.message}-${index}`}
+                      component="li"
+                      sx={{
+                        mt: 0.4,
+                        fontSize: 12,
+                        color: "#fecaca",
+                        fontFamily: "'Syne', sans-serif",
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {reason.field}: {reason.message}
+                    </Typography>
+                  ))}
+                </Box>
+              </Box>
+            )}
+
           {isEdit && isCompetitionLoading ? (
             <Box
               sx={{

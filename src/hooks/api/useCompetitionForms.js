@@ -10,13 +10,14 @@ const normalizeList = (data) =>
 
 const normalizeOne = (data) => data?.data || data || null;
 
-export function useCompetitionForms() {
+export function useCompetitionForms(enabled = true) {
   return useQuery({
     queryKey: queryKeys.forms.list(),
     queryFn: async () => {
       const { data } = await apiClient.get("/forms");
       return normalizeList(data);
     },
+    enabled,
   });
 }
 

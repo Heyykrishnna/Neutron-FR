@@ -83,11 +83,21 @@ export default function CompetitionRegistrationConfigStep({
   const competitionType = useWatch({ control, name: "type" });
   const registrationFee = useWatch({ control, name: "registrationFee" });
   const isPaid = useWatch({ control, name: "isPaid" });
+  const requiresApproval = useWatch({ control, name: "requiresApproval" });
+  const autoApproveTeams = useWatch({ control, name: "autoApproveTeams" });
   const isTeam = competitionType === "TEAM";
   const normalizedFee = Number(registrationFee || 0);
   const promoCodesDisabled =
-    !Number.isFinite(normalizedFee) || normalizedFee <= 0;
+    !Number.isFinite(normalizedFee) || normalizedFee <= 0 || !isPaid;
   const perPersonDisabled = !isPaid;
+  const prizePoolErrorMessage =
+    typeof errors?.prizePool?.message === "string"
+      ? errors.prizePool.message
+      : null;
+  const promoCodesErrorMessage =
+    typeof errors?.promoCodes?.message === "string"
+      ? errors.promoCodes.message
+      : null;
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -114,6 +124,21 @@ export default function CompetitionRegistrationConfigStep({
       setValue("perPerson", false, { shouldDirty: true, shouldValidate: true });
     }
   }, [perPersonDisabled, setValue]);
+
+  useEffect(() => {
+    if (Number.isFinite(normalizedFee) && normalizedFee > 0 && !isPaid) {
+      setValue("isPaid", true, { shouldDirty: true, shouldValidate: true });
+    }
+  }, [normalizedFee, isPaid, setValue]);
+
+  useEffect(() => {
+    if (requiresApproval === autoApproveTeams) {
+      setValue("autoApproveTeams", !requiresApproval, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+  }, [requiresApproval, autoApproveTeams, setValue]);
 
   useEffect(() => {
     if (promoCodesDisabled) {
@@ -257,7 +282,23 @@ export default function CompetitionRegistrationConfigStep({
                 </Box>
                 <Toggle
                   checked={!!field.value}
-                  onChange={field.onChange}
+                  onChange={(nextValue) => {
+                    field.onChange(nextValue);
+
+                    if (item.name === "requiresApproval") {
+                      setValue("autoApproveTeams", !nextValue, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                    }
+
+                    if (item.name === "autoApproveTeams") {
+                      setValue("requiresApproval", !nextValue, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                    }
+                  }}
                   disabled={
                     item.name === "perPerson" ? perPersonDisabled : false
                   }
@@ -323,6 +364,19 @@ export default function CompetitionRegistrationConfigStep({
             Add Prize
           </button>
         </Box>
+
+        {prizePoolErrorMessage && (
+          <Typography
+            sx={{
+              mb: 1.5,
+              fontSize: 11,
+              color: "#f87171",
+              fontFamily: "'Syne', sans-serif",
+            }}
+          >
+            {prizePoolErrorMessage}
+          </Typography>
+        )}
 
         {fields.length === 0 && (
           <Box
@@ -532,6 +586,19 @@ export default function CompetitionRegistrationConfigStep({
           </button>
         </Box>
 
+        {promoCodesErrorMessage && (
+          <Typography
+            sx={{
+              mb: 1.5,
+              fontSize: 11,
+              color: "#f87171",
+              fontFamily: "'Syne', sans-serif",
+            }}
+          >
+            {promoCodesErrorMessage}
+          </Typography>
+        )}
+
         {promoFields.length === 0 && (
           <Box
             sx={{
@@ -549,7 +616,9 @@ export default function CompetitionRegistrationConfigStep({
               }}
             >
               {promoCodesDisabled
-                ? "Promo codes are disabled when registration fee is 0"
+                ? !isPaid
+                  ? "Enable Paid Event to use promo codes"
+                  : "Promo codes are disabled when registration fee is 0"
                 : "No promo codes added yet"}
             </Typography>
           </Box>

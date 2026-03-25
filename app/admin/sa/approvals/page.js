@@ -15,6 +15,8 @@ import {
 } from "@/src/hooks/api/useJudging";
 import { useReviewProposals } from "@/src/hooks/api/useReviews";
 import { useIssues, useResolveIssue } from "@/src/hooks/api/useIssues";
+import { useCompetition } from "@/src/hooks/api/useCompetitions";
+import { useCompetitionForms } from "@/src/hooks/api/useCompetitionForms";
 import { Box, Dialog, Typography } from "@mui/material";
 import {
   ShieldCheck,
@@ -243,6 +245,77 @@ export default function RequestsPage() {
   const [detailApproval, setDetailApproval] = useState(null);
   const [processingApprovalId, setProcessingApprovalId] = useState(null);
   const [handledApprovalIds, setHandledApprovalIds] = useState(() => new Set());
+
+  const requestedPublishStatus =
+    detailApproval?.requestData?.proposed?.status ||
+    detailApproval?.requestData?.after?.status ||
+    detailApproval?.requestData?.status ||
+    null;
+
+  const publishPreviewCompetitionId =
+    detailDialogOpen && detailApproval
+      ? detailApproval?.relatedEntityId ||
+        detailApproval?.requestData?.competitionId ||
+        detailApproval?.requestData?.before?.id ||
+        detailApproval?.requestData?.proposed?.id ||
+        null
+      : null;
+
+  const isCompetitionPublishRequest = useMemo(() => {
+    if (!detailApproval) return false;
+
+    const type = detailApproval.type;
+    const relatedEntityType =
+      detailApproval.relatedEntityType ||
+      detailApproval.requestData?.category ||
+      "";
+    const title = (detailApproval.title || "").toLowerCase();
+    const description = (detailApproval.description || "").toLowerCase();
+
+    const looksLikePublishCopy =
+      title.includes("publish") || description.includes("publish");
+    const targetsCompetition =
+      `${relatedEntityType}`.toLowerCase() === "competition";
+    const isCompetitionApprovalType =
+      type === "EVENT_UPDATE" || type === "COMPETITION_EDIT";
+
+    return (
+      isCompetitionApprovalType &&
+      targetsCompetition &&
+      (requestedPublishStatus === "OPEN" || looksLikePublishCopy)
+    );
+  }, [detailApproval, requestedPublishStatus]);
+
+  const {
+    data: publishPreviewCompetition,
+    isLoading: publishPreviewCompetitionLoading,
+  } = useCompetition(
+    isCompetitionPublishRequest ? publishPreviewCompetitionId : null,
+  );
+
+  const { data: allCompetitionForms = [] } = useCompetitionForms(
+    detailDialogOpen && isCompetitionPublishRequest,
+  );
+
+  const linkedFormsForPublishPreview = useMemo(() => {
+    if (!isCompetitionPublishRequest || !publishPreviewCompetitionId) return [];
+
+    return allCompetitionForms
+      .filter((form) => form?.competitionId === publishPreviewCompetitionId)
+      .sort((left, right) => {
+        const leftTime = left?.createdAt
+          ? new Date(left.createdAt).getTime()
+          : 0;
+        const rightTime = right?.createdAt
+          ? new Date(right.createdAt).getTime()
+          : 0;
+        return rightTime - leftTime;
+      });
+  }, [
+    isCompetitionPublishRequest,
+    publishPreviewCompetitionId,
+    allCompetitionForms,
+  ]);
 
   const allApprovals = useMemo(
     () => approvalsRes?.data?.approvals || [],
@@ -1500,6 +1573,151 @@ export default function RequestsPage() {
                 </Typography>
               </Box>
             </Box>
+
+            {isCompetitionPublishRequest && (
+              <Box
+                sx={{
+                  p: 1.75,
+                  borderRadius: "10px",
+                  border: "1px solid rgba(74,222,128,0.2)",
+                  background: "rgba(74,222,128,0.05)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 1.25,
+                }}
+              >
+                <Label>Competition Publish Preview</Label>
+
+                {publishPreviewCompetitionLoading ? (
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      color: "rgba(255,255,255,0.45)",
+                      fontFamily: "'DM Mono', monospace",
+                    }}
+                  >
+                    Loading competition details…
+                  </Typography>
+                ) : publishPreviewCompetition ? (
+                  <>
+                    <Box
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: 1.25,
+                      }}
+                    >
+                      <PreviewItem
+                        label="Title"
+                        value={publishPreviewCompetition.title || "—"}
+                      />
+                      <PreviewItem
+                        label="Status"
+                        value={publishPreviewCompetition.status || "—"}
+                      />
+                      <PreviewItem
+                        label="Event Type"
+                        value={publishPreviewCompetition.eventType || "—"}
+                      />
+                      <PreviewItem
+                        label="Competition Type"
+                        value={publishPreviewCompetition.type || "—"}
+                      />
+                      <PreviewItem
+                        label="Registration Fee"
+                        value={`₹${publishPreviewCompetition.registrationFee ?? 0}`}
+                      />
+                      <PreviewItem
+                        label="Registration Deadline"
+                        value={fmtDateTime(
+                          publishPreviewCompetition.registrationDeadline,
+                        )}
+                      />
+                      <PreviewItem
+                        label="Start Time"
+                        value={fmtDateTime(publishPreviewCompetition.startTime)}
+                      />
+                      <PreviewItem
+                        label="End Time"
+                        value={fmtDateTime(publishPreviewCompetition.endTime)}
+                      />
+                    </Box>
+
+                    <Box>
+                      <Label>
+                        Linked Forms ({linkedFormsForPublishPreview.length})
+                      </Label>
+                      {linkedFormsForPublishPreview.length === 0 ? (
+                        <Typography
+                          sx={{
+                            fontSize: 12,
+                            color: "rgba(255,255,255,0.45)",
+                            fontFamily: "'DM Mono', monospace",
+                          }}
+                        >
+                          No linked form found.
+                        </Typography>
+                      ) : (
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 1,
+                            mt: 0.75,
+                          }}
+                        >
+                          {linkedFormsForPublishPreview.map((form) => (
+                            <Box
+                              key={form.id}
+                              sx={{
+                                p: 1,
+                                borderRadius: "8px",
+                                background: "rgba(255,255,255,0.03)",
+                                border: "1px solid rgba(255,255,255,0.08)",
+                              }}
+                            >
+                              <Typography
+                                sx={{
+                                  fontSize: 12,
+                                  color: "#e4e4e7",
+                                  fontFamily: "'Syne', sans-serif",
+                                  fontWeight: 500,
+                                }}
+                              >
+                                {form.title || "Untitled Form"}
+                              </Typography>
+                              <Typography
+                                sx={{
+                                  fontSize: 11,
+                                  color: "rgba(255,255,255,0.35)",
+                                  fontFamily: "'DM Mono', monospace",
+                                  mt: 0.25,
+                                }}
+                              >
+                                Status: {form.status || "—"} · Opens:{" "}
+                                {fmtDateTime(form.opensAt)} · Closes:{" "}
+                                {fmtDateTime(form.closesAt)}
+                              </Typography>
+                            </Box>
+                          ))}
+                        </Box>
+                      )}
+                    </Box>
+                  </>
+                ) : (
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      color: "rgba(255,255,255,0.45)",
+                      fontFamily: "'DM Mono', monospace",
+                    }}
+                  >
+                    Unable to load linked competition details.
+                  </Typography>
+                )}
+              </Box>
+            )}
+
             {detailApproval.requestData && (
               <Box>
                 <Label>Request Data</Label>
@@ -1643,6 +1861,24 @@ function Label({ children }) {
     >
       {children}
     </Typography>
+  );
+}
+
+function PreviewItem({ label, value }) {
+  return (
+    <Box>
+      <Label>{label}</Label>
+      <Typography
+        sx={{
+          fontSize: 12,
+          color: "rgba(255,255,255,0.7)",
+          fontFamily: "'Syne', sans-serif",
+          lineHeight: 1.5,
+        }}
+      >
+        {value || "—"}
+      </Typography>
+    </Box>
   );
 }
 
