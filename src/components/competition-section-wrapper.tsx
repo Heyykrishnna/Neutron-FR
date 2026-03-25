@@ -44,7 +44,7 @@ export default function SectionWrapper({ competition }: { competition: any }) {
           />
           
           <div className="relative max-w-3xl group pt-4">
-            <div className="absolute -left-6 top-0 bottom-0 w-[2px] bg-white/10 transition-all duration-700"></div>
+            {/* <div className="absolute -left-6 top-0 bottom-0 w-[2px] bg-white/10 transition-all duration-700"></div> */}
             <div className="pl-8 space-y-8">
               <div className="flex flex-wrap gap-3">
                 <span className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs uppercase tracking-[0.2em] text-white/50 font-mono backdrop-blur-md">

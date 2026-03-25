@@ -22,18 +22,19 @@ export function ScrollRevealCards({ prizePool, location, teamSize }: ScrollRevea
   const titleOpacity = useTransform(scrollYProgress, [0.15, 0.25], [0, 1]);
   const titleY = useTransform(scrollYProgress, [0.15, 0.25], [20, 0]);
 
-  const gap = useTransform(scrollYProgress, [0.3, 0.5], ["0px", "24px"]);
+  const gap = 0; // Fixed gap to 0 to keep cards joined
   
   const outerBorderRadiusRound = useTransform(scrollYProgress, [0, 0.25], [0, 24]);
-  const innerBorderRadiusRound = useTransform(scrollYProgress, [0.3, 0.5], [0, 24]);
+  const innerBorderRadiusRound = 0; // Keep inner corners sharp to hide lines
 
   const leftRadius = useMotionTemplate`${outerBorderRadiusRound}px ${innerBorderRadiusRound}px ${innerBorderRadiusRound}px ${outerBorderRadiusRound}px`;
   const centerRadius = useMotionTemplate`${innerBorderRadiusRound}px ${innerBorderRadiusRound}px ${innerBorderRadiusRound}px ${innerBorderRadiusRound}px`;
   const rightRadius = useMotionTemplate`${innerBorderRadiusRound}px ${outerBorderRadiusRound}px ${outerBorderRadiusRound}px ${innerBorderRadiusRound}px`;
 
-  const rotateYLeft = useTransform(scrollYProgress, [0.6, 0.8], [0, 180]);
-  const rotateYCenter = useTransform(scrollYProgress, [0.65, 0.85], [0, 180]);
-  const rotateYRight = useTransform(scrollYProgress, [0.7, 0.9], [0, 180]);
+  const rotateYCommon = useTransform(scrollYProgress, [0.7, 0.9], [0, 180]);
+  const rotateYLeft = rotateYCommon;
+  const rotateYCenter = rotateYCommon;
+  const rotateYRight = rotateYCommon;
 
   const rotateZLeft = useTransform(scrollYProgress, [0.7, 0.9], [0, -8]);
   const rotateZCenter = useTransform(scrollYProgress, [0.7, 0.9], [0, 0]);
@@ -128,16 +129,17 @@ function FlipCard({ rotateY, rotateZ, y, borderRadius, bgPosition, bgImage, back
         rotateX: 0,
         transformStyle: "preserve-3d"
       }}
-      className="relative flex-1 h-full cursor-pointer"
+      className="relative flex-1 h-full cursor-pointer -mr-px last:mr-0"
     >
       <motion.div
         style={{ 
           borderRadius, 
           backfaceVisibility: "hidden", 
           WebkitBackfaceVisibility: "hidden",
-          transformStyle: "preserve-3d"
+          transformStyle: "preserve-3d",
+          transform: "translateZ(1px)"
         }}
-        className="absolute inset-0 w-full h-full bg-cover bg-no-repeat shadow-2xl z-20"
+        className="absolute inset-0 w-full h-full bg-cover bg-no-repeat z-20"
       >
         <div 
           className="w-full h-full"
@@ -157,10 +159,10 @@ function FlipCard({ rotateY, rotateZ, y, borderRadius, bgPosition, bgImage, back
           color: textColor,
           backfaceVisibility: "hidden", 
           WebkitBackfaceVisibility: "hidden",
-          transform: "rotateY(180deg)",
+          transform: "rotateY(180deg) translateZ(1px)",
           transformStyle: "preserve-3d"
         }}
-        className="absolute inset-0 w-full h-full overflow-hidden border border-white/10 shadow-2xl flex flex-col justify-between p-10 z-10"
+        className="absolute inset-0 w-full h-full overflow-hidden shadow-2xl flex flex-col justify-between p-10 z-10"
       >
         <div className="absolute bg-[url('https://res.cloudinary.com/dpod2sj9t/image/upload/v1774362639/nnnoise_zgex87.svg')] opacity-[1] mix-blend-overlay pointer-events-none z-0"></div>
         
