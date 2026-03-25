@@ -1,4 +1,4 @@
-export type CompetitionRecord = {
+export type EventRecord = {
   slug: string;
   title: string;
   description: string;
@@ -18,7 +18,7 @@ export type CompetitionRecord = {
   rules: string[];
 };
 
-export const COMPETITIONS_DATA: CompetitionRecord[] = [
+export const EVENTS_DATA: EventRecord[] = [
   {
     slug: "explorers-guide",
     title: "Explorer's Guide to Space",
@@ -124,6 +124,6 @@ export const COMPETITIONS_DATA: CompetitionRecord[] = [
   }
 ];
 
-export const getCompetitionBySlug = (slug: string) => {
-  return COMPETITIONS_DATA.find((comp) => comp.slug === slug);
+export const getEventBySlug = (slug: string) => {
+  return EVENTS_DATA.find((event) => event.slug === slug);
 };
