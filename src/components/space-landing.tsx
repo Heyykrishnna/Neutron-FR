@@ -149,19 +149,63 @@ export default function SpaceLanding() {
   }, []);
 
   const [handsProgress, setHandsProgress] = useState(0);
+  const handsRef = useRef<HTMLDivElement | null>(null);
+  const handsLRef = useRef<HTMLDivElement | null>(null);
+  const handsRRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const onScroll = () => {
       const scrolledVH = (window.scrollY / window.innerHeight) * 100;
-      setVideoOpacity(Math.max(0, 1 - scrolledVH / 150));
+      // Fade video out slowly — keep it visible through the zoom phase (first 80vh)
+      setVideoOpacity(Math.max(0, 1 - scrolledVH / 320));
       setIsScrolled(scrolledVH > 50);
-      const rawProgress = Math.min(1, scrolledVH / 220);
-      const fadeOut = scrolledVH > 200 ? Math.max(0, 1 - (scrolledVH - 200) / 150) : 1;
-      setHandsProgress(rawProgress * fadeOut);
+      const raw = Math.min(1, scrolledVH / 160);
+      const eased = raw * raw * (3 - 2 * raw);
+      const fadeOut = scrolledVH > 140 ? Math.max(0, 1 - (scrolledVH - 140) / 100) : 1;
+      setHandsProgress(eased * fadeOut);
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (!handsLRef.current || !handsRRef.current) return;
+    const ctx = gsap.context(() => {
+      // Start with hands 38% below their container (only gloves visible at the bottom)
+      // then sink fully off-screen as the user scrolls
+      gsap.fromTo(
+        handsLRef.current,
+        { yPercent: 38, rotation: 10 },
+        {
+          yPercent: 120,
+          rotation: 5,
+          ease: "power2.inOut",
+          scrollTrigger: {
+            trigger: document.documentElement,
+            start: "top top",
+            end: "+=160vh",
+            scrub: 1.8,
+          },
+        }
+      );
+      gsap.fromTo(
+        handsRRef.current,
+        { yPercent: 38, rotation: -10 },
+        {
+          yPercent: 120,
+          rotation: -5,
+          ease: "power2.inOut",
+          scrollTrigger: {
+            trigger: document.documentElement,
+            start: "top top",
+            end: "+=160vh",
+            scrub: 1.8,
+          },
+        }
+      );
+    });
+    return () => ctx.revert();
   }, []);
 
   useEffect(() => {
@@ -426,6 +470,7 @@ export default function SpaceLanding() {
         </div>
 
         <div
+          ref={handsRef}
           aria-hidden
           className="pointer-events-none fixed inset-x-0 bottom-0 overflow-visible"
           style={{
@@ -435,13 +480,14 @@ export default function SpaceLanding() {
             transition: "opacity 0.3s ease",
           }}
         >
+          {/* Left hand — GSAP controls yPercent & rotation via handsLRef */}
           <div
+            ref={handsLRef}
             className="absolute bottom-0 left-0"
             style={{
-              transform: `translateY(${handsProgress * 72 + 22}%) rotate(${18 * (1 - handsProgress)}deg)`,
               transformOrigin: "bottom left",
-              transition: "transform 0.06s linear",
               width: "clamp(220px, 36vw, 520px)",
+              willChange: "transform",
             }}
           >
             <Image
@@ -461,13 +507,14 @@ export default function SpaceLanding() {
             />
           </div>
 
+          {/* Right hand — GSAP controls yPercent & rotation via handsRRef */}
           <div
+            ref={handsRRef}
             className="absolute bottom-0 right-0"
             style={{
-              transform: `translateY(${handsProgress * 72 + 22}%) rotate(${-18 * (1 - handsProgress)}deg)`,
               transformOrigin: "bottom right",
-              transition: "transform 0.06s linear",
               width: "clamp(220px, 36vw, 520px)",
+              willChange: "transform",
             }}
           >
             <Image
@@ -487,12 +534,12 @@ export default function SpaceLanding() {
             />
           </div>
 
+          {/* Bottom glow fades with hands */}
           <div
             className="absolute bottom-0 inset-x-0 h-40 pointer-events-none"
             style={{
               background: "linear-gradient(0deg, rgba(120,55,8,0.28) 0%, transparent 100%)",
-              transform: `translateY(${handsProgress * 72 + 22}%)`,
-              transition: "transform 0.06s linear",
+              opacity: 1 - handsProgress,
             }}
           />
         </div>
@@ -871,9 +918,12 @@ async function createScene({
     const vh = window.innerHeight || 800;
     const scrolledVH = (scrolledPx / vh) * 100;
     
-    const intro  = smoothstep(20, 150, scrolledVH);
-    const spread = smoothstep(120, 300, scrolledVH);
-    const focus  = smoothstep(280, 420, scrolledVH);
+    // intro: camera zooms forward — completes in the first 80vh (no overlap with spread)
+    const intro  = smoothstep(0, 80, scrolledVH);
+    // spread: planets fan out — starts AFTER zoom is done (240-420vh)
+    const spread = smoothstep(240, 420, scrolledVH);
+    // focus: front-facing planet lock-in
+    const focus  = smoothstep(420, 560, scrolledVH);
     const exit   = 0;
 
     const mob = window.innerWidth < 768;
@@ -947,20 +997,43 @@ async function createScene({
     cameraOffset.set(0, mob ? 3.8 : 5.2, mob ? 8.5 : 11.0);
     const focusLookAt = new THREE.Vector3(0, mob ? 0.0 : 0.5, ringCenterZ);
 
-    targetCameraPosition.set(0, mob ? 0.35 : 0.7, THREE.MathUtils.lerp(mob ? 19.5 : 18, mob ? 14.6 : 13.2, intro));
-    targetLookAt.set(0, 0.2, -2.8);
-    
+    // Phase 1 — aggressive zoom INTO center: z shrinks from 16 → 2.5 in first 80vh of scroll
+    // Camera stays low (y barely moves) so it reads as flying straight into the portal.
+    const startZ = mob ? 16.8 : 16.0;
+    const endZ   = mob ? 3.2  : 2.5;   // fly deep into the scene
+    const startY = mob ? 0.40 : 0.70;
+    const endY   = mob ? 0.20 : 0.30;  // slightly lower — follows natural sightline
+    targetCameraPosition.set(
+      0,
+      THREE.MathUtils.lerp(startY, endY, intro),
+      THREE.MathUtils.lerp(startZ, endZ, intro)
+    );
+    // Look ahead, slightly downward at the end of zoom to feel like breaking through
+    targetLookAt.set(0, THREE.MathUtils.lerp(0.1, -0.3, intro), THREE.MathUtils.lerp(-1.5, -5.0, intro));
+
+    // Animate FOV: widen during zoom-in for a "punch-through" cinematic feeling
+    camera.fov = THREE.MathUtils.lerp(40, 52, intro * (1 - spread));
+    camera.updateProjectionMatrix();
+
+    // Animate scene fog density: less fog as camera charges forward, more as it backs off
+    if (scene.fog instanceof THREE.FogExp2) {
+      (scene.fog as THREE.FogExp2).density = THREE.MathUtils.lerp(0.022, 0.010, intro * (1 - spread));
+    }
+
+    // Phase 2 — spread: pull back to show full ring from above
     targetCameraPosition.lerp(new THREE.Vector3(0, mob ? 3.0 : 4.8, mob ? 18.2 : 20.5), spread);
     targetLookAt.lerp(new THREE.Vector3(0, 0.2, ringCenterZ), spread);
-    
+
+    // Phase 3 — focus: zoom toward active planet
     targetCameraPosition.lerp(idealFrontPosition.clone().add(cameraOffset), focus);
     targetLookAt.lerp(focusLookAt, focus);
-    
+
     exitOffset.set(mob ? 1.4 : 2.1, 2.4, 5.8);
     targetCameraPosition.lerp(idealFrontPosition.clone().add(exitOffset), exit);
     targetLookAt.lerp(idealFrontPosition.clone().add(new THREE.Vector3(0.2, 0.1, 0)), exit);
-    camera.position.lerp(targetCameraPosition, 0.055);
-    cameraLookAt.lerp(targetLookAt, 0.068);
+    // Slightly faster lerp for more punchy camera response
+    camera.position.lerp(targetCameraPosition, 0.065);
+    cameraLookAt.lerp(targetLookAt, 0.078);
     camera.lookAt(cameraLookAt);
 
     starsNear.rotation.y += delta * 0.0065;
