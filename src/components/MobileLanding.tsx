@@ -100,27 +100,25 @@ export default function MobileLanding({ onMenuToggle, isMenuOpen }: MobileLandin
           
           <div className="absolute inset-0 bg-linear-to-t from-[#0d0a08]/90 via-transparent to-transparent opacity-80 z-10" />
           
-          {/* First Text Block */}
           <motion.div 
             style={{ opacity: firstTextOpacity, y: firstTextY }}
-            className="absolute bottom-[10%] left-0 w-full px-8 pb-4 pointer-events-none z-30"
+            className="absolute bottom-1 left-0 w-full px-8 pb-4 pointer-events-none z-30"
           >
             <h1 
-              className="text-[4rem] font-bold leading-[0.85] tracking-tighter mb-6 drop-shadow-2xl text-white"
+              className="text-[3rem] font-bold leading-[0.85] tracking-tighter mb-6 drop-shadow-2xl text-white"
               style={{ fontFamily: "var(--font-sora)" }}
             >
-              Skip traffic.<br />Time to fly.
+              Break Limits.<br />Build Galaxies.
             </h1>
 
             <p 
               className="text-[1.1rem] text-white/80 font-normal tracking-wide max-w-[85%]"
               style={{ fontFamily: "var(--font-sora)" }}
             >
-              The future of aviation is coming soon.
+              Neutron is not just a fest. It’s a launchpad for the engineers of the future.
             </p>
           </motion.div>
 
-          {/* Second Text Block */}
           <motion.div 
             style={{ opacity: secondTextOpacity, y: secondTextY }}
             className="absolute bottom-[12%] left-0 w-full px-8 pb-4 pointer-events-none z-30"

@@ -35,7 +35,7 @@ const LoaderWrapper: React.FC<LoaderWrapperProps> = ({ children }) => {
   };
 
   if (showLoader === null) {
-    return <div className="fixed inset-0 bg-[#030303] z-[9999]" />;
+    return <div className="fixed inset-0 bg-[#030303] z-9999" />;
   }
 
   return (
