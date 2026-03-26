@@ -4,7 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Box, CircularProgress, Dialog, Typography } from "@mui/material";
-import { Check, ChevronLeft, ChevronRight, AlertCircle, Trophy } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  AlertCircle,
+  Trophy,
+} from "lucide-react";
 import { useSnackbar } from "notistack";
 
 import {
@@ -29,7 +35,13 @@ import { useAuth } from "@/contexts/AuthContext";
 
 // ─── Step config ──────────────────────────────────────────────────────────────
 
-const STEP_LABELS = ["Basic Info", "Schedule & Venue", "Rules", "Registration", "Review"];
+const STEP_LABELS = [
+  "Basic Info",
+  "Schedule & Venue",
+  "Rules",
+  "Registration",
+  "Review",
+];
 const STEP_DESCRIPTIONS = [
   "Core identity and structure",
   "Timeline and location",
@@ -66,22 +78,30 @@ const BACKEND_FIELD_TOKEN_TO_FORM_FIELD = {
   POSTERPATH: "poster",
   POSTERMIMETYPE: "poster",
   POSTERORIGINALNAME: "poster",
+  BANNERPATH: "banner",
+  BANNERMIMETYPE: "banner",
+  BANNERORIGINALNAME: "banner",
+  BANNERSIZEBYTES: "banner",
 };
 
 const ERROR_MESSAGE_MAP = {
   INVALID_SCHEDULE_RANGE: "Event end time must be after start time",
-  INVALID_REGISTRATION_DEADLINE: "Registration deadline must be before event start time",
+  INVALID_REGISTRATION_DEADLINE:
+    "Registration deadline must be before event start time",
   INVALID_PROMO_CODES_FORMAT: "Promo codes have invalid format or values",
   INVALID_MIN_TEAM_SIZE_VALUE: "Minimum team size must be a positive number",
   INVALID_MAX_TEAM_SIZE_VALUE: "Maximum team size must be greater than minimum",
   INVALID_COMPETITION_TYPE_VALUE: "Invalid competition type",
-  PENDING_PROPOSAL_ALREADY_EXISTS: "A pending edit proposal already exists for this competition",
+  PENDING_PROPOSAL_ALREADY_EXISTS:
+    "A pending edit proposal already exists for this competition",
   PROMO_PERCENT_EXCEEDS_100: "Promo code discount cannot exceed 100%",
-  PROMO_FLAT_EXCEEDS_REGISTRATION_FEE: "Flat discount cannot exceed registration fee",
+  PROMO_FLAT_EXCEEDS_REGISTRATION_FEE:
+    "Flat discount cannot exceed registration fee",
 };
 
 const findStepIndexForField = (fieldName) => {
-  if (fieldName === "poster") return STEP_LABELS.length - 1;
+  if (fieldName === "poster" || fieldName === "banner")
+    return STEP_LABELS.length - 1;
   const index = STEP_FIELDS.findIndex((fields) => fields.includes(fieldName));
   return index >= 0 ? index : 0;
 };
@@ -93,7 +113,11 @@ const parseBackendValidationCode = (code) => {
     const parts = code.match(/^INVALID_([A-Z_]+)/) || code.match(/^([A-Z_]+)/);
     const token = parts ? parts[1].replaceAll("_", "") : "";
     const fieldName = BACKEND_FIELD_TOKEN_TO_FORM_FIELD[token] || "title";
-    return { field: fieldName, stepIndex: findStepIndexForField(fieldName), message: ERROR_MESSAGE_MAP[code] };
+    return {
+      field: fieldName,
+      stepIndex: findStepIndexForField(fieldName),
+      message: ERROR_MESSAGE_MAP[code],
+    };
   }
 
   const invalidValueMatch = code.match(/^INVALID_([A-Z_]+)_VALUE$/);
@@ -101,7 +125,11 @@ const parseBackendValidationCode = (code) => {
     const token = invalidValueMatch[1].replaceAll("_", "");
     const fieldName = BACKEND_FIELD_TOKEN_TO_FORM_FIELD[token];
     if (!fieldName) return null;
-    return { field: fieldName, stepIndex: findStepIndexForField(fieldName), message: "Please enter a valid value for this field." };
+    return {
+      field: fieldName,
+      stepIndex: findStepIndexForField(fieldName),
+      message: "Please enter a valid value for this field.",
+    };
   }
 
   const indexMatch = code.match(/^INVALID_([A-Z_]+)_AT_INDEX_\d+/);
@@ -109,11 +137,19 @@ const parseBackendValidationCode = (code) => {
     const token = indexMatch[1].replaceAll("_", "");
     const fieldName = BACKEND_FIELD_TOKEN_TO_FORM_FIELD[token];
     if (!fieldName) return null;
-    return { field: fieldName, stepIndex: findStepIndexForField(fieldName), message: `Invalid entry in ${fieldName}. Please review and correct.` };
+    return {
+      field: fieldName,
+      stepIndex: findStepIndexForField(fieldName),
+      message: `Invalid entry in ${fieldName}. Please review and correct.`,
+    };
   }
 
   if (code.startsWith("PROMO_")) {
-    return { field: "promoCodes", stepIndex: findStepIndexForField("promoCodes"), message: ERROR_MESSAGE_MAP[code] || "Promo code validation failed" };
+    return {
+      field: "promoCodes",
+      stepIndex: findStepIndexForField("promoCodes"),
+      message: ERROR_MESSAGE_MAP[code] || "Promo code validation failed",
+    };
   }
 
   return null;
@@ -188,7 +224,8 @@ const getStepErrorMessages = (errors, fields = []) => {
   });
 };
 
-const countStepErrors = (errors, fields = []) => getStepErrorMessages(errors, fields).length;
+const countStepErrors = (errors, fields = []) =>
+  getStepErrorMessages(errors, fields).length;
 
 // ─── Buttons ──────────────────────────────────────────────────────────────────
 
@@ -248,7 +285,12 @@ function PurpleBtn({ children, disabled, onClick }) {
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
 
-function StepIndicator({ activeStep, visitedUpTo, stepErrorCounts, onStepClick }) {
+function StepIndicator({
+  activeStep,
+  visitedUpTo,
+  stepErrorCounts,
+  onStepClick,
+}) {
   return (
     <Box
       sx={{
@@ -285,7 +327,9 @@ function StepIndicator({ activeStep, visitedUpTo, stepErrorCounts, onStepClick }
                 alignItems: "center",
                 gap: 0.5,
                 cursor: canClick ? "pointer" : "default",
-                "&:hover .step-label": canClick ? { color: "rgba(255,255,255,0.7)" } : {},
+                "&:hover .step-label": canClick
+                  ? { color: "rgba(255,255,255,0.7)" }
+                  : {},
               }}
             >
               <Box
@@ -297,17 +341,17 @@ function StepIndicator({ activeStep, visitedUpTo, stepErrorCounts, onStepClick }
                   background: hasErrors
                     ? "rgba(239,68,68,0.12)"
                     : isDone
-                    ? "rgba(168,85,247,0.9)"
-                    : isActive
-                    ? "rgba(168,85,247,0.12)"
-                    : "rgba(255,255,255,0.04)",
+                      ? "rgba(168,85,247,0.9)"
+                      : isActive
+                        ? "rgba(168,85,247,0.12)"
+                        : "rgba(255,255,255,0.04)",
                   border: hasErrors
                     ? "2px solid rgba(239,68,68,0.5)"
                     : isDone
-                    ? "2px solid rgba(168,85,247,0.9)"
-                    : isActive
-                    ? "2px solid rgba(168,85,247,0.8)"
-                    : "2px solid rgba(255,255,255,0.07)",
+                      ? "2px solid rgba(168,85,247,0.9)"
+                      : isActive
+                        ? "2px solid rgba(168,85,247,0.8)"
+                        : "2px solid rgba(255,255,255,0.07)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -339,10 +383,10 @@ function StepIndicator({ activeStep, visitedUpTo, stepErrorCounts, onStepClick }
                   color: hasErrors
                     ? "#f87171"
                     : isActive
-                    ? "rgba(255,255,255,0.8)"
-                    : isDone
-                    ? "rgba(168,85,247,0.75)"
-                    : "rgba(255,255,255,0.2)",
+                      ? "rgba(255,255,255,0.8)"
+                      : isDone
+                        ? "rgba(168,85,247,0.75)"
+                        : "rgba(255,255,255,0.2)",
                   fontFamily: "'Syne', sans-serif",
                   whiteSpace: "nowrap",
                 }}
@@ -412,7 +456,8 @@ function StepErrorBanner({ messages }) {
               mt: 0.25,
             }}
           >
-            <strong style={{ color: "#fca5a5" }}>{item.field}:</strong> {item.message}
+            <strong style={{ color: "#fca5a5" }}>{item.field}:</strong>{" "}
+            {item.message}
           </Typography>
         ))}
       </Box>
@@ -422,7 +467,12 @@ function StepErrorBanner({ messages }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function CompetitionFormModal({ open, onClose, competition, mode = "modal" }) {
+export default function CompetitionFormModal({
+  open,
+  onClose,
+  competition,
+  mode = "modal",
+}) {
   const isPageMode = mode === "page";
   const isVisible = isPageMode ? true : Boolean(open);
   const isEdit = Boolean(competition);
@@ -432,6 +482,7 @@ export default function CompetitionFormModal({ open, onClose, competition, mode 
   const [activeStep, setActiveStep] = useState(0);
   const [visitedUpTo, setVisitedUpTo] = useState(0);
   const [poster, setPoster] = useState(null);
+  const [banner, setBanner] = useState(null);
   const [showErrorBanner, setShowErrorBanner] = useState(false);
 
   const { data: fetchedCompetition, isLoading: isCompetitionLoading } =
@@ -479,12 +530,14 @@ export default function CompetitionFormModal({ open, onClose, competition, mode 
     setActiveStep(0);
     setVisitedUpTo(0);
     setPoster(null);
+    setBanner(null);
     setShowErrorBanner(false);
   }, [isVisible, isEdit, currentCompetition, reset]);
 
   const closeModal = () => {
     reset(DEFAULT_VALUES);
     setPoster(null);
+    setBanner(null);
     setActiveStep(0);
     setVisitedUpTo(0);
     setShowErrorBanner(false);
@@ -499,7 +552,10 @@ export default function CompetitionFormModal({ open, onClose, competition, mode 
   );
 
   const currentStepErrors = useMemo(
-    () => (showErrorBanner ? getStepErrorMessages(errors, STEP_FIELDS[activeStep] || []) : []),
+    () =>
+      showErrorBanner
+        ? getStepErrorMessages(errors, STEP_FIELDS[activeStep] || [])
+        : [],
     [showErrorBanner, errors, activeStep],
   );
 
@@ -536,10 +592,11 @@ export default function CompetitionFormModal({ open, onClose, competition, mode 
   };
 
   const onSubmit = async (values) => {
-    const formData = buildCompetitionPayloadFormData(values, poster);
+    const formData = buildCompetitionPayloadFormData(values, poster, banner);
 
     const handleError = (error) => {
-      const backendCode = error?.response?.data?.error || error?.response?.data?.message;
+      const backendCode =
+        error?.response?.data?.error || error?.response?.data?.message;
       const mapped = parseBackendValidationCode(backendCode);
       if (mapped) {
         setError(mapped.field, { type: "server", message: mapped.message });
@@ -548,7 +605,11 @@ export default function CompetitionFormModal({ open, onClose, competition, mode 
         setShowErrorBanner(true);
       }
       enqueueSnackbar(
-        mapped?.message || error?.response?.data?.message || (isEdit ? "Failed to update competition" : "Failed to create competition"),
+        mapped?.message ||
+          error?.response?.data?.message ||
+          (isEdit
+            ? "Failed to update competition"
+            : "Failed to create competition"),
         { variant: "error" },
       );
     };
@@ -560,9 +621,13 @@ export default function CompetitionFormModal({ open, onClose, competition, mode 
           onSuccess: (response) => {
             enqueueSnackbar(
               response?.pendingApproval
-                ? (response?.message || "Competition change submitted for SA approval.")
+                ? response?.message ||
+                    "Competition change submitted for SA approval."
                 : "Competition updated successfully",
-              { variant: response?.pendingApproval ? "info" : "success", autoHideDuration: 6000 },
+              {
+                variant: response?.pendingApproval ? "info" : "success",
+                autoHideDuration: 6000,
+              },
             );
             closeModal();
           },
@@ -576,9 +641,13 @@ export default function CompetitionFormModal({ open, onClose, competition, mode 
       onSuccess: (response) => {
         enqueueSnackbar(
           response?.pendingApproval
-            ? (response?.message || "Competition creation submitted for SA approval.")
+            ? response?.message ||
+                "Competition creation submitted for SA approval."
             : "Competition created successfully",
-          { variant: response?.pendingApproval ? "info" : "success", autoHideDuration: 6000 },
+          {
+            variant: response?.pendingApproval ? "info" : "success",
+            autoHideDuration: 6000,
+          },
         );
         closeModal();
       },
@@ -589,11 +658,34 @@ export default function CompetitionFormModal({ open, onClose, competition, mode 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
   const steps = [
-    <CompetitionBasicInfoStep key="basic" control={control} errors={errors} statusOptions={statusOptions} />,
-    <CompetitionScheduleVenueStep key="schedule" control={control} errors={errors} />,
+    <CompetitionBasicInfoStep
+      key="basic"
+      control={control}
+      errors={errors}
+      statusOptions={statusOptions}
+    />,
+    <CompetitionScheduleVenueStep
+      key="schedule"
+      control={control}
+      errors={errors}
+    />,
     <CompetitionRulesStep key="rules" control={control} errors={errors} />,
-    <CompetitionRegistrationConfigStep key="registration" control={control} errors={errors} setValue={setValue} />,
-    <CompetitionPosterReviewStep key="poster" watch={watch} poster={poster} onPosterChange={setPoster} existingPosterPath={currentCompetition?.posterPath} />,
+    <CompetitionRegistrationConfigStep
+      key="registration"
+      control={control}
+      errors={errors}
+      setValue={setValue}
+    />,
+    <CompetitionPosterReviewStep
+      key="poster"
+      watch={watch}
+      poster={poster}
+      onPosterChange={setPoster}
+      existingPosterPath={currentCompetition?.posterPath}
+      banner={banner}
+      onBannerChange={setBanner}
+      existingBannerPath={currentCompetition?.bannerPath}
+    />,
   ];
 
   const formContent = (
@@ -635,7 +727,9 @@ export default function CompetitionFormModal({ open, onClose, competition, mode 
               lineHeight: 1.2,
             }}
           >
-            {isEdit ? `Edit: ${currentCompetition?.title || "Competition"}` : "Create Competition"}
+            {isEdit
+              ? `Edit: ${currentCompetition?.title || "Competition"}`
+              : "Create Competition"}
           </Typography>
           <Typography
             sx={{
@@ -644,7 +738,8 @@ export default function CompetitionFormModal({ open, onClose, competition, mode 
               fontFamily: "'DM Mono', monospace",
             }}
           >
-            Step {activeStep + 1} of {STEP_LABELS.length} · {STEP_DESCRIPTIONS[activeStep]}
+            Step {activeStep + 1} of {STEP_LABELS.length} ·{" "}
+            {STEP_DESCRIPTIONS[activeStep]}
           </Typography>
         </Box>
       </Box>
@@ -669,9 +764,25 @@ export default function CompetitionFormModal({ open, onClose, competition, mode 
 
           {/* Loading state (edit mode) */}
           {isEdit && isCompetitionLoading ? (
-            <Box sx={{ height: "100%", minHeight: 240, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 1 }}>
+            <Box
+              sx={{
+                height: "100%",
+                minHeight: 240,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "column",
+                gap: 1,
+              }}
+            >
               <CircularProgress size={22} sx={{ color: "#a855f7" }} />
-              <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.3)", fontFamily: "'DM Mono', monospace" }}>
+              <Typography
+                sx={{
+                  fontSize: 12,
+                  color: "rgba(255,255,255,0.3)",
+                  fontFamily: "'DM Mono', monospace",
+                }}
+              >
                 Loading competition…
               </Typography>
             </Box>
@@ -709,7 +820,10 @@ export default function CompetitionFormModal({ open, onClose, competition, mode 
                 <ChevronRight size={14} />
               </PurpleBtn>
             ) : (
-              <PurpleBtn onClick={handleSubmit(onSubmit)} disabled={isSubmitting}>
+              <PurpleBtn
+                onClick={handleSubmit(onSubmit)}
+                disabled={isSubmitting}
+              >
                 {isSubmitting ? (
                   <>
                     <CircularProgress size={13} sx={{ color: "#fff" }} />

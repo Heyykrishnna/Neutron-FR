@@ -610,7 +610,7 @@ const normalizeSubVenues = (subVenues = []) => {
     .filter(Boolean);
 };
 
-export function buildCompetitionPayloadFormData(values, poster) {
+export function buildCompetitionPayloadFormData(values, poster, banner) {
   const formData = new FormData();
 
   const append = (key, value) => {
@@ -695,6 +695,10 @@ export function buildCompetitionPayloadFormData(values, poster) {
 
   if (poster) {
     formData.append("poster", poster);
+  }
+
+  if (banner) {
+    formData.append("banner", banner);
   }
 
   return formData;

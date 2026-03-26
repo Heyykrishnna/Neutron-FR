@@ -88,47 +88,66 @@ export default function CompetitionPosterReviewStep({
   poster,
   onPosterChange,
   existingPosterPath,
+  banner,
+  onBannerChange,
+  existingBannerPath,
 }) {
   const fileInputRef = useRef(null);
+  const bannerInputRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
+  const [dragOverBanner, setDragOverBanner] = useState(false);
 
   const formValues = watch();
 
-  const previewUrl = useMemo(() => {
-    if (poster) {
-      return URL.createObjectURL(poster);
+  const toPreviewUrl = (file, existingPath) => {
+    if (file) {
+      return URL.createObjectURL(file);
     }
 
-    if (!existingPosterPath) return null;
+    if (!existingPath) return null;
 
-    if (/^https?:\/\//i.test(existingPosterPath)) {
-      return existingPosterPath;
+    if (/^https?:\/\//i.test(existingPath)) {
+      return existingPath;
     }
 
     const base =
       process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001";
     const normalizedBase = base.endsWith("/") ? base.slice(0, -1) : base;
-    const normalizedPath = existingPosterPath.startsWith("/")
-      ? existingPosterPath
-      : `/${existingPosterPath}`;
+    const normalizedPath = existingPath.startsWith("/")
+      ? existingPath
+      : `/${existingPath}`;
 
     return `${normalizedBase}${normalizedPath}`;
-  }, [poster, existingPosterPath]);
+  };
+
+  const previewUrl = useMemo(
+    () => toPreviewUrl(poster, existingPosterPath),
+    [poster, existingPosterPath],
+  );
+
+  const bannerPreviewUrl = useMemo(
+    () => toPreviewUrl(banner, existingBannerPath),
+    [banner, existingBannerPath],
+  );
 
   useEffect(() => {
     return () => {
       if (poster && previewUrl?.startsWith("blob:")) {
         URL.revokeObjectURL(previewUrl);
       }
-    };
-  }, [poster, previewUrl]);
 
-  function handleFiles(files) {
+      if (banner && bannerPreviewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(bannerPreviewUrl);
+      }
+    };
+  }, [poster, previewUrl, banner, bannerPreviewUrl]);
+
+  function handleFiles(files, onChange) {
     if (!files || files.length === 0) return;
     const file = files[0];
     if (!file.type.startsWith("image/")) return;
     if (file.size > 8 * 1024 * 1024) return;
-    onPosterChange(file);
+    onChange(file);
   }
 
   const fmtDate = (d) => {
@@ -179,7 +198,7 @@ export default function CompetitionPosterReviewStep({
           onDrop={(e) => {
             e.preventDefault();
             setDragOver(false);
-            handleFiles(e.dataTransfer.files);
+            handleFiles(e.dataTransfer.files, onPosterChange);
           }}
           onClick={() => fileInputRef.current?.click()}
           sx={{
@@ -281,7 +300,7 @@ export default function CompetitionPosterReviewStep({
           type="file"
           accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
           style={{ display: "none" }}
-          onChange={(e) => handleFiles(e.target.files)}
+          onChange={(e) => handleFiles(e.target.files, onPosterChange)}
         />
 
         {poster && (
@@ -352,6 +371,196 @@ export default function CompetitionPosterReviewStep({
             }}
           >
             Existing poster will be kept
+          </Typography>
+        )}
+
+        <Box sx={{ mt: 2 }}>
+          <FieldLabel>Event Banner</FieldLabel>
+        </Box>
+
+        <Box
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOverBanner(true);
+          }}
+          onDragLeave={() => setDragOverBanner(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOverBanner(false);
+            handleFiles(e.dataTransfer.files, onBannerChange);
+          }}
+          onClick={() => bannerInputRef.current?.click()}
+          sx={{
+            position: "relative",
+            height: bannerPreviewUrl ? "auto" : 200,
+            borderRadius: "10px",
+            border: dragOverBanner
+              ? "2px solid rgba(168,85,247,0.6)"
+              : "2px dashed rgba(255,255,255,0.1)",
+            background: dragOverBanner
+              ? "rgba(168,85,247,0.06)"
+              : "rgba(255,255,255,0.02)",
+            cursor: "pointer",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 1,
+            transition: "all 0.15s",
+            overflow: "hidden",
+            mt: 1,
+            "&:hover": {
+              borderColor: "rgba(168,85,247,0.4)",
+              background: "rgba(168,85,247,0.03)",
+            },
+          }}
+        >
+          {bannerPreviewUrl ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={bannerPreviewUrl}
+                alt="Banner preview"
+                style={{
+                  width: "100%",
+                  height: "auto",
+                  maxHeight: 320,
+                  objectFit: "cover",
+                  borderRadius: "8px",
+                }}
+              />
+              <Box
+                sx={{
+                  position: "absolute",
+                  inset: 0,
+                  background: "rgba(0,0,0,0)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "background 0.15s",
+                  "&:hover": { background: "rgba(0,0,0,0.45)" },
+                  "& .upload-hint": { opacity: 0, transition: "opacity 0.15s" },
+                  "&:hover .upload-hint": { opacity: 1 },
+                }}
+              >
+                <Box className="upload-hint" sx={{ textAlign: "center" }}>
+                  <Upload size={20} color="rgba(255,255,255,0.8)" />
+                  <Typography
+                    sx={{
+                      fontSize: 11,
+                      color: "rgba(255,255,255,0.7)",
+                      fontFamily: "'Syne', sans-serif",
+                      mt: 0.5,
+                    }}
+                  >
+                    Click to replace
+                  </Typography>
+                </Box>
+              </Box>
+            </>
+          ) : (
+            <>
+              <ImageIcon size={28} color="rgba(255,255,255,0.2)" />
+              <Typography
+                sx={{
+                  fontSize: 12,
+                  color: "rgba(255,255,255,0.3)",
+                  fontFamily: "'Syne', sans-serif",
+                  textAlign: "center",
+                }}
+              >
+                Drag & drop or{" "}
+                <span style={{ color: "#a855f7" }}>click to upload</span>
+              </Typography>
+              <Typography
+                sx={{
+                  fontSize: 10,
+                  color: "rgba(255,255,255,0.15)",
+                  fontFamily: "'DM Mono', monospace",
+                }}
+              >
+                JPEG · PNG · WebP · max 8 MB
+              </Typography>
+            </>
+          )}
+        </Box>
+
+        <input
+          ref={bannerInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
+          style={{ display: "none" }}
+          onChange={(e) => handleFiles(e.target.files, onBannerChange)}
+        />
+
+        {banner && (
+          <Box
+            sx={{
+              mt: 1.5,
+              p: 1.5,
+              borderRadius: "8px",
+              background: "rgba(168,85,247,0.06)",
+              border: "1px solid rgba(168,85,247,0.15)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Box>
+              <Typography
+                sx={{
+                  fontSize: 11,
+                  color: "#c084fc",
+                  fontFamily: "'DM Mono', monospace",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  maxWidth: 180,
+                }}
+              >
+                {banner.name}
+              </Typography>
+              <Typography
+                sx={{
+                  fontSize: 10,
+                  color: "rgba(255,255,255,0.25)",
+                  fontFamily: "'DM Mono', monospace",
+                }}
+              >
+                {(banner.size / 1024).toFixed(0)} KB
+              </Typography>
+            </Box>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onBannerChange(null);
+                if (bannerInputRef.current) bannerInputRef.current.value = "";
+              }}
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: "rgba(255,255,255,0.35)",
+                padding: 4,
+                display: "flex",
+              }}
+            >
+              <X size={14} />
+            </button>
+          </Box>
+        )}
+
+        {!banner && existingBannerPath && (
+          <Typography
+            sx={{
+              mt: 1,
+              fontSize: 10,
+              color: "rgba(255,255,255,0.2)",
+              fontFamily: "'DM Mono', monospace",
+            }}
+          >
+            Existing banner will be kept
           </Typography>
         )}
       </Box>
