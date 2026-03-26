@@ -638,15 +638,49 @@ function FormBuilderDialog({
     );
   }, [open, isEdit, registrationDeadlineLocal]);
 
-  const isStepOneValid = useMemo(() => {
-    if (!competitionId || !opensAt || !closesAt) {
-      return false;
+  const stepOneValidation = useMemo(() => {
+    if (!competitionId) {
+      return {
+        valid: false,
+        message: "Select a competition first.",
+      };
+    }
+
+    if (!opensAt) {
+      return {
+        valid: false,
+        message: "Opening time is required.",
+      };
+    }
+
+    if (!closesAt) {
+      return {
+        valid: false,
+        message: "Closing time is required.",
+      };
     }
 
     const opens = new Date(opensAt);
     const closes = new Date(closesAt);
-    return opens < closes;
+
+    if (Number.isNaN(opens.getTime()) || Number.isNaN(closes.getTime())) {
+      return {
+        valid: false,
+        message: "Please enter valid opening and closing date/time values.",
+      };
+    }
+
+    if (opens >= closes) {
+      return {
+        valid: false,
+        message: "Opening time must be earlier than closing time.",
+      };
+    }
+
+    return { valid: true, message: "" };
   }, [competitionId, opensAt, closesAt]);
+
+  const isStepOneValid = stepOneValidation.valid;
 
   const isSaving =
     createFormMutation.isPending ||
@@ -950,6 +984,7 @@ function FormBuilderDialog({
                     disabled={isEdit || isCompetitionFixed}
                     onChange={(event) => {
                       setCompetitionId(event.target.value);
+                      setErrorText("");
                       setHasUnsavedChanges(true);
                     }}
                     sx={inputSx}
@@ -969,6 +1004,7 @@ function FormBuilderDialog({
                     value={opensAt}
                     onChange={(event) => {
                       setOpensAt(event.target.value);
+                      setErrorText("");
                       setHasUnsavedChanges(true);
                     }}
                     InputLabelProps={{ shrink: true }}
@@ -984,6 +1020,7 @@ function FormBuilderDialog({
                     disabled={isClosesAtLocked}
                     onChange={(event) => {
                       setClosesAt(event.target.value);
+                      setErrorText("");
                       setHasUnsavedChanges(true);
                     }}
                     InputLabelProps={{ shrink: true }}
@@ -994,6 +1031,19 @@ function FormBuilderDialog({
                     }
                     sx={inputSx}
                   />
+
+                  {!isStepOneValid &&
+                    (competitionId || opensAt || closesAt) && (
+                      <Typography
+                        sx={{
+                          color: "#f87171",
+                          fontSize: 12,
+                          fontFamily: "'DM Mono', monospace",
+                        }}
+                      >
+                        {stepOneValidation.message}
+                      </Typography>
+                    )}
                 </Box>
               ) : (
                 <Box sx={{ display: "grid", gap: 2 }}>
@@ -1309,8 +1359,16 @@ function FormBuilderDialog({
           </GhostBtn>
           {step === 1 ? (
             <PurpleBtn
-              disabled={!isStepOneValid || isSaving}
-              onClick={() => setStep(2)}
+              disabled={isSaving}
+              onClick={() => {
+                if (!isStepOneValid) {
+                  setErrorText(stepOneValidation.message);
+                  return;
+                }
+
+                setErrorText("");
+                setStep(2);
+              }}
             >
               Next: Field Builder
               <ChevronRight size={14} />

@@ -16,7 +16,6 @@ import {
   Plus,
   Send,
   Users,
-  UserPlus,
   Trash2,
   Lock,
   Unlock,
@@ -47,9 +46,13 @@ import {
   useCompetitionClubs,
   useAssignClubToCompetition,
   useRemoveClubFromCompetition,
+  useCompetitionDepartments,
+  useAssignDepartmentToCompetition,
+  useRemoveDepartmentFromCompetition,
 } from "@/src/hooks/api/useCompetitions";
 import { useUsers } from "@/src/hooks/api/useUsers";
 import { useClubs } from "@/src/hooks/api/useClubs";
+import { useDepartments } from "@/src/hooks/api/useDepartments";
 import { LoadingState } from "@/src/components/LoadingState";
 import PromoCodeApprovalModal from "@/src/components/forms/PromoCodeApprovalModal";
 import CompetitionFormModal from "@/src/components/forms/CompetitionFormModal";
@@ -476,18 +479,19 @@ function CompetitionToggles({ competition }) {
 
 function ManageDialog({ competition, open, onClose }) {
   const { enqueueSnackbar } = useSnackbar();
+  const { user } = useAuth();
   const [tab, setTab] = useState("judges");
 
-  const [judgeUserId, setJudgeUserId] = useState("");
+  const [judgeSearch, setJudgeSearch] = useState("");
   const { data: judges = [], isLoading: judgesLoading } = useCompetitionJudges(
     open ? competition?.id : null,
   );
   const { data: judgeUsers = [] } = useUsers({ role: "JUDGE", limit: 200 });
   const { mutate: assignJudge, isPending: assigningJudge } = useAssignJudge();
   const { mutate: removeJudge } = useRemoveJudge();
-  const [removingJudgeId, setRemovingJudgeId] = useState(null);
+  const [judgeActionId, setJudgeActionId] = useState(null);
 
-  const [volunteerUserId, setVolunteerUserId] = useState("");
+  const [volunteerSearch, setVolunteerSearch] = useState("");
   const { data: volunteers = [], isLoading: volunteersLoading } =
     useCompetitionVolunteers(open ? competition?.id : null);
   const { data: volunteerUsers = [] } = useUsers({
@@ -497,39 +501,78 @@ function ManageDialog({ competition, open, onClose }) {
   const { mutate: assignVolunteer, isPending: assigningVol } =
     useAssignVolunteer();
   const { mutate: removeVolunteer } = useRemoveVolunteer();
-  const [removingVolId, setRemovingVolId] = useState(null);
+  const [volunteerActionId, setVolunteerActionId] = useState(null);
 
   const [dangerAction, setDangerAction] = useState("");
   const [dangerDate, setDangerDate] = useState("");
   const { mutate: cancelOrPostpone, isPending: dangerPending } =
     useCancelOrPostpone();
 
-  const [selectedClubId, setSelectedClubId] = useState("");
+  const [clubSearch, setClubSearch] = useState("");
   const { data: competitionClubs = [], isLoading: compClubsLoading } =
     useCompetitionClubs(open ? competition?.id : null);
   const { data: allClubs = [] } = useClubs();
   const { mutate: assignClub, isPending: assigningClub } =
     useAssignClubToCompetition();
   const { mutate: removeClub } = useRemoveClubFromCompetition();
-  const [removingClubId, setRemovingClubId] = useState(null);
+  const [clubActionId, setClubActionId] = useState(null);
+
+  const [departmentSearch, setDepartmentSearch] = useState("");
+  const {
+    data: competitionDepartments = [],
+    isLoading: compDepartmentsLoading,
+  } = useCompetitionDepartments(
+    open && user?.role === "SA" ? competition?.id : null,
+  );
+  const { data: allDepartments = [] } = useDepartments({
+    enabled: user?.role === "SA",
+  });
+  const { mutate: assignDepartment, isPending: assigningDepartment } =
+    useAssignDepartmentToCompetition();
+  const { mutate: removeDepartment } = useRemoveDepartmentFromCompetition();
+  const [departmentActionId, setDepartmentActionId] = useState(null);
 
   if (!competition) return null;
 
   const assignedJudgeIds = new Set(judges.map((j) => j.userId || j.user?.id));
-  const availableJudges = judgeUsers.filter((u) => !assignedJudgeIds.has(u.id));
   const assignedVolIds = new Set(volunteers.map((v) => v.userId || v.user?.id));
-  const availableVols = volunteerUsers.filter((u) => !assignedVolIds.has(u.id));
-
   const assignedClubIds = new Set(
     competitionClubs.map((c) => c.clubId || c.id),
   );
-  const availableClubs = allClubs.filter((c) => !assignedClubIds.has(c.id));
+
+  const assignedDepartmentIds = new Set(
+    competitionDepartments.map((d) => d.departmentId || d.id),
+  );
+
+  const queryMatch = (value, query) =>
+    (value || "").toLowerCase().includes((query || "").toLowerCase());
+
+  const filteredAllJudges = judgeUsers.filter(
+    (u) => queryMatch(u.name, judgeSearch) || queryMatch(u.email, judgeSearch),
+  );
+
+  const filteredAllVolunteers = volunteerUsers.filter(
+    (u) =>
+      queryMatch(u.name, volunteerSearch) ||
+      queryMatch(u.email, volunteerSearch),
+  );
+
+  const filteredAllClubs = allClubs.filter((c) =>
+    queryMatch(c.name, clubSearch),
+  );
+
+  const filteredAllDepartments = allDepartments.filter((d) =>
+    queryMatch(d.name, departmentSearch),
+  );
 
   const tabList = [
     { key: "judges", label: "Judges" },
     { key: "volunteers", label: "Volunteers" },
     { key: "controls", label: "Controls" },
     { key: "clubs", label: "Clubs" },
+    ...(user?.role === "SA"
+      ? [{ key: "departments", label: "Departments" }]
+      : []),
   ];
 
   return (
@@ -574,7 +617,7 @@ function ManageDialog({ competition, open, onClose }) {
             mt: 0.25,
           }}
         >
-          Manage judges, volunteers, controls and clubs
+          Manage judges, volunteers, controls, clubs and departments
         </Typography>
 
         {/* Tab switcher */}
@@ -623,177 +666,242 @@ function ManageDialog({ competition, open, onClose }) {
         {/* Judges tab */}
         {tab === "judges" && (
           <Box>
-            <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
-              <select
-                value={judgeUserId}
-                onChange={(e) => setJudgeUserId(e.target.value)}
+            <Box sx={{ position: "relative", mb: 1.5 }}>
+              <Box
+                sx={{
+                  position: "absolute",
+                  left: 11,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  pointerEvents: "none",
+                }}
+              >
+                <Search size={12} color="rgba(255,255,255,0.25)" />
+              </Box>
+              <input
+                value={judgeSearch}
+                onChange={(e) => setJudgeSearch(e.target.value)}
+                placeholder="Search judges…"
                 style={{
-                  flex: 1,
-                  padding: "8px 12px",
+                  width: "100%",
+                  padding: "8px 12px 8px 30px",
                   background: "rgba(255,255,255,0.04)",
                   border: "1px solid rgba(255,255,255,0.08)",
                   borderRadius: 8,
-                  color: "rgba(255,255,255,0.65)",
+                  color: "rgba(255,255,255,0.75)",
                   fontSize: 13,
                   fontFamily: "'Syne', sans-serif",
                   outline: "none",
+                  boxSizing: "border-box",
                 }}
-              >
-                <option value="">Select a judge…</option>
-                {availableJudges.map((u) => (
-                  <option
-                    key={u.id}
-                    value={u.id}
-                    style={{ background: "#0e0e0e" }}
-                  >
-                    {u.name} — {u.email}
-                  </option>
-                ))}
-              </select>
-              <SmallActionBtn
-                onClick={() => {
-                  if (!judgeUserId) return;
-                  assignJudge(
-                    { competitionId: competition.id, judgeUserId },
-                    {
-                      onSuccess: () => {
-                        enqueueSnackbar("Judge assigned", {
-                          variant: "success",
-                        });
-                        setJudgeUserId("");
-                      },
-                      onError: (err) =>
-                        enqueueSnackbar(
-                          err?.response?.data?.message || "Failed",
-                          { variant: "error" },
-                        ),
-                    },
-                  );
-                }}
-                color="#a855f7"
-                hoverBg="rgba(168,85,247,0.1)"
-                disabled={!judgeUserId || assigningJudge}
-              >
-                {assigningJudge ? (
-                  <CircularProgress size={11} sx={{ color: "#a855f7" }} />
-                ) : (
-                  <UserPlus size={11} />
-                )}
-                Add
-              </SmallActionBtn>
+              />
             </Box>
             {judgesLoading ? (
               <LoadingState message="Loading…" size="small" />
-            ) : judges.length === 0 ? (
-              <Typography
+            ) : (
+              <Box
                 sx={{
-                  color: "rgba(255,255,255,0.15)",
-                  fontSize: 12,
-                  fontFamily: "'DM Mono', monospace",
-                  py: 2,
+                  maxHeight: 320,
+                  overflowY: "auto",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: "10px",
                 }}
               >
-                No judges assigned yet
-              </Typography>
-            ) : (
-              judges.map((j) => {
-                const name = j.user?.name || j.userName || j.name || "—";
-                const email = j.user?.email || j.userEmail || j.email || "";
-                return (
-                  <Box
-                    key={j.id}
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1.5,
-                      py: 1.25,
-                      borderBottom: "1px solid rgba(255,255,255,0.04)",
-                    }}
-                  >
-                    <Avatar
+                {filteredAllJudges.length === 0 ? (
+                  <Box sx={{ py: 4, textAlign: "center" }}>
+                    <Typography
                       sx={{
-                        width: 28,
-                        height: 28,
-                        background: "rgba(168,85,247,0.35)",
-                        fontSize: 11,
+                        fontSize: 12,
+                        color: "rgba(255,255,255,0.2)",
+                        fontFamily: "'Syne', sans-serif",
                       }}
                     >
-                      {name.charAt(0).toUpperCase()}
-                    </Avatar>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography
-                        sx={{
-                          fontSize: 13,
-                          color: "#e4e4e7",
-                          fontFamily: "'Syne', sans-serif",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {name}
-                      </Typography>
-                      <Typography
-                        sx={{
-                          fontSize: 11,
-                          color: "rgba(255,255,255,0.25)",
-                          fontFamily: "'DM Mono', monospace",
-                        }}
-                      >
-                        {email}
-                      </Typography>
-                    </Box>
-                    {j.isHeadJudge && (
-                      <Pill
-                        bg="rgba(168,85,247,0.1)"
-                        text="#c084fc"
-                        border="rgba(168,85,247,0.2)"
-                      >
-                        Head
-                      </Pill>
-                    )}
-                    <button
-                      type="button"
-                      disabled={removingJudgeId === j.id}
-                      onClick={() => {
-                        setRemovingJudgeId(j.id);
-                        removeJudge(
-                          {
-                            judgeAssignmentId: j.id,
-                            competitionId: competition.id,
-                          },
-                          {
-                            onSuccess: () =>
-                              enqueueSnackbar("Judge removed", {
-                                variant: "success",
-                              }),
-                            onError: (e) =>
-                              enqueueSnackbar(
-                                e?.response?.data?.message || "Failed",
-                                { variant: "error" },
-                              ),
-                            onSettled: () => setRemovingJudgeId(null),
-                          },
-                        );
-                      }}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        cursor: "pointer",
-                        color: "#f87171",
-                        padding: 4,
-                        lineHeight: 0,
-                      }}
-                    >
-                      {removingJudgeId === j.id ? (
-                        <CircularProgress size={11} sx={{ color: "#f87171" }} />
-                      ) : (
-                        <Trash2 size={13} />
-                      )}
-                    </button>
+                      No judges found
+                    </Typography>
                   </Box>
-                );
-              })
+                ) : (
+                  filteredAllJudges.map((u, idx) => {
+                    const name = u.name || "—";
+                    const email = u.email || "";
+                    const judgeUserId = u.id;
+                    const checked = assignedJudgeIds.has(judgeUserId);
+                    const assignedEntry = judges.find(
+                      (a) => (a.userId || a.user?.id) === judgeUserId,
+                    );
+                    const assignmentId = assignedEntry?.id;
+                    const isHeadJudge = !!assignedEntry?.isHeadJudge;
+                    const rowBusy = judgeActionId === judgeUserId;
+
+                    return (
+                      <Box key={judgeUserId}>
+                        <Box
+                          onClick={() => {
+                            if (rowBusy || assigningJudge) return;
+                            setJudgeActionId(judgeUserId);
+
+                            if (checked) {
+                              if (!assignmentId) {
+                                enqueueSnackbar(
+                                  "Unable to remove judge assignment",
+                                  { variant: "error" },
+                                );
+                                setJudgeActionId(null);
+                                return;
+                              }
+
+                              removeJudge(
+                                {
+                                  judgeAssignmentId: assignmentId,
+                                  competitionId: competition.id,
+                                },
+                                {
+                                  onSuccess: () =>
+                                    enqueueSnackbar("Judge removed", {
+                                      variant: "success",
+                                    }),
+                                  onError: (e) =>
+                                    enqueueSnackbar(
+                                      e?.response?.data?.message || "Failed",
+                                      { variant: "error" },
+                                    ),
+                                  onSettled: () => setJudgeActionId(null),
+                                },
+                              );
+                              return;
+                            }
+
+                            assignJudge(
+                              { competitionId: competition.id, judgeUserId },
+                              {
+                                onSuccess: () =>
+                                  enqueueSnackbar("Judge assigned", {
+                                    variant: "success",
+                                  }),
+                                onError: (err) =>
+                                  enqueueSnackbar(
+                                    err?.response?.data?.message || "Failed",
+                                    { variant: "error" },
+                                  ),
+                                onSettled: () => setJudgeActionId(null),
+                              },
+                            );
+                          }}
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1.5,
+                            px: 2,
+                            py: 1.5,
+                            cursor:
+                              rowBusy || assigningJudge
+                                ? "not-allowed"
+                                : "pointer",
+                            transition: "background 0.1s",
+                            background: checked
+                              ? "rgba(168,85,247,0.06)"
+                              : "transparent",
+                            opacity: rowBusy ? 0.65 : 1,
+                            "&:hover": {
+                              background: checked
+                                ? "rgba(168,85,247,0.09)"
+                                : "rgba(255,255,255,0.02)",
+                            },
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: 16,
+                              height: 16,
+                              borderRadius: "4px",
+                              flexShrink: 0,
+                              border: checked
+                                ? "1px solid rgba(168,85,247,0.6)"
+                                : "1px solid rgba(255,255,255,0.15)",
+                              background: checked
+                                ? "rgba(168,85,247,0.25)"
+                                : "transparent",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            {rowBusy ? (
+                              <CircularProgress
+                                size={9}
+                                sx={{ color: checked ? "#c084fc" : "#94a3b8" }}
+                              />
+                            ) : (
+                              checked && (
+                                <Box
+                                  sx={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: "2px",
+                                    background: "#c084fc",
+                                  }}
+                                />
+                              )
+                            )}
+                          </Box>
+                          <Avatar
+                            sx={{
+                              width: 28,
+                              height: 28,
+                              background: "rgba(168,85,247,0.35)",
+                              fontSize: 11,
+                            }}
+                          >
+                            {name.charAt(0).toUpperCase()}
+                          </Avatar>
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Typography
+                              sx={{
+                                fontSize: 13,
+                                color: "#e4e4e7",
+                                fontFamily: "'Syne', sans-serif",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {name}
+                            </Typography>
+                            <Typography
+                              sx={{
+                                fontSize: 11,
+                                color: "rgba(255,255,255,0.25)",
+                                fontFamily: "'DM Mono', monospace",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {email}
+                            </Typography>
+                          </Box>
+                          {isHeadJudge && (
+                            <Pill
+                              bg="rgba(168,85,247,0.1)"
+                              text="#c084fc"
+                              border="rgba(168,85,247,0.2)"
+                            >
+                              Head
+                            </Pill>
+                          )}
+                        </Box>
+                        {idx < filteredAllJudges.length - 1 && (
+                          <Box
+                            sx={{
+                              height: "1px",
+                              background: "rgba(255,255,255,0.04)",
+                            }}
+                          />
+                        )}
+                      </Box>
+                    );
+                  })
+                )}
+              </Box>
             )}
           </Box>
         )}
@@ -801,171 +909,235 @@ function ManageDialog({ competition, open, onClose }) {
         {/* Volunteers tab */}
         {tab === "volunteers" && (
           <Box>
-            <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
-              <select
-                value={volunteerUserId}
-                onChange={(e) => setVolunteerUserId(e.target.value)}
+            <Box sx={{ position: "relative", mb: 1.5 }}>
+              <Box
+                sx={{
+                  position: "absolute",
+                  left: 11,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  pointerEvents: "none",
+                }}
+              >
+                <Search size={12} color="rgba(255,255,255,0.25)" />
+              </Box>
+              <input
+                value={volunteerSearch}
+                onChange={(e) => setVolunteerSearch(e.target.value)}
+                placeholder="Search volunteers…"
                 style={{
-                  flex: 1,
-                  padding: "8px 12px",
+                  width: "100%",
+                  padding: "8px 12px 8px 30px",
                   background: "rgba(255,255,255,0.04)",
                   border: "1px solid rgba(255,255,255,0.08)",
                   borderRadius: 8,
-                  color: "rgba(255,255,255,0.65)",
+                  color: "rgba(255,255,255,0.75)",
                   fontSize: 13,
                   fontFamily: "'Syne', sans-serif",
                   outline: "none",
+                  boxSizing: "border-box",
                 }}
-              >
-                <option value="">Select a volunteer…</option>
-                {availableVols.map((u) => (
-                  <option
-                    key={u.id}
-                    value={u.id}
-                    style={{ background: "#0e0e0e" }}
-                  >
-                    {u.name} — {u.email}
-                  </option>
-                ))}
-              </select>
-              <SmallActionBtn
-                onClick={() => {
-                  if (!volunteerUserId) return;
-                  assignVolunteer(
-                    {
-                      competitionId: competition.id,
-                      volunteerUserId,
-                    },
-                    {
-                      onSuccess: () => {
-                        enqueueSnackbar("Volunteer assigned", {
-                          variant: "success",
-                        });
-                        setVolunteerUserId("");
-                      },
-                      onError: (err) =>
-                        enqueueSnackbar(
-                          err?.response?.data?.message || "Failed",
-                          { variant: "error" },
-                        ),
-                    },
-                  );
-                }}
-                color="#60a5fa"
-                hoverBg="rgba(59,130,246,0.1)"
-                disabled={!volunteerUserId || assigningVol}
-              >
-                {assigningVol ? (
-                  <CircularProgress size={11} sx={{ color: "#60a5fa" }} />
-                ) : (
-                  <UserPlus size={11} />
-                )}
-                Add
-              </SmallActionBtn>
+              />
             </Box>
             {volunteersLoading ? (
               <LoadingState message="Loading…" size="small" />
-            ) : volunteers.length === 0 ? (
-              <Typography
+            ) : (
+              <Box
                 sx={{
-                  color: "rgba(255,255,255,0.15)",
-                  fontSize: 12,
-                  fontFamily: "'DM Mono', monospace",
-                  py: 2,
+                  maxHeight: 320,
+                  overflowY: "auto",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: "10px",
                 }}
               >
-                No volunteers assigned yet
-              </Typography>
-            ) : (
-              volunteers.map((v) => {
-                const name = v.user?.name || v.userName || v.name || "—";
-                const email = v.user?.email || v.userEmail || v.email || "";
-                return (
-                  <Box
-                    key={v.id}
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1.5,
-                      py: 1.25,
-                      borderBottom: "1px solid rgba(255,255,255,0.04)",
-                    }}
-                  >
-                    <Avatar
+                {filteredAllVolunteers.length === 0 ? (
+                  <Box sx={{ py: 4, textAlign: "center" }}>
+                    <Typography
                       sx={{
-                        width: 28,
-                        height: 28,
-                        background: "rgba(59,130,246,0.35)",
-                        fontSize: 11,
+                        fontSize: 12,
+                        color: "rgba(255,255,255,0.2)",
+                        fontFamily: "'Syne', sans-serif",
                       }}
                     >
-                      {name.charAt(0).toUpperCase()}
-                    </Avatar>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography
-                        sx={{
-                          fontSize: 13,
-                          color: "#e4e4e7",
-                          fontFamily: "'Syne', sans-serif",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {name}
-                      </Typography>
-                      <Typography
-                        sx={{
-                          fontSize: 11,
-                          color: "rgba(255,255,255,0.25)",
-                          fontFamily: "'DM Mono', monospace",
-                        }}
-                      >
-                        {email}
-                      </Typography>
-                    </Box>
-                    <button
-                      type="button"
-                      disabled={removingVolId === v.id}
-                      onClick={() => {
-                        setRemovingVolId(v.id);
-                        removeVolunteer(
-                          {
-                            volunteerAssignmentId: v.id,
-                            competitionId: competition.id,
-                          },
-                          {
-                            onSuccess: () =>
-                              enqueueSnackbar("Volunteer removed", {
-                                variant: "success",
-                              }),
-                            onError: (e) =>
-                              enqueueSnackbar(
-                                e?.response?.data?.message || "Failed",
-                                { variant: "error" },
-                              ),
-                            onSettled: () => setRemovingVolId(null),
-                          },
-                        );
-                      }}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        cursor: "pointer",
-                        color: "#f87171",
-                        padding: 4,
-                        lineHeight: 0,
-                      }}
-                    >
-                      {removingVolId === v.id ? (
-                        <CircularProgress size={11} sx={{ color: "#f87171" }} />
-                      ) : (
-                        <Trash2 size={13} />
-                      )}
-                    </button>
+                      No volunteers found
+                    </Typography>
                   </Box>
-                );
-              })
+                ) : (
+                  filteredAllVolunteers.map((v, idx) => {
+                    const name = v.name || "—";
+                    const email = v.email || "";
+                    const volunteerId = v.id;
+                    const checked = assignedVolIds.has(volunteerId);
+                    const assignedEntry = volunteers.find(
+                      (a) => (a.userId || a.user?.id) === volunteerId,
+                    );
+                    const assignmentId = assignedEntry?.id;
+                    const rowBusy = volunteerActionId === volunteerId;
+
+                    return (
+                      <Box key={volunteerId}>
+                        <Box
+                          onClick={() => {
+                            if (rowBusy || assigningVol) return;
+                            setVolunteerActionId(volunteerId);
+
+                            if (checked) {
+                              if (!assignmentId) {
+                                enqueueSnackbar(
+                                  "Unable to remove volunteer assignment",
+                                  { variant: "error" },
+                                );
+                                setVolunteerActionId(null);
+                                return;
+                              }
+
+                              removeVolunteer(
+                                {
+                                  volunteerAssignmentId: assignmentId,
+                                  competitionId: competition.id,
+                                },
+                                {
+                                  onSuccess: () =>
+                                    enqueueSnackbar("Volunteer removed", {
+                                      variant: "success",
+                                    }),
+                                  onError: (e) =>
+                                    enqueueSnackbar(
+                                      e?.response?.data?.message || "Failed",
+                                      { variant: "error" },
+                                    ),
+                                  onSettled: () => setVolunteerActionId(null),
+                                },
+                              );
+                              return;
+                            }
+
+                            assignVolunteer(
+                              {
+                                competitionId: competition.id,
+                                volunteerUserId: volunteerId,
+                              },
+                              {
+                                onSuccess: () =>
+                                  enqueueSnackbar("Volunteer assigned", {
+                                    variant: "success",
+                                  }),
+                                onError: (err) =>
+                                  enqueueSnackbar(
+                                    err?.response?.data?.message || "Failed",
+                                    { variant: "error" },
+                                  ),
+                                onSettled: () => setVolunteerActionId(null),
+                              },
+                            );
+                          }}
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1.5,
+                            px: 2,
+                            py: 1.5,
+                            cursor:
+                              rowBusy || assigningVol
+                                ? "not-allowed"
+                                : "pointer",
+                            transition: "background 0.1s",
+                            background: checked
+                              ? "rgba(168,85,247,0.06)"
+                              : "transparent",
+                            opacity: rowBusy ? 0.65 : 1,
+                            "&:hover": {
+                              background: checked
+                                ? "rgba(168,85,247,0.09)"
+                                : "rgba(255,255,255,0.02)",
+                            },
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: 16,
+                              height: 16,
+                              borderRadius: "4px",
+                              flexShrink: 0,
+                              border: checked
+                                ? "1px solid rgba(168,85,247,0.6)"
+                                : "1px solid rgba(255,255,255,0.15)",
+                              background: checked
+                                ? "rgba(168,85,247,0.25)"
+                                : "transparent",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            {rowBusy ? (
+                              <CircularProgress
+                                size={9}
+                                sx={{ color: checked ? "#c084fc" : "#94a3b8" }}
+                              />
+                            ) : (
+                              checked && (
+                                <Box
+                                  sx={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: "2px",
+                                    background: "#c084fc",
+                                  }}
+                                />
+                              )
+                            )}
+                          </Box>
+                          <Avatar
+                            sx={{
+                              width: 28,
+                              height: 28,
+                              background: "rgba(59,130,246,0.35)",
+                              fontSize: 11,
+                            }}
+                          >
+                            {name.charAt(0).toUpperCase()}
+                          </Avatar>
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Typography
+                              sx={{
+                                fontSize: 13,
+                                color: "#e4e4e7",
+                                fontFamily: "'Syne', sans-serif",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {name}
+                            </Typography>
+                            <Typography
+                              sx={{
+                                fontSize: 11,
+                                color: "rgba(255,255,255,0.25)",
+                                fontFamily: "'DM Mono', monospace",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {email}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        {idx < filteredAllVolunteers.length - 1 && (
+                          <Box
+                            sx={{
+                              height: "1px",
+                              background: "rgba(255,255,255,0.04)",
+                            }}
+                          />
+                        )}
+                      </Box>
+                    );
+                  })
+                )}
+              </Box>
             )}
           </Box>
         )}
@@ -1106,159 +1278,412 @@ function ManageDialog({ competition, open, onClose }) {
         {/* Clubs tab */}
         {tab === "clubs" && (
           <Box>
-            <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
-              <select
-                value={selectedClubId}
-                onChange={(e) => setSelectedClubId(e.target.value)}
+            <Box sx={{ position: "relative", mb: 1.5 }}>
+              <Box
+                sx={{
+                  position: "absolute",
+                  left: 11,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  pointerEvents: "none",
+                }}
+              >
+                <Search size={12} color="rgba(255,255,255,0.25)" />
+              </Box>
+              <input
+                value={clubSearch}
+                onChange={(e) => setClubSearch(e.target.value)}
+                placeholder="Search clubs…"
                 style={{
-                  flex: 1,
-                  padding: "8px 12px",
+                  width: "100%",
+                  padding: "8px 12px 8px 30px",
                   background: "rgba(255,255,255,0.04)",
                   border: "1px solid rgba(255,255,255,0.08)",
                   borderRadius: 8,
-                  color: "rgba(255,255,255,0.65)",
+                  color: "rgba(255,255,255,0.75)",
                   fontSize: 13,
                   fontFamily: "'Syne', sans-serif",
                   outline: "none",
+                  boxSizing: "border-box",
                 }}
-              >
-                <option value="">Select a club…</option>
-                {availableClubs.map((c) => (
-                  <option
-                    key={c.id}
-                    value={c.id}
-                    style={{ background: "#0e0e0e" }}
-                  >
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <SmallActionBtn
-                onClick={() => {
-                  if (!selectedClubId) return;
-                  assignClub(
-                    { competitionId: competition.id, clubId: selectedClubId },
-                    {
-                      onSuccess: () => {
-                        enqueueSnackbar("Club assigned", {
-                          variant: "success",
-                        });
-                        setSelectedClubId("");
-                      },
-                      onError: (err) =>
-                        enqueueSnackbar(
-                          err?.response?.data?.message || "Failed",
-                          { variant: "error" },
-                        ),
-                    },
-                  );
-                }}
-                color="#2dd4bf"
-                hoverBg="rgba(45,212,191,0.1)"
-                disabled={!selectedClubId || assigningClub}
-              >
-                {assigningClub ? (
-                  <CircularProgress size={11} sx={{ color: "#2dd4bf" }} />
-                ) : (
-                  <Building2 size={11} />
-                )}
-                Add
-              </SmallActionBtn>
+              />
             </Box>
             {compClubsLoading ? (
               <LoadingState message="Loading…" size="small" />
-            ) : competitionClubs.length === 0 ? (
-              <Typography
+            ) : (
+              <Box
                 sx={{
-                  color: "rgba(255,255,255,0.15)",
-                  fontSize: 12,
-                  fontFamily: "'DM Mono', monospace",
-                  py: 2,
+                  maxHeight: 320,
+                  overflowY: "auto",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: "10px",
                 }}
               >
-                No clubs assigned yet
-              </Typography>
-            ) : (
-              competitionClubs.map((c) => {
-                const name = c.club?.name || c.name || "—";
-                const clubId = c.clubId || c.id;
-                return (
-                  <Box
-                    key={clubId}
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1.5,
-                      py: 1.25,
-                      borderBottom: "1px solid rgba(255,255,255,0.04)",
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: "8px",
-                        background: "rgba(45,212,191,0.15)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <Building2 size={13} color="#2dd4bf" />
-                    </Box>
+                {filteredAllClubs.length === 0 ? (
+                  <Box sx={{ py: 4, textAlign: "center" }}>
                     <Typography
                       sx={{
-                        flex: 1,
-                        fontSize: 13,
-                        color: "#e4e4e7",
+                        fontSize: 12,
+                        color: "rgba(255,255,255,0.2)",
                         fontFamily: "'Syne', sans-serif",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
                       }}
                     >
-                      {name}
+                      No clubs found
                     </Typography>
-                    <button
-                      type="button"
-                      disabled={removingClubId === clubId}
-                      onClick={() => {
-                        setRemovingClubId(clubId);
-                        removeClub(
-                          { competitionId: competition.id, clubId },
-                          {
-                            onSuccess: () =>
-                              enqueueSnackbar("Club removed", {
-                                variant: "success",
-                              }),
-                            onError: (e) =>
-                              enqueueSnackbar(
-                                e?.response?.data?.message || "Failed",
-                                { variant: "error" },
-                              ),
-                            onSettled: () => setRemovingClubId(null),
-                          },
-                        );
-                      }}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        cursor: "pointer",
-                        color: "#f87171",
-                        padding: 4,
-                        lineHeight: 0,
+                  </Box>
+                ) : (
+                  filteredAllClubs.map((c, idx) => {
+                    const name = c.name || "—";
+                    const clubId = c.id;
+                    const checked = assignedClubIds.has(clubId);
+                    const rowBusy = clubActionId === clubId;
+
+                    return (
+                      <Box key={clubId}>
+                        <Box
+                          onClick={() => {
+                            if (rowBusy || assigningClub) return;
+                            setClubActionId(clubId);
+
+                            if (checked) {
+                              removeClub(
+                                { competitionId: competition.id, clubId },
+                                {
+                                  onSuccess: () =>
+                                    enqueueSnackbar("Club removed", {
+                                      variant: "success",
+                                    }),
+                                  onError: (e) =>
+                                    enqueueSnackbar(
+                                      e?.response?.data?.message || "Failed",
+                                      { variant: "error" },
+                                    ),
+                                  onSettled: () => setClubActionId(null),
+                                },
+                              );
+                              return;
+                            }
+
+                            assignClub(
+                              { competitionId: competition.id, clubId },
+                              {
+                                onSuccess: () =>
+                                  enqueueSnackbar("Club assigned", {
+                                    variant: "success",
+                                  }),
+                                onError: (err) =>
+                                  enqueueSnackbar(
+                                    err?.response?.data?.message || "Failed",
+                                    { variant: "error" },
+                                  ),
+                                onSettled: () => setClubActionId(null),
+                              },
+                            );
+                          }}
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1.5,
+                            px: 2,
+                            py: 1.5,
+                            cursor:
+                              rowBusy || assigningClub
+                                ? "not-allowed"
+                                : "pointer",
+                            transition: "background 0.1s",
+                            background: checked
+                              ? "rgba(168,85,247,0.06)"
+                              : "transparent",
+                            opacity: rowBusy ? 0.65 : 1,
+                            "&:hover": {
+                              background: checked
+                                ? "rgba(168,85,247,0.09)"
+                                : "rgba(255,255,255,0.02)",
+                            },
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: 16,
+                              height: 16,
+                              borderRadius: "4px",
+                              flexShrink: 0,
+                              border: checked
+                                ? "1px solid rgba(168,85,247,0.6)"
+                                : "1px solid rgba(255,255,255,0.15)",
+                              background: checked
+                                ? "rgba(168,85,247,0.25)"
+                                : "transparent",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            {rowBusy ? (
+                              <CircularProgress
+                                size={9}
+                                sx={{ color: checked ? "#c084fc" : "#94a3b8" }}
+                              />
+                            ) : (
+                              checked && (
+                                <Box
+                                  sx={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: "2px",
+                                    background: "#c084fc",
+                                  }}
+                                />
+                              )
+                            )}
+                          </Box>
+                          <Box
+                            sx={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: "8px",
+                              background: "rgba(45,212,191,0.15)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Building2 size={13} color="#2dd4bf" />
+                          </Box>
+                          <Typography
+                            sx={{
+                              flex: 1,
+                              fontSize: 13,
+                              color: "#e4e4e7",
+                              fontFamily: "'Syne', sans-serif",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {name}
+                          </Typography>
+                        </Box>
+                        {idx < filteredAllClubs.length - 1 && (
+                          <Box
+                            sx={{
+                              height: "1px",
+                              background: "rgba(255,255,255,0.04)",
+                            }}
+                          />
+                        )}
+                      </Box>
+                    );
+                  })
+                )}
+              </Box>
+            )}
+          </Box>
+        )}
+
+        {tab === "departments" && user?.role === "SA" && (
+          <Box>
+            <Box sx={{ position: "relative", mb: 1.5 }}>
+              <Box
+                sx={{
+                  position: "absolute",
+                  left: 11,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  pointerEvents: "none",
+                }}
+              >
+                <Search size={12} color="rgba(255,255,255,0.25)" />
+              </Box>
+              <input
+                value={departmentSearch}
+                onChange={(e) => setDepartmentSearch(e.target.value)}
+                placeholder="Search departments…"
+                style={{
+                  width: "100%",
+                  padding: "8px 12px 8px 30px",
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 8,
+                  color: "rgba(255,255,255,0.75)",
+                  fontSize: 13,
+                  fontFamily: "'Syne', sans-serif",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </Box>
+            {compDepartmentsLoading ? (
+              <LoadingState message="Loading…" size="small" />
+            ) : (
+              <Box
+                sx={{
+                  maxHeight: 320,
+                  overflowY: "auto",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: "10px",
+                }}
+              >
+                {filteredAllDepartments.length === 0 ? (
+                  <Box sx={{ py: 4, textAlign: "center" }}>
+                    <Typography
+                      sx={{
+                        fontSize: 12,
+                        color: "rgba(255,255,255,0.2)",
+                        fontFamily: "'Syne', sans-serif",
                       }}
                     >
-                      {removingClubId === clubId ? (
-                        <CircularProgress size={11} sx={{ color: "#f87171" }} />
-                      ) : (
-                        <Trash2 size={13} />
-                      )}
-                    </button>
+                      No departments found
+                    </Typography>
                   </Box>
-                );
-              })
+                ) : (
+                  filteredAllDepartments.map((d, idx) => {
+                    const name = d.name || "—";
+                    const departmentId = d.id;
+                    const checked = assignedDepartmentIds.has(departmentId);
+                    const rowBusy = departmentActionId === departmentId;
+
+                    return (
+                      <Box key={departmentId}>
+                        <Box
+                          onClick={() => {
+                            if (rowBusy || assigningDepartment) return;
+                            setDepartmentActionId(departmentId);
+
+                            if (checked) {
+                              removeDepartment(
+                                { competitionId: competition.id, departmentId },
+                                {
+                                  onSuccess: () =>
+                                    enqueueSnackbar("Department removed", {
+                                      variant: "success",
+                                    }),
+                                  onError: (e) =>
+                                    enqueueSnackbar(
+                                      e?.response?.data?.message || "Failed",
+                                      { variant: "error" },
+                                    ),
+                                  onSettled: () => setDepartmentActionId(null),
+                                },
+                              );
+                              return;
+                            }
+
+                            assignDepartment(
+                              { competitionId: competition.id, departmentId },
+                              {
+                                onSuccess: () =>
+                                  enqueueSnackbar("Department assigned", {
+                                    variant: "success",
+                                  }),
+                                onError: (err) =>
+                                  enqueueSnackbar(
+                                    err?.response?.data?.message || "Failed",
+                                    { variant: "error" },
+                                  ),
+                                onSettled: () => setDepartmentActionId(null),
+                              },
+                            );
+                          }}
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1.5,
+                            px: 2,
+                            py: 1.5,
+                            cursor:
+                              rowBusy || assigningDepartment
+                                ? "not-allowed"
+                                : "pointer",
+                            transition: "background 0.1s",
+                            background: checked
+                              ? "rgba(168,85,247,0.06)"
+                              : "transparent",
+                            opacity: rowBusy ? 0.65 : 1,
+                            "&:hover": {
+                              background: checked
+                                ? "rgba(168,85,247,0.09)"
+                                : "rgba(255,255,255,0.02)",
+                            },
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: 16,
+                              height: 16,
+                              borderRadius: "4px",
+                              flexShrink: 0,
+                              border: checked
+                                ? "1px solid rgba(168,85,247,0.6)"
+                                : "1px solid rgba(255,255,255,0.15)",
+                              background: checked
+                                ? "rgba(168,85,247,0.25)"
+                                : "transparent",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            {rowBusy ? (
+                              <CircularProgress
+                                size={9}
+                                sx={{ color: checked ? "#c084fc" : "#94a3b8" }}
+                              />
+                            ) : (
+                              checked && (
+                                <Box
+                                  sx={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: "2px",
+                                    background: "#c084fc",
+                                  }}
+                                />
+                              )
+                            )}
+                          </Box>
+                          <Box
+                            sx={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: "8px",
+                              background: "rgba(96,165,250,0.15)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Building2 size={13} color="#60a5fa" />
+                          </Box>
+                          <Typography
+                            sx={{
+                              flex: 1,
+                              fontSize: 13,
+                              color: "#e4e4e7",
+                              fontFamily: "'Syne', sans-serif",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {name}
+                          </Typography>
+                        </Box>
+                        {idx < filteredAllDepartments.length - 1 && (
+                          <Box
+                            sx={{
+                              height: "1px",
+                              background: "rgba(255,255,255,0.04)",
+                            }}
+                          />
+                        )}
+                      </Box>
+                    );
+                  })
+                )}
+              </Box>
             )}
           </Box>
         )}

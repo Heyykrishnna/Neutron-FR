@@ -320,9 +320,11 @@ export function useRemoveVolunteer() {
  */
 export function useCompetitionClubs(competitionId) {
   return useQuery({
-    queryKey: ['competitions', competitionId, 'clubs'],
+    queryKey: ["competitions", competitionId, "clubs"],
     queryFn: async () => {
-      const { data } = await apiClient.get(`/competitions/${competitionId}/clubs`);
+      const { data } = await apiClient.get(
+        `/competitions/${competitionId}/clubs`,
+      );
       return data?.data?.clubs || [];
     },
     enabled: !!competitionId,
@@ -336,11 +338,16 @@ export function useAssignClubToCompetition() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ competitionId, clubId }) => {
-      const { data } = await apiClient.post(`/competitions/${competitionId}/clubs`, { clubId });
+      const { data } = await apiClient.post(
+        `/competitions/${competitionId}/clubs`,
+        { clubId },
+      );
       return data;
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['competitions', variables.competitionId, 'clubs'] });
+      queryClient.invalidateQueries({
+        queryKey: ["competitions", variables.competitionId, "clubs"],
+      });
     },
   });
 }
@@ -352,11 +359,72 @@ export function useRemoveClubFromCompetition() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ competitionId, clubId }) => {
-      const { data } = await apiClient.delete(`/competitions/${competitionId}/clubs/${clubId}`);
+      const { data } = await apiClient.delete(
+        `/competitions/${competitionId}/clubs/${clubId}`,
+      );
       return data;
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['competitions', variables.competitionId, 'clubs'] });
+      queryClient.invalidateQueries({
+        queryKey: ["competitions", variables.competitionId, "clubs"],
+      });
+    },
+  });
+}
+
+/**
+ * Get departments assigned to a competition (SA)
+ */
+export function useCompetitionDepartments(competitionId) {
+  return useQuery({
+    queryKey: ["competitions", competitionId, "departments"],
+    queryFn: async () => {
+      const { data } = await apiClient.get(
+        `/competitions/${competitionId}/departments`,
+      );
+      return data?.data?.departments || [];
+    },
+    enabled: !!competitionId,
+  });
+}
+
+/**
+ * Assign a department to a competition (SA)
+ */
+export function useAssignDepartmentToCompetition() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ competitionId, departmentId }) => {
+      const { data } = await apiClient.post(
+        `/competitions/${competitionId}/departments`,
+        { departmentId },
+      );
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["competitions", variables.competitionId, "departments"],
+      });
+    },
+  });
+}
+
+/**
+ * Remove a department from a competition (SA)
+ */
+export function useRemoveDepartmentFromCompetition() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ competitionId, departmentId }) => {
+      const { data } = await apiClient.delete(
+        `/competitions/${competitionId}/departments/${departmentId}`,
+      );
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["competitions", variables.competitionId, "departments"],
+      });
     },
   });
 }

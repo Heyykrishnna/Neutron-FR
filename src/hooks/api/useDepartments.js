@@ -30,16 +30,19 @@ const normalizeDepartment = (dept) => ({
  * Fetch all departments
  */
 export function useDepartments(filters = {}) {
+  const { enabled = true, ...params } = filters || {};
+
   return useQuery({
-    queryKey: queryKeys.departments.list(filters),
+    queryKey: queryKeys.departments.list(params),
     queryFn: async () => {
       const { data } = await apiClient.get("/sa/departments", {
-        params: filters,
+        params,
       });
 
       const departments = data?.data?.departments || data?.departments || [];
       return departments.map(normalizeDepartment);
     },
+    enabled,
   });
 }
 
