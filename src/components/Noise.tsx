@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useRef, useEffect } from 'react';
 
 interface NoiseProps {
@@ -87,11 +89,13 @@ const Noise: React.FC<NoiseProps> = ({
 
   return (
     <canvas
-      className={`pointer-events-none absolute top-0 left-0 ${className}`.trim()}
+      className={`pointer-events-none fixed inset-0 ${className}`.trim()}
       ref={grainRef}
       style={{
         imageRendering: 'pixelated',
-        ...(fullScreen ? { width: '100vw', height: '100vh' } : { width: '100%', height: '100%' })
+        width: '100vw',
+        height: '100vh',
+        zIndex: 0
       }}
     />
   );

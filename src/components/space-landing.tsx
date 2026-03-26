@@ -16,6 +16,9 @@ import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 import { PLANET_RECORDS } from "@/lib/planet-data";
 import NebulaStar from "./nebula-star";
 import Noise from "./Noise";
+import Grainient from "./Grainient";
+import MobileLanding from "./MobileLanding";
+import MobileNavbar from "./MobileNavbar";
 
 type PlanetRuntimeEntry = {
   slug: string;
@@ -122,6 +125,17 @@ export default function SpaceLanding() {
   const [hoveredPlanet, setHoveredPlanet] = useState<string | null>(null);
   const [videoOpacity, setVideoOpacity] = useState(1);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const currentPlanet = PLANET_RECORDS.find((p) => p.slug === activePlanet) ?? PLANET_RECORDS[0];
 
@@ -294,6 +308,19 @@ export default function SpaceLanding() {
   return (
     <MotionConfig transition={{ type: "spring", stiffness: 240, damping: 28 }}>
       <div className="relative min-h-[50000svh] overflow-x-clip">
+        
+        {isMobile && (
+          <div className="fixed inset-0 z-100 h-screen w-full pointer-events-auto">
+            <MobileLanding 
+              isMenuOpen={isMobileMenuOpen} 
+              onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
+            />
+            <MobileNavbar 
+              isOpen={isMobileMenuOpen} 
+              onClose={() => setIsMobileMenuOpen(false)} 
+            />
+          </div>
+        )}
 
         <style>{`
           @keyframes drift-stars    { from{transform:translate(0,0)} to{transform:translate(-22px,-18px)} }
@@ -323,8 +350,20 @@ export default function SpaceLanding() {
         <div
           aria-hidden
           className="pointer-events-none fixed inset-0 z-0"
-          style={{ background: "linear-gradient(180deg,rgba(10,4,0,0.2) 0%,rgba(4,2,0,0.6) 100%)" }}
+          style={{ background: "linear-gradient(180deg,rgba(5,5,5,0.4) 0%,rgba(5,5,5,0.95) 100%)" }}
         />
+
+         <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.14]">
+            <Grainient
+               color1="#3e2723"
+               color2="#5d4037"
+               color3="#0d0a08"
+               timeSpeed={0.2}
+               warpStrength={0.6}
+               zoom={1.2}
+               className="w-full h-full"
+             />
+         </div>
 
         <div aria-hidden className="pointer-events-none fixed inset-0 z-1 overflow-hidden">
           <div
