@@ -232,7 +232,9 @@ export default function RegistrationsPage() {
       });
     } catch (err) {
       enqueueSnackbar(
-        err?.response?.data?.message || err?.message || "Failed to approve team",
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to approve team",
         { variant: "error" },
       );
     } finally {
