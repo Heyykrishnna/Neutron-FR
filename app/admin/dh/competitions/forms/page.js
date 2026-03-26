@@ -593,7 +593,7 @@ function FormBuilderDialog({
   );
 
   const isCompetitionFixed = !isEdit && Boolean(preselectedCompetitionId);
-  const isClosesAtLocked = !isEdit && Boolean(registrationDeadlineLocal);
+  const isClosesAtLocked = Boolean(registrationDeadlineLocal);
 
   useEffect(() => {
     if (!open) return;
@@ -629,14 +629,14 @@ function FormBuilderDialog({
   }, [open, isEdit, formDetails, preselectedCompetitionId]);
 
   useEffect(() => {
-    if (!open || isEdit) return;
+    if (!open) return;
     if (!registrationDeadlineLocal) return;
     setClosesAt((current) =>
       current === registrationDeadlineLocal
         ? current
         : registrationDeadlineLocal,
     );
-  }, [open, isEdit, registrationDeadlineLocal]);
+  }, [open, registrationDeadlineLocal]);
 
   const stepOneValidation = useMemo(() => {
     if (!competitionId) {
@@ -662,6 +662,9 @@ function FormBuilderDialog({
 
     const opens = new Date(opensAt);
     const closes = new Date(closesAt);
+    const competitionDeadline = selectedCompetition?.registrationDeadline
+      ? new Date(selectedCompetition.registrationDeadline)
+      : null;
 
     if (Number.isNaN(opens.getTime()) || Number.isNaN(closes.getTime())) {
       return {
@@ -677,8 +680,36 @@ function FormBuilderDialog({
       };
     }
 
+    if (
+      competitionDeadline &&
+      !Number.isNaN(competitionDeadline.getTime()) &&
+      closes.getTime() !== competitionDeadline.getTime()
+    ) {
+      return {
+        valid: false,
+        message: "Closing time is locked to competition registration deadline.",
+      };
+    }
+
+    if (
+      competitionDeadline &&
+      !Number.isNaN(competitionDeadline.getTime()) &&
+      opens >= competitionDeadline
+    ) {
+      return {
+        valid: false,
+        message:
+          "Form opening time must be before competition registration deadline.",
+      };
+    }
+
     return { valid: true, message: "" };
-  }, [competitionId, opensAt, closesAt]);
+  }, [
+    competitionId,
+    opensAt,
+    closesAt,
+    selectedCompetition?.registrationDeadline,
+  ]);
 
   const isStepOneValid = stepOneValidation.valid;
 

@@ -86,6 +86,10 @@ const BACKEND_FIELD_TOKEN_TO_FORM_FIELD = {
 
 const ERROR_MESSAGE_MAP = {
   INVALID_SCHEDULE_RANGE: "Event end time must be after start time",
+  INVALID_START_TIME_NOT_IN_FUTURE: "Event start time must be in the future",
+  INVALID_END_TIME_NOT_IN_FUTURE: "Event end time must be in the future",
+  INVALID_REGISTRATION_DEADLINE_NOT_IN_FUTURE:
+    "Registration deadline must be in the future",
   INVALID_REGISTRATION_DEADLINE:
     "Registration deadline must be before event start time",
   INVALID_PROMO_CODES_FORMAT: "Promo codes have invalid format or values",

@@ -235,6 +235,7 @@ export const competitionSchema = z
     promoCodes: z.array(promoCodeSchema).optional(),
   })
   .superRefine((value, ctx) => {
+    const now = new Date();
     const startDate = value.startTime ? new Date(value.startTime) : null;
     const endDate = value.endTime ? new Date(value.endTime) : null;
     const deadlineDate = value.registrationDeadline
@@ -292,11 +293,35 @@ export const competitionSchema = z
       });
     }
 
-    if (deadlineDate && startDate && deadlineDate > startDate) {
+    if (startDate && startDate <= now) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["startTime"],
+        message: "Start time must be in the future",
+      });
+    }
+
+    if (endDate && endDate <= now) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["endTime"],
+        message: "End time must be in the future",
+      });
+    }
+
+    if (deadlineDate && deadlineDate <= now) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["registrationDeadline"],
-        message: "Registration deadline must be on or before start time",
+        message: "Registration deadline must be in the future",
+      });
+    }
+
+    if (deadlineDate && startDate && deadlineDate >= startDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["registrationDeadline"],
+        message: "Registration deadline must be before start time",
       });
     }
 
