@@ -17,7 +17,7 @@ const DISCOVER_LINKS = [
   { name: "About Us", href: "/news" },
   { name: "Competitions", href: "/planets/jupiter" },
   { name: "Events", href: "/planets/venus" },
-  { name: "Our Sponsors", href: "/planets/pluto" },
+  { name: "Campus Ambassador", href: "https://ca.neutronfest.org" },
   { name: "Profile", href: "/profile" }
 ];
 
