@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { getEventBySlug } from "@/lib/events-data";
-import SmoothScroll from "@/components/smooth-scroll";
 import Link from "next/link";
 import React from "react";
 import EventSectionWrapper from "@/components/event-section-wrapper";
@@ -16,7 +15,6 @@ export default async function EventSlugPage({ params }: { params: Promise<{ slug
   }
 
   return (
-    <SmoothScroll>
       <div className="min-h-screen bg-[#030303] text-white selection:bg-white/20 relative font-sans text-pretty">
         
         <div 
@@ -90,6 +88,5 @@ export default async function EventSlugPage({ params }: { params: Promise<{ slug
           }
         `}</style>
       </div>
-    </SmoothScroll>
   );
 }

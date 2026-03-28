@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { getCompetitionBySlug } from "@/lib/competitions-data";
-import SmoothScroll from "@/components/smooth-scroll";
 import Link from "next/link";
 import React from "react";
 import SectionWrapper from "../../../components/competition-section-wrapper";
@@ -16,7 +15,6 @@ export default async function CompetitionSlugPage({ params }: { params: Promise<
   }
 
   return (
-    <SmoothScroll>
       <div className="min-h-screen bg-[#b70000] text-white selection:bg-white/20 relative font-sans text-pretty">
         
         <div 
@@ -90,6 +88,5 @@ export default async function CompetitionSlugPage({ params }: { params: Promise<
           }
         `}</style>
       </div>
-    </SmoothScroll>
   );
 }
