@@ -1,4 +1,43 @@
-// Hook to fetch pending team invites
+
+
+export function useMyRegistrations(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.publicRegistrations.my(),
+    queryFn: async () => {
+      const { data } = await apiClient.get("/registration/my");
+      return Array.isArray(data?.data) ? data.data : [];
+    },
+    enabled,
+  });
+}
+
+export function useTeamInvitePreview(inviteToken: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.publicRegistrations.invitePreview(inviteToken),
+    queryFn: async () => {
+      const { data } = await apiClient.get(
+        `/registration/team/invite/${inviteToken}`,
+      );
+      return data?.data || data;
+    },
+    enabled: Boolean(inviteToken) && enabled,
+    retry: false,
+  });
+}
+
+
+
+export function useTeamDetails(teamId: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.publicRegistrations.team(teamId),
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/registration/team/${teamId}`);
+      return data?.data || data;
+    },
+    enabled: Boolean(teamId) && enabled,
+  });
+}
+
 export function usePendingTeamInvites(enabled = true) {
   return useQuery({
     queryKey: queryKeys.publicRegistrations.pendingInvites(),
@@ -9,6 +48,7 @@ export function usePendingTeamInvites(enabled = true) {
     enabled,
   });
 }
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import apiClient from "@/lib/axios";
 import { queryKeys } from "@/src/lib/queryKeys";

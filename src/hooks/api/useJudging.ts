@@ -1,3 +1,173 @@
+/**
+ * Judges who haven't submitted scores yet (Head Judge / DH)
+ * GET /api/v1/judging/rounds/:roundId/pending-judges
+ */
+export function usePendingJudges(roundId:string) {
+  return useQuery({
+    queryKey: queryKeys.judging.pendingJudges(roundId),
+    queryFn: async () => {
+      const { data } = await apiClient.get(
+        `/judging/rounds/${roundId}/pending-judges`,
+      );
+      return (
+        data?.data?.judges ||
+        data?.judges ||
+        (Array.isArray(data?.data) ? data.data : null) ||
+        (Array.isArray(data) ? data : [])
+      );
+    },
+    enabled: !!roundId,
+  });
+}
+
+/**
+ * Leaderboard for a round
+ * GET /api/v1/judging/rounds/:roundId/leaderboard
+ */
+export function useRoundLeaderboard(roundId:string) {
+  return useQuery({
+    queryKey: queryKeys.judging.leaderboard(roundId),
+    queryFn: async () => {
+      const { data } = await apiClient.get(
+        `/judging/rounds/${roundId}/leaderboard`,
+      );
+      return (
+        data?.data?.leaderboard ||
+        data?.leaderboard ||
+        (Array.isArray(data?.data) ? data.data : null) ||
+        (Array.isArray(data) ? data : [])
+      );
+    },
+    enabled: !!roundId,
+  });
+}
+
+/**
+ * Whether all judges have submitted scores for a round
+ * GET /api/v1/judging/rounds/:roundId/all-scored
+ */
+export function useAllScored(roundId:string) {
+  return useQuery({
+    queryKey: queryKeys.judging.allScored(roundId),
+    queryFn: async () => {
+      const { data } = await apiClient.get(
+        `/judging/rounds/${roundId}/all-scored`,
+      );
+      return data?.data?.allScored ?? data?.allScored ?? false;
+    },
+    enabled: !!roundId,
+  });
+}
+
+/**
+ * Send lock request to SA for a round (Head Judge / DH)
+ * POST /api/v1/judging/rounds/:roundId/lock-request
+ */
+export function useSendLockRequest() {
+  return useMutation({
+    mutationFn: async (roundId:string) => {
+      const { data } = await apiClient.post(
+        `/judging/rounds/${roundId}/lock-request`,
+      );
+      return data;
+    },
+  });
+}
+
+/**
+ * Admin: All rounds for a competition (no judge-assignment check)
+ * GET /api/v1/judging/admin/competitions/:competitionId/rounds
+ */
+export function useAdminCompetitionRounds(competitionId:string) {
+  return useQuery({
+    queryKey: queryKeys.judging.adminRounds(competitionId),
+    queryFn: async () => {
+      const { data } = await apiClient.get(
+        `/judging/admin/competitions/${competitionId}/rounds`,
+      );
+      return (
+        (Array.isArray(data?.data) ? data.data : null) ||
+        (Array.isArray(data) ? data : [])
+      );
+    },
+    enabled: !!competitionId,
+  });
+}
+
+/**
+ * Admin: Approved teams for a competition with prevRoundStatus
+ * GET /api/v1/judging/admin/competitions/:competitionId/teams
+ */
+export function useAdminCompetitionTeams(competitionId:string) {
+  return useQuery({
+    queryKey: queryKeys.judging.adminTeams(competitionId),
+    queryFn: async () => {
+      const { data } = await apiClient.get(
+        `/judging/admin/competitions/${competitionId}/teams`,
+      );
+      return (
+        (Array.isArray(data?.data) ? data.data : null) ||
+        (Array.isArray(data) ? data : [])
+      );
+    },
+    enabled: !!competitionId,
+  });
+}
+
+/**
+ * Admin: All teams in a round with scores and qualification status
+ * GET /api/v1/judging/admin/rounds/:roundId/teams
+ */
+export function useAdminRoundTeams(roundId:string) {
+  return useQuery({
+    queryKey: queryKeys.judging.adminRoundTeams(roundId),
+    queryFn: async () => {
+      const { data } = await apiClient.get(
+        `/judging/admin/rounds/${roundId}/teams`,
+      );
+      return data?.data || data || null;
+    },
+    enabled: !!roundId,
+  });
+}
+
+/**
+ * Score details for a team by the current judge (pre-fills scoring form)
+ * GET /api/v1/judging/rounds/:roundId/teams/:teamId/score-details
+ */
+export function useTeamScoreDetails(roundId:string, teamId:string) {
+  return useQuery({
+    queryKey: queryKeys.judging.teamScoreDetails(roundId, teamId),
+    queryFn: async () => {
+      const { data } = await apiClient.get(
+        `/judging/rounds/${roundId}/teams/${teamId}/score-details`,
+      );
+      return data?.data || data || null;
+    },
+    enabled: !!roundId && !!teamId,
+  });
+}
+
+
+/**
+ * Pending lock requests awaiting SA approval
+ * GET /api/v1/judging/lock-requests/pending
+ */
+export function usePendingLockRequests() {
+  return useQuery({
+    queryKey: queryKeys.judging.pendingLockRequests(),
+    queryFn: async () => {
+      const { data } = await apiClient.get("/judging/lock-requests/pending");
+      return (
+        data?.data?.requests ||
+        data?.requests ||
+        (Array.isArray(data?.data) ? data.data : null) ||
+        (Array.isArray(data) ? data : [])
+      );
+    },
+  });
+}
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/src/lib/queryKeys";
 import apiClient from "@/lib/axios";
