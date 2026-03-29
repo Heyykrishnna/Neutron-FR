@@ -3,15 +3,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-/* ────────────────────────────────────────────────────────────────
-   Full-screen WebGL warp / space-distortion transition overlay.
-   
-   Phases:
-     0 → 0.4s  : warp builds (radial lensing + chromatic abberation)
-     0.4 → 0.9s: intense warp + speed-lines / radial blur
-     0.9 → 1.2s: white flash → fade out → onComplete()
-   ──────────────────────────────────────────────────────────────── */
-
 const VERT = /* glsl */ `
   attribute vec2 position;
   void main(){
@@ -138,7 +129,6 @@ export default function WarpTransition({ active, onComplete }: Props) {
     gl.linkProgram(prog);
     progRef.current = prog;
 
-    // Full-screen quad
     const buf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
@@ -148,7 +138,6 @@ export default function WarpTransition({ active, onComplete }: Props) {
     gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
   }, []);
 
-  // Resize helper
   const resize = useCallback(() => {
     const canvas = canvasRef.current;
     const gl = glRef.current;
@@ -158,7 +147,6 @@ export default function WarpTransition({ active, onComplete }: Props) {
     gl.viewport(0, 0, canvas.width, canvas.height);
   }, []);
 
-  // Animation loop
   const animate = useCallback((now: number) => {
     const gl   = glRef.current;
     const prog = progRef.current;

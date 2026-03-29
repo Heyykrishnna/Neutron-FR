@@ -15,7 +15,6 @@ export const AuthModal = ({ isOpen, onClose, title, children }: AuthModalProps) 
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -24,7 +23,6 @@ export const AuthModal = ({ isOpen, onClose, title, children }: AuthModalProps) 
             className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
           />
           
-          {/* Modal Container */}
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -33,11 +31,10 @@ export const AuthModal = ({ isOpen, onClose, title, children }: AuthModalProps) 
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
               className="w-full max-w-md bg-[#0a0a0a] border border-white/10 rounded-3xl p-8 shadow-2xl pointer-events-auto relative overflow-hidden"
             >
-              {/* Subtle background glow */}
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-1/2 bg-purple-600/10 blur-[80px] -z-10 rounded-full" />
               
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-white to-white/50">
+                <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-linear-to-b from-white to-white/50">
                   {title}
                 </h3>
                 <button

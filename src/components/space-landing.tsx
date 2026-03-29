@@ -11,7 +11,7 @@ import {
   useState,
 } from "react";
 
-import { AnimatePresence, MotionConfig, motion, useSpring, useMotionValue, useTransform } from "framer-motion";
+import { AnimatePresence, MotionConfig, motion, useSpring, useMotionValue, useTransform, useTime } from "framer-motion";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -134,11 +134,18 @@ export default function SpaceLanding() {
   
   const [isEntering, setIsEntering]           = useState(false);
   const [flashOverlay, setFlashOverlay]       = useState(false);
+  const [showScrollIndicator, setShowScrollIndicator] = useState(true);
 
   const mouseX = useMotionValue(0.5);
   const mouseY = useMotionValue(0.5);
-  const bgXSpring = useSpring(mouseX, { stiffness: 38, damping: 20, mass: 1.4 });
-  const bgYSpring = useSpring(mouseY, { stiffness: 38, damping: 20, mass: 1.4 });
+  const time = useTime();
+  
+  // Subtle drift values based on time
+  const driftX = useTransform(time, (t) => Math.sin(t / 2000) * 0.02);
+  const driftY = useTransform(time, (t) => Math.cos(t / 1800) * 0.02);
+
+  const bgXSpring = useSpring(useTransform(() => mouseX.get() + driftX.get()), { stiffness: 38, damping: 20, mass: 1.4 });
+  const bgYSpring = useSpring(useTransform(() => mouseY.get() + driftY.get()), { stiffness: 38, damping: 20, mass: 1.4 });
   const bgX = useTransform(bgXSpring, [0, 1], ["0%", "100%"]);
   const bgY = useTransform(bgYSpring, [0, 1], ["0%", "100%"]);
 
@@ -271,6 +278,10 @@ export default function SpaceLanding() {
             const activeIndex   = rawIndex % N;
             const next          = PLANET_RECORDS[activeIndex]?.slug ?? PLANET_RECORDS[0].slug;
             if (next !== lastPlanet) { lastPlanet = next; syncActivePlanet(next); }
+
+            if (progress > 0.005 && showScrollIndicator) {
+              setShowScrollIndicator(false);
+            }
           },
         },
       });
@@ -525,47 +536,6 @@ export default function SpaceLanding() {
           )}
         </AnimatePresence>
 
-        <AnimatePresence>
-          {scenePhase === "planets" && (
-            <motion.div
-              key="planets-ui"
-              className="pointer-events-none fixed inset-0 z-10"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.7, delay: 0.1 }}
-            >
-              <motion.button
-                className="pointer-events-auto fixed top-20 right-6 z-20"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.6 }}
-                onClick={() => {
-                  window.scrollTo({ top: 0, behavior: "instant" });
-                  progressRef.current = 0;
-                  setScenePhase("landing");
-                  setRuntimeState("loading");
-                  setPlanetPositions([]);
-                }}
-                style={{
-                  fontFamily: "monospace",
-                  fontSize: "0.65rem",
-                  letterSpacing: "0.22em",
-                  textTransform: "uppercase",
-                  color: "rgba(255,180,80,0.7)",
-                  background: "rgba(0,0,0,0.55)",
-                  border: "1px solid rgba(255,160,40,0.25)",
-                  backdropFilter: "blur(10px)",
-                  padding: "0.45rem 0.9rem",
-                  cursor: "pointer",
-                  clipPath: "polygon(4px 0%,calc(100% - 4px) 0%,100% 4px,100% calc(100% - 4px),calc(100% - 4px) 100%,4px 100%,0% calc(100% - 4px),0% 4px)",
-                }}
-              >
-                ← Exit
-              </motion.button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         <a href="/" className="fixed top-6 left-6 z-50 transition-transform duration-300 hover:scale-110" aria-label="Neutron Home">
           <Image
             src="/neutron.png"
@@ -713,7 +683,7 @@ export default function SpaceLanding() {
               { label: "Terms",   href: "/terms",   drift: "star-link-a 9s ease-in-out infinite",  delay: "0s"   },
               { label: "Privacy", href: "/privacy", drift: "star-link-b 11s ease-in-out infinite", delay: "1.4s" },
               { label: "Contact", href: "/contact", drift: "star-link-c 13s ease-in-out infinite", delay: "0.6s" },
-              { label: "About",   href: "/about",   drift: "star-link-d 10s ease-in-out infinite", delay: "2s"   },
+              // { label: "About",   href: "/about",   drift: "star-link-d 10s ease-in-out infinite", delay: "2s"   },
               { label: "FAQ",     href: "/faq",     drift: "star-link-e 12s ease-in-out infinite", delay: "0.9s" },
             ].map(({ label, href, drift, delay }, index) => {
               const pos = planetPositions[index];
@@ -764,6 +734,27 @@ export default function SpaceLanding() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.4, ease: "easeInOut" }}
             />
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {scenePhase === "planets" && showScrollIndicator && (
+            <motion.div
+              className="fixed bottom-12 left-1/2 z-50 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 1, delay: 1 }}
+            >
+              <p className="text-[0.7rem] uppercase tracking-[0.4em] text-black/50 font-primary font-bold">
+                Scroll to Explore
+              </p>
+              <motion.div 
+                className="w-px h-12 bg-linear-to-b from-black/40 to-transparent"
+                animate={{ scaleY: [0, 1, 0], opacity: [0, 1, 0] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                style={{ originY: 0 }}
+              />
+            </motion.div>
           )}
         </AnimatePresence>
       </div>

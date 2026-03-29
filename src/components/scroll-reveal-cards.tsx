@@ -21,11 +21,10 @@ export function ScrollRevealCards({ prizePool, location, teamSize }: ScrollRevea
   
   const titleOpacity = useTransform(scrollYProgress, [0.15, 0.25], [0, 1]);
   const titleY = useTransform(scrollYProgress, [0.15, 0.25], [20, 0]);
-
-  const gap = 0; // Fixed gap to 0 to keep cards joined
+  const gap = 0;
   
   const outerBorderRadiusRound = useTransform(scrollYProgress, [0, 0.25], [0, 24]);
-  const innerBorderRadiusRound = 0; // Keep inner corners sharp to hide lines
+  const innerBorderRadiusRound = 0;
 
   const leftRadius = useMotionTemplate`${outerBorderRadiusRound}px ${innerBorderRadiusRound}px ${innerBorderRadiusRound}px ${outerBorderRadiusRound}px`;
   const centerRadius = useMotionTemplate`${innerBorderRadiusRound}px ${innerBorderRadiusRound}px ${innerBorderRadiusRound}px ${innerBorderRadiusRound}px`;

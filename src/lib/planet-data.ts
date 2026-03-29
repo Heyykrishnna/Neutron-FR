@@ -68,24 +68,24 @@ export const PLANET_RECORDS: PlanetRecord[] = [
       { label: "Window", value: "96 days" },
     ],
   },
-  {
-    slug: "pluto",
-    name: "Our Sponsors",
-    accent: "#9fd5ff",
-    size: 2.1,
-    kind: "glb",
-    model: "/3D/planets/planet_earth.glb",
-    texture: "/3D/planets/pluto/textures/pluto.jpeg",
-    eyebrow: "Outer drift",
-    headline: "A colder transfer line where the motion opens up and the scene starts to breathe.",
-    summary:
-      "Pluto is deliberately lighter and farther in the composition so it feels like the route slips out of the crowded inner system.",
-    stats: [
-      { label: "Route", value: "Drift-32" },
-      { label: "Velocity", value: "9.1 km/s" },
-      { label: "Window", value: "402 days" },
-    ],
-  },
+  // {
+  //   slug: "pluto",
+  //   name: "Our Sponsors",
+  //   accent: "#9fd5ff",
+  //   size: 2.1,
+  //   kind: "glb",
+  //   model: "/3D/planets/planet_earth.glb",
+  //   texture: "/3D/planets/pluto/textures/pluto.jpeg",
+  //   eyebrow: "Outer drift",
+  //   headline: "A colder transfer line where the motion opens up and the scene starts to breathe.",
+  //   summary:
+  //     "Pluto is deliberately lighter and farther in the composition so it feels like the route slips out of the crowded inner system.",
+  //   stats: [
+  //     { label: "Route", value: "Drift-32" },
+  //     { label: "Velocity", value: "9.1 km/s" },
+  //     { label: "Window", value: "402 days" },
+  //   ],
+  // },
   {
     slug: "moon",
     name: "Gallery",
