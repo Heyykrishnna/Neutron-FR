@@ -627,7 +627,7 @@ function LogsTab() {
             sx={{
               borderRadius: "12px",
               border: "1px solid rgba(255,255,255,0.06)",
-              overflow: "hidden",
+      
               background: "#0c0c0c",
             }}
           >
@@ -661,7 +661,7 @@ function LogsTab() {
             <Box
               sx={{
                 maxHeight: "min(62vh, 620px)",
-                overflowY: "auto",
+                overflowY: "scroll",
                 overflowX: "hidden",
               }}
             >

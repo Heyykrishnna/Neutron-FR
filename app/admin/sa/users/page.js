@@ -736,7 +736,6 @@ function UsersPageContent() {
         sx={{
           borderRadius: "12px",
           border: "1px solid rgba(255,255,255,0.06)",
-          overflow: "hidden",
           background: "#0c0c0c",
         }}
       >
@@ -768,7 +767,7 @@ function UsersPageContent() {
         <Box
           sx={{
             maxHeight: "min(62vh, 620px)",
-            overflowY: "auto",
+            overflowY: "scroll",
             overflowX: "hidden",
           }}
         >
@@ -788,7 +787,9 @@ function UsersPageContent() {
             </Box>
           ) : (
             filteredUsers.map((user, idx) => (
-              <Box key={user.id}>
+              <Box key={user.id}
+              
+              >
                 <Box
                   sx={{
                     display: "grid",
@@ -808,6 +809,7 @@ function UsersPageContent() {
                       gap: 1.5,
                       minWidth: 0,
                     }}
+                    
                   >
                     <UserAvatar name={user.name} />
                     <Box sx={{ minWidth: 0 }}>
