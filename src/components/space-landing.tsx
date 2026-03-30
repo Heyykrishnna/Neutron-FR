@@ -697,7 +697,6 @@ export default function SpaceLanding() {
           <div className="pointer-events-none fixed inset-0 z-25 transition-opacity duration-1000" style={{ opacity: 1 }}>
             {[
               { label: "Terms",   href: "/terms",   drift: "star-link-a 9s ease-in-out infinite",  delay: "0s"   },
-              { label: "Privacy", href: "/privacy", drift: "star-link-b 11s ease-in-out infinite", delay: "1.4s" },
               { label: "Contact", href: "/contact", drift: "star-link-c 13s ease-in-out infinite", delay: "0.6s" },
               { label: "About",   href: "/about",   drift: "star-link-d 10s ease-in-out infinite", delay: "2s"   },
               { label: "FAQ",     href: "/faq",     drift: "star-link-e 12s ease-in-out infinite", delay: "0.9s" },
