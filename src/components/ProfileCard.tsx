@@ -629,7 +629,7 @@ const ProfileCardComponent: React.FC<ProfileCardProps> = ({
                 <h3
                   className="font-sans font-bold m-0 leading-[1.1] tracking-tight"
                   style={{
-                    fontSize: 'min(8.5vw, 2.5em)',
+                    fontSize: 'min(8.5vw, 2em)',
                     backgroundImage: 'linear-gradient(to bottom, #fff 30%, rgba(255,255,255,0.7) 100%)',
                     WebkitTextFillColor: 'transparent',
                     backgroundClip: 'text',
