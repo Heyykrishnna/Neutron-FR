@@ -1,8 +1,10 @@
 "use client";
 
-import { motion, useScroll, useTransform } from "framer-motion";
-import { useRef, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Image from "next/image";
+import { motion, useSpring } from "framer-motion";
 
 const STORY_SECTIONS = [
   {
@@ -33,87 +35,185 @@ const STORY_SECTIONS = [
 
 export default function AboutStory() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
-
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ["start start", "end end"],
-  });
+  const scrollRef = useRef<HTMLDivElement>(null);
+  
+  const [mousePos, setMousePos] = useState({ x: -100, y: -100 });
+  const [isHovering, setIsHovering] = useState(false);
+  
+  const springConfig = { stiffness: 400, damping: 28, mass: 0.5 };
+  const springX = useSpring(0, springConfig);
+  const springY = useSpring(0, springConfig);
 
   useEffect(() => {
-    const unsubscribe = scrollYProgress.onChange((latest) => {
-      const index = Math.min(
-        STORY_SECTIONS.length - 1,
-        Math.floor(latest * STORY_SECTIONS.length)
-      );
-      if (index !== activeIndex) {
-        setActiveIndex(index);
-      }
-    });
-    return () => unsubscribe();
-  }, [scrollYProgress, activeIndex]);
+    springX.set(mousePos.x);
+    springY.set(mousePos.y);
+  }, [mousePos, springX, springY]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePos({ x: e.clientX, y: e.clientY });
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, []);
+
+  useEffect(() => {
+    gsap.registerPlugin(ScrollTrigger);
+    
+    if (!containerRef.current || !scrollRef.current) return;
+
+    const panels = gsap.utils.toArray<HTMLElement>(".story-panel");
+    const isMobile = window.innerWidth < 768;
+    
+    const ctx = gsap.context(() => {
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: containerRef.current,
+          start: "top top",
+          end: "+=" + (panels.length * 100) + "%",
+          pin: true,
+          scrub: 1,
+        }
+      });
+
+      tl.to(scrollRef.current, {
+        xPercent: -100 * (panels.length - 1) / panels.length,
+        ease: "none"
+      });
+
+      panels.forEach((panel) => {
+        const img = panel.querySelector(".story-image");
+        if (img && !isMobile) {
+            gsap.fromTo(img, 
+                { x: "-15%" },
+                { 
+                    x: "15%",
+                    ease: "none",
+                    scrollTrigger: {
+                        trigger: panel,
+                        containerAnimation: tl,
+                        start: "left right",
+                        end: "right left",
+                        scrub: true
+                    }
+                }
+            );
+        }
+
+        const titleWords = panel.querySelectorAll(".title-word");
+        const textP = panel.querySelector(".story-text");
+        const phase = panel.querySelector(".story-phase");
+
+        gsap.fromTo(titleWords, 
+            { opacity: 0, rotateX: 90, y: 100 },
+            { 
+                opacity: 1, rotateX: 0, y: 0, 
+                stagger: 0.1, 
+                duration: 0.8,
+                ease: "back.out(1.7)",
+                scrollTrigger: {
+                    trigger: panel,
+                    containerAnimation: tl,
+                    start: isMobile ? "left center+=200" : "left center", 
+                    toggleActions: "play reverse play reverse"
+                }
+            }
+        );
+
+        gsap.fromTo([phase, textP], 
+            { opacity: 0, x: -30 },
+            { 
+                opacity: 1, x: 0, 
+                stagger: 0.15,
+                duration: 0.6,
+                ease: "power2.out",
+                scrollTrigger: {
+                    trigger: panel,
+                    containerAnimation: tl,
+                    start: isMobile ? "left center+=200" : "left center",
+                    toggleActions: "play reverse play reverse"
+                }
+            }
+        );
+      });
+
+    }, containerRef);
+
+    return () => ctx.revert();
+  }, []);
 
   return (
-    <section ref={containerRef} className="relative w-full bg-transparent min-h-[350vh]">
-      <div className="flex flex-col md:flex-row gap-8 px-4 md:px-12 pt-24">
-        <div className="w-full md:w-1/2 space-y-[40vh] md:space-y-[60vh] pb-[20vh]">
-          {STORY_SECTIONS.map((section, i) => (
-            <motion.div
-              key={section.id}
-              initial={{ opacity: 0.2, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, ease: "easeOut" }}
-              viewport={{ margin: "-40% 0% -40% 0%", once: false }}
-              className="flex flex-col gap-6"
-            >
-              <span className="text-[#ffb84d] font-mono text-sm tracking-[0.3em] uppercase opacity-70">
-                Chapter 0{section.id}
-              </span>
-              <h2 className="text-[2.5rem] md:text-[3.5rem] font-bold leading-tight tracking-tight text-white mb-4 italic">
-                {section.title}
-              </h2>
-              <p className="text-[1.1rem] md:text-[1.3rem] leading-relaxed text-white/50 max-w-[85%]">
-                {section.text}
-              </p>
-              
-              <div className="block md:hidden w-full aspect-4/3 relative rounded-3xl overflow-hidden mt-8 grayscale-[0.5] hover:grayscale-0 transition-all duration-700">
-                <Image
-                  src={section.image}
-                  alt={section.title}
-                  fill
-                  className="object-cover"
-                />
-              </div>
-            </motion.div>
-          ))}
-        </div>
+    <section 
+      ref={containerRef} 
+      className="relative w-full h-screen bg-[#050505] overflow-hidden md:cursor-none"
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
+    >
+      
+      {isHovering && (
+        <motion.div 
+          className="hidden md:flex fixed top-0 left-0 w-10 h-10 rounded-full border border-[#ffb84d]/50 pointer-events-none z-50 items-center justify-center mix-blend-difference"
+          style={{ x: springX, y: springY, translateX: "-50%", translateY: "-50%" }}
+        >
+          <div className="w-1.5 h-1.5 bg-white rounded-full" />
+        </motion.div>
+      )}
 
-        <div className="hidden md:block w-1/2 sticky top-[20vh] h-[60vh] rounded-[2.5rem] overflow-hidden border border-white/10 group shadow-2xl shadow-white/5">
-          {STORY_SECTIONS.map((section, i) => (
-            <motion.div
-              key={section.id}
-              initial={{ opacity: 0, scale: 1.1 }}
-              animate={{
-                opacity: activeIndex === i ? 1 : 0,
-                scale: activeIndex === i ? 1 : 1.1,
-              }}
-              transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-              className="absolute inset-0 grayscale-[0.4] group-hover:grayscale-0 transition-all duration-1000"
-            >
-              <Image
-                src={section.image}
-                alt={section.title}
-                fill
-                className="object-cover"
-                priority={i === 0}
-              />
-              <div className="absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent opacity-60" />
-            </motion.div>
-          ))}
-          
-          <div className="absolute top-8 left-8 w-12 h-12 border-t border-l border-[#ffb84d]/30 pointer-events-none" />
-          <div className="absolute bottom-8 right-8 w-12 h-12 border-b border-r border-[#ffb84d]/30 pointer-events-none" />
-        </div>
+      <h1 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[15vw] md:text-[25vw] font-black text-transparent opacity-[0.02] pointer-events-none select-none tracking-tighter whitespace-nowrap"
+          style={{ WebkitTextStroke: "1px #ffffff" }}>
+        NEUTRON
+      </h1>
+
+      <div 
+        ref={scrollRef} 
+        className="flex h-full w-[400vw]"
+      >
+        {STORY_SECTIONS.map((section, index) => (
+          <div 
+            key={section.id} 
+            className="story-panel relative w-screen h-full flex items-center justify-center p-6 md:p-24 overflow-hidden shrink-0"
+          >
+            
+            <div className={`w-full max-w-[1400px] mx-auto flex flex-col ${index % 2 !== 0 ? 'md:flex-row-reverse' : 'md:flex-row'} items-center gap-8 md:gap-24 relative z-10`} style={{ perspective: "1000px" }}>
+              
+              <div className="w-full md:w-1/2 h-[35vh] md:h-[65vh] overflow-hidden rounded-[2vw] relative border border-white/5 shadow-2xl backdrop-blur-sm">
+                <div className="absolute inset-0 bg-black/20 z-10 transition-colors duration-700 hover:bg-transparent" />
+                <div className="story-image w-full h-full md:w-[130%] md:h-[130%] absolute md:top-[-15%] md:left-[-15%] top-0 left-0">
+                  <Image 
+                    src={section.image} 
+                    alt={section.title} 
+                    fill 
+                    className="object-cover grayscale hover:grayscale-0 transition-all duration-700 md:hover:scale-105"
+                  />
+                </div>
+              </div>
+
+              <div className="w-full md:w-1/2 flex flex-col justify-center">
+                <div className="overflow-hidden mb-4 md:mb-6">
+                  <span className="story-phase text-[#ffb84d] font-mono text-xs md:text-sm tracking-[0.4em] uppercase block">
+                    Phase 0{section.id}
+                  </span>
+                </div>
+                
+                <h2 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-black text-white mb-6 md:mb-8 tracking-tighter leading-[0.9] uppercase italic" style={{ transformStyle: "preserve-3d" }}>
+                  {section.title.split(" ").map((word, i) => (
+                    <span 
+                      key={i}
+                      className="title-word inline-block mr-[2vw]"
+                    >
+                      {word}
+                    </span>
+                  ))}
+                </h2>
+                
+                <p className="story-text text-sm sm:text-base md:text-xl lg:text-2xl text-white/60 font-light leading-relaxed max-w-xl">
+                  {section.text}
+                </p>
+              </div>
+
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );
