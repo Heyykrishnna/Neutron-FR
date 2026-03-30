@@ -1175,7 +1175,7 @@ export default function RequestsPage() {
                   {filteredApprovals.length === 0 ? (
                     <EmptyRow message="No approvals found" />
                   ) : (
-                    filteredApprovals.map(({ a, idx }: any) => (
+                    filteredApprovals.map((a:any , idx : any) => (
                       <Box key={a.id}>
                         {(() => {
                           const isLocallyHandled = handledApprovalIds.has(a.id);
@@ -1338,7 +1338,7 @@ export default function RequestsPage() {
                 {lockRequests.length === 0 ? (
                   <EmptyRow message="No pending score lock requests" />
                 ) : (
-                  lockRequests.map(({ req, idx }: any) => (
+                  lockRequests.map(( req:any, idx:any) => (
                     <Box key={req.id}>
                       <Box
                         sx={{
@@ -2270,7 +2270,7 @@ export default function RequestsPage() {
                             }}
                           >
                             {formRequestPreview.proposed.fields.map(
-                              ({ field, index }: any) => (
+                              (field:any, index:any) => (
                                 <Box
                                   key={`${field?.label || "field"}-${index}`}
                                 >

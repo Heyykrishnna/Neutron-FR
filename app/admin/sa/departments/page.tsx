@@ -870,7 +870,7 @@ export default function DepartmentsPage() {
               </Typography>
             </Box>
           ) : (
-            filteredDeptHeads.map(({ h, idx }: any) => {
+            filteredDeptHeads.map(( h:any, idx:any ) => {
               const checked = deptHeadIds.includes(h.id);
               return (
                 <Box key={h.id}>

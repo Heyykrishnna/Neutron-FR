@@ -457,7 +457,7 @@ function LogsTab() {
           <StatCard
             label="Anomalies"
             value={(stats.anomalyStats || []).reduce(
-              ({ s, a }: any) => s + Number(a.count),
+              ( s:any, a : any) => s + Number(a.count),
               0,
             )}
             color="#fbbf24"

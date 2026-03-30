@@ -547,7 +547,7 @@ export default function RegistrationsPage() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {group.members.map(({ row, memberIndex }: any) => {
+                    {group.members.map((row:any, memberIndex:any) => {
                       const name = row.user?.name || row.userName || "Unknown";
                       const email = row.user?.email || row.userEmail || "";
                       const registrationId = getRegistrationId(row);

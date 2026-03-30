@@ -6,6 +6,7 @@ import LoaderWrapper from "@/components/LoaderWrapper";
 
 import Noise from "@/components/Noise";
 import SmoothScroll from "@/components/smooth-scroll";
+import ClientProvider from "@/src/providers/ClientProvider";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -28,14 +29,16 @@ export default function RootLayout({
   return (
     <html lang="en" className={cn("antialiased", sora.variable, "font-sans", geist.variable)}>
       <body className={`${sora.className} bg-[#0d0a08] text-white selection:bg-orange-500/30 overflow-x-hidden`}>
-        <Noise patternAlpha={10} className="fixed inset-0 z-100 pointer-events-none opacity-40" />
-        <LoaderWrapper>
-          <SmoothScroll>
-            <div className="relative z-1">
-              {children}
-            </div>
-          </SmoothScroll>
-        </LoaderWrapper>
+        <ClientProvider>
+          <Noise patternAlpha={10} className="fixed inset-0 z-100 pointer-events-none opacity-40" />
+          <LoaderWrapper>
+            <SmoothScroll>
+              <div className="relative z-1">
+                {children}
+              </div>
+            </SmoothScroll>
+          </LoaderWrapper>
+        </ClientProvider>
       </body>
     </html>
   );
