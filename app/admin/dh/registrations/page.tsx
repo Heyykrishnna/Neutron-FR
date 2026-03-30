@@ -206,7 +206,7 @@ export default function RegistrationsPage() {
     const normalized = Array.from(groups.values());
 
     normalized.forEach((group) => {
-      group.members.sort(({ a, b }: any) => {
+      group.members.sort(( a:any, b:any ) => {
         const aIsLeader =
           group.teamId &&
           (a.team?.leaderId || a.teamLeaderId) &&
