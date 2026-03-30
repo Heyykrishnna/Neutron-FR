@@ -82,7 +82,6 @@ const MOCK_GLOBAL_USERS = [
 ];
 
 function isTeamEvent(teamSize: string): boolean {
-  // e.g. "1-3 Members", "2 Members", "4 Members", "Solo"
   const match = teamSize.match(/\d+/g);
   if (!match) return false;
   const max = parseInt(match[match.length - 1]);

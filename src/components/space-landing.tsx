@@ -182,6 +182,8 @@ export default function SpaceLanding() {
       startTransition(() => { 
         if (slug === "mars") {
           router.push("/about"); 
+        } else if (slug === "moon") {
+          router.push("/profile");
         } else {
           router.push(`/planets/${slug}`);
         }
@@ -197,7 +199,15 @@ export default function SpaceLanding() {
   }, []);
 
   useEffect(() => {
-    for (const planet of PLANET_RECORDS) router.prefetch(`/planets/${planet.slug}`);
+    for (const planet of PLANET_RECORDS) {
+      if (planet.slug === "mars") {
+        router.prefetch("/about");
+      } else if (planet.slug === "moon") {
+        router.prefetch("/profile");
+      } else {
+        router.prefetch(`/planets/${planet.slug}`);
+      }
+    }
   }, [router]);
 
   const handleBlackHoleClick = useCallback(() => {

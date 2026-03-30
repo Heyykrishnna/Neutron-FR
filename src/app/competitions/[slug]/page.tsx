@@ -36,7 +36,7 @@ export default async function CompetitionSlugPage({ params }: { params: Promise<
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,transparent_0%,#030303_100%)] z-10 opacity-70" />
         </div>
 
-        <div className="fixed top-8 left-8 z-50 pointer-events-auto">
+        <div className="fixed top-6 md:top-8 left-6 md:left-8 z-50 pointer-events-auto">
           <Link href="/planets/jupiter">
             <div className="flex items-center space-x-4 group cursor-pointer relative overflow-hidden backdrop-blur-xl bg-white/5 border border-white/10 px-4 py-2 rounded-full hover:bg-white/10 hover:border-white/30 transition-all duration-500">
                <div className="flex items-center justify-center bg-black/50 w-8 h-8 rounded-full group-hover:bg-white transition-colors duration-500">
@@ -49,7 +49,7 @@ export default async function CompetitionSlugPage({ params }: { params: Promise<
           </Link>
         </div>
 
-        <main className="relative z-20 mx-auto px-6 md:px-12 lg:px-24 pt-48 pb-40">
+        <main className="relative z-20 mx-auto px-6 md:px-12 lg:px-24 pt-32 md:pt-48 pb-20 md:pb-40">
           <SectionWrapper competition={competition} />
         </main>
 

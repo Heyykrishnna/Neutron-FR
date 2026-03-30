@@ -7,6 +7,7 @@ import EventRegistration from "./event-registration";
 import { StickyScrollCards } from "./sticky-scroll-cards";
 import ScrollReveal from "./ScrollReveal";
 import RulesSection from "./rules-section";
+import { MobileStackedCards } from "./mobile-stacked-cards";
 import { EventRecord } from "@/lib/events-data";
 
 export default function EventSectionWrapper({ event }: { event: EventRecord }) {
@@ -15,6 +16,20 @@ export default function EventSectionWrapper({ event }: { event: EventRecord }) {
     target: targetRef,
     offset: ["start start", "end end"]
   });
+
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  const yPos = useTransform(scrollYProgress, [0, 0.4], [0, -500]);
+  const opacityVal = useTransform(scrollYProgress, [0.35, 0.45], [1, 0]);
+  const dataOpacity = useTransform(scrollYProgress, [0.7, 0.8], [0, 0.5]);
+  const dataY = useTransform(scrollYProgress, [0.7, 0.8], [50, 0]);
 
   return (
     <div className="flex flex-col space-y-32">
@@ -32,15 +47,15 @@ export default function EventSectionWrapper({ event }: { event: EventRecord }) {
         </div>
 
         <div className="absolute -inset-12 bg-white/5 border border-white/10 blur-3xl rounded-[4rem] -z-10 opacity-30"></div>
-        <div className="relative z-10 max-w-[1400px] pt-60">
-          <div className="flex items-center space-x-4 mb-10 overflow-hidden">
+        <div className="relative z-10 max-w-[1400px] pt-40 md:pt-60">
+          <div className="flex items-center space-x-4 mb-8 md:mb-12 overflow-hidden">
             <div className="h-px w-12 bg-white/20"></div>
             <span className="text-white/70 font-mono text-xs tracking-widest uppercase">{event.date}</span>
           </div>
 
           <BlurHeading 
             text={event.title} 
-            className="text-7xl md:text-9xl lg:text-[10rem] font-bold tracking-tighter leading-[0.8] mb-12 uppercase"
+            className="text-5xl md:text-9xl lg:text-[10rem] font-bold tracking-tighter leading-[0.8] mb-16 md:mb-12 uppercase"
             spanClassName="bg-clip-text text-transparent bg-linear-to-b from-white via-white to-white/20 drop-shadow-[0_10px_30px_rgba(255,255,255,0.1)]"
           />
           
@@ -67,14 +82,14 @@ export default function EventSectionWrapper({ event }: { event: EventRecord }) {
           </div>
         </div>
       </div>
-      <div ref={targetRef} className="relative h-[400vh] w-full">
-        <div className="sticky top-0 h-screen flex items-center">
+      <div ref={targetRef} className="relative h-auto lg:h-[400vh] w-full">
+        <div className="relative lg:sticky lg:top-0 lg:h-screen flex items-center">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 w-full items-start">
-            <div className="relative h-screen px-4 py-32 overflow-hidden">
+            <div className="relative h-auto lg:h-screen px-4 py-12 md:py-32 overflow-hidden">
                <motion.div 
                  style={{ 
-                   y: useTransform(scrollYProgress, [0, 0.4], [0, -500]),
-                   opacity: useTransform(scrollYProgress, [0.35, 0.45], [1, 0])
+                   y: isMobile ? 0 : yPos,
+                   opacity: isMobile ? 1 : opacityVal
                  }}
                  className="flex flex-col space-y-12"
                >
@@ -123,8 +138,8 @@ export default function EventSectionWrapper({ event }: { event: EventRecord }) {
                
                <motion.div
                  style={{ 
-                   opacity: useTransform(scrollYProgress, [0.7, 0.8], [0, 0.5]),
-                   y: useTransform(scrollYProgress, [0.7, 0.8], [50, 0])
+                   opacity: isMobile ? 0.2 : dataOpacity,
+                   y: isMobile ? 0 : dataY
                  }}
                  className="absolute inset-x-0 bottom-24 flex items-center justify-start px-4 text-white/20 pointer-events-none"
                >
@@ -145,6 +160,14 @@ export default function EventSectionWrapper({ event }: { event: EventRecord }) {
                  competitionTitle={event.title}
                  category={event.category}
                  eventType={event.eventType}
+               />
+            </div>
+
+            <div className="block lg:hidden mt-0">
+               <MobileStackedCards 
+                 prizePool={event.prizePool}
+                 location={event.location}
+                 teamSize={event.teamSize}
                />
             </div>
           </div>

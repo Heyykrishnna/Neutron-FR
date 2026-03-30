@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useRef, useEffect, useState, useMemo } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import BlurHeading from "./blur-heading";
 import { EVENTS_DATA } from "@/lib/events-data";
 import gsap from "gsap";
+import {Filter, CircleDot, ArrowDownUp, ChevronDown } from "lucide-react";
 
 type CardProps = {
   title: string;
@@ -50,9 +51,9 @@ function EventParallaxCard({ title, description, image, heightClass, delay = 0, 
         <div className="absolute inset-0 z-10 bg-linear-to-t from-black/80 via-black/20 to-transparent transition-opacity duration-500 group-hover:from-black/95" />
 
         <div className="absolute bottom-0 left-0 right-0 z-20 p-8 md:p-10 flex flex-col items-start transition-transform duration-500 group-hover:-translate-y-2">
-          <h2 className="text-3xl md:text-[2.6rem] font-medium tracking-tight leading-[1.05] mb-4 text-white">
+          <h3 className="text-4xl font-bold tracking-tighter leading-tight mb-4 text-white uppercase wrap-break-word">
             {title}
-          </h2>
+          </h3>
           {description && (
             <p className="text-gray-400 text-sm md:text-[15px] leading-relaxed max-w-[90%] font-light mb-6">
               {description}
@@ -103,13 +104,28 @@ export default function EventsPage() {
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [selectedStatus, setSelectedStatus] = useState("All Status");
   const [sortBy, setSortBy] = useState("Default");
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
+  const filterRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setActiveDropdown(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const categories = useMemo(() => {
     const cats = Array.from(new Set(EVENTS_DATA.map(e => e.category)));
     return ["All Categories", ...cats];
   }, []);
 
+
   const statuses = ["All Status", "open", "closed", "postponed", "cancelled"];
+  const sortOptions = ["Default", "Title (A-Z)", "Title (Z-A)", "Date (Newest)", "Date (Oldest)"];
 
   const filteredEvents = useMemo(() => {
     let result = [...EVENTS_DATA];
@@ -184,14 +200,14 @@ export default function EventsPage() {
       </div>
 
       <main className="max-w-[1400px] mx-auto px-6 md:px-12 lg:px-20 pt-32 pb-40">
-        <div className="mb-24 mt-10 max-w-4xl relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-12">
+        <div className="mb-12 md:mb-24 mt-4 md:mt-10 max-w-4xl relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-12">
           <BlurHeading
             text={"Explore the\ncosmic events\nat neutron"}
-            className="text-6xl md:text-[5.5rem] lg:text-[7rem] font-bold uppercase tracking-[-0.03em] leading-[0.92]"
+            className="text-4xl sm:text-5xl md:text-[5.5rem] lg:text-[7rem] font-bold uppercase tracking-[-0.03em] leading-[0.92]"
           />
         </div>
 
-        <div className="relative z-20 mb-16 flex flex-col gap-6">
+        <div className="relative z-20 mb-16 flex flex-col gap-6" ref={filterRef}>
           <div className="flex flex-col md:flex-row gap-4 items-center">
             <div className="relative w-full md:w-[400px]">
               <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
@@ -203,43 +219,144 @@ export default function EventsPage() {
                 type="text" 
                 placeholder="Search events, categories..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setActiveDropdown(null);
+                }}
                 className="w-full h-14 bg-white/5 border border-white/10 rounded-sm pl-12 pr-4 text-white placeholder:text-white/20 focus:outline-hidden focus:border-white/30 transition-all font-mono text-sm"
               />
             </div>
 
-            <div className="flex flex-wrap gap-4 w-full md:w-auto">
-              <select 
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="h-14 bg-white/5 border border-white/10 rounded-sm px-6 text-white font-mono text-xs uppercase tracking-widest focus:outline-hidden hover:bg-white/10 transition-all cursor-pointer appearance-none min-w-[160px]"
-              >
-                {categories.map(cat => (
-                  <option key={cat} value={cat} className="bg-[#0a0a0a]">{cat}</option>
-                ))}
-              </select>
+            <div className="flex flex-row flex-wrap gap-3 w-full md:w-auto overflow-visible py-2">
+              {/* Category Filter */}
+              <div className="relative">
+                <button
+                  onClick={() => setActiveDropdown(activeDropdown === 'category' ? null : 'category')}
+                  className={`h-14 px-6 flex items-center gap-3 rounded-sm border transition-all cursor-pointer font-mono text-[10px] uppercase tracking-widest ${
+                    activeDropdown === 'category' || selectedCategory !== "All Categories"
+                      ? "bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.2)]" 
+                      : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <Filter size={18} strokeWidth={activeDropdown === 'category' ? 2.5 : 1.5} />
+                  <span>{selectedCategory === "All Categories" ? "Category" : selectedCategory}</span>
+                  <ChevronDown size={14} className={`transition-transform duration-300 ${activeDropdown === 'category' ? 'rotate-180' : ''}`} />
+                </button>
+                <AnimatePresence>
+                  {activeDropdown === 'category' && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute top-full left-0 mt-2 w-64 bg-[#0a0a0a]/95 backdrop-blur-xl border border-white/10 rounded-sm shadow-2xl z-50 p-2 overflow-hidden"
+                    >
+                      {categories.map((cat) => {
+                        return (
+                          <button
+                            key={cat}
+                            onClick={() => {
+                              setSelectedCategory(cat);
+                              setActiveDropdown(null);
+                            }}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm transition-all text-left group ${
+                              selectedCategory === cat ? "bg-white/10 text-white" : "text-white/40 hover:bg-white/5 hover:text-white"
+                            }`}
+                          >
+                            <span className="font-mono text-[10px] uppercase tracking-widest">{cat === "All Categories" ? "All events" : cat}</span>
+                          </button>
+                        );
+                      })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
-              <select 
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className="h-14 bg-white/5 border border-white/10 rounded-sm px-6 text-white font-mono text-xs uppercase tracking-widest focus:outline-hidden hover:bg-white/10 transition-all cursor-pointer appearance-none min-w-[140px]"
-              >
-                {statuses.map(status => (
-                  <option key={status} value={status} className="bg-[#0a0a0a]">{status}</option>
-                ))}
-              </select>
+              {/* Status Filter */}
+              <div className="relative">
+                <button
+                  onClick={() => setActiveDropdown(activeDropdown === 'status' ? null : 'status')}
+                  className={`h-14 px-6 flex items-center gap-3 rounded-sm border transition-all cursor-pointer font-mono text-[10px] uppercase tracking-widest ${
+                    activeDropdown === 'status' || selectedStatus !== "All Status"
+                      ? "bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.2)]" 
+                      : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <CircleDot size={18} strokeWidth={activeDropdown === 'status' ? 2.5 : 1.5} />
+                  <span>{selectedStatus === "All Status" ? "Status" : selectedStatus}</span>
+                  <ChevronDown size={14} className={`transition-transform duration-300 ${activeDropdown === 'status' ? 'rotate-180' : ''}`} />
+                </button>
+                <AnimatePresence>
+                  {activeDropdown === 'status' && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute top-full left-0 mt-2 w-48 bg-[#0a0a0a]/95 backdrop-blur-xl border border-white/10 rounded-sm shadow-2xl z-50 p-2 overflow-hidden"
+                    >
+                      {statuses.map((status) => (
+                        <button
+                          key={status}
+                          onClick={() => {
+                            setSelectedStatus(status);
+                            setActiveDropdown(null);
+                          }}
+                          className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm transition-all text-left ${
+                            selectedStatus === status ? "bg-white/10 text-white" : "text-white/40 hover:bg-white/5 hover:text-white"
+                          }`}
+                        >
+                          <div className={`w-2 h-2 rounded-full ${
+                             status === 'open' ? 'bg-emerald-500' : 
+                             status === 'closed' ? 'bg-rose-500' : 
+                             status === 'postponed' ? 'bg-amber-500' : 'bg-white/20'
+                          }`} />
+                          <span className="font-mono text-[10px] uppercase tracking-widest">{status === "All Status" ? "All Status" : status}</span>
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
-              <select 
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="h-14 bg-white/5 border border-white/10 rounded-sm px-6 text-white font-mono text-xs uppercase tracking-widest focus:outline-hidden hover:bg-white/10 transition-all cursor-pointer appearance-none min-w-[140px]"
-              >
-                <option value="Default" className="bg-[#0a0a0a]">Sort By</option>
-                <option value="Title (A-Z)" className="bg-[#0a0a0a]">Title (A-Z)</option>
-                <option value="Title (Z-A)" className="bg-[#0a0a0a]">Title (Z-A)</option>
-                <option value="Date (Newest)" className="bg-[#0a0a0a]">Date (Newest)</option>
-                <option value="Date (Oldest)" className="bg-[#0a0a0a]">Date (Oldest)</option>
-              </select>
+              {/* Sort Filter */}
+              <div className="relative">
+                <button
+                  onClick={() => setActiveDropdown(activeDropdown === 'sort' ? null : 'sort')}
+                  className={`h-14 px-6 flex items-center gap-3 rounded-sm border transition-all cursor-pointer font-mono text-[10px] uppercase tracking-widest ${
+                    activeDropdown === 'sort' || sortBy !== "Default"
+                      ? "bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.2)]" 
+                      : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <ArrowDownUp size={18} strokeWidth={activeDropdown === 'sort' ? 2.5 : 1.5} />
+                  <span>{sortBy === "Default" ? "Sort By" : sortBy}</span>
+                  <ChevronDown size={14} className={`transition-transform duration-300 ${activeDropdown === 'sort' ? 'rotate-180' : ''}`} />
+                </button>
+                <AnimatePresence>
+                  {activeDropdown === 'sort' && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute top-full right-0 mt-2 w-48 bg-[#0a0a0a]/95 backdrop-blur-xl border border-white/10 rounded-sm shadow-2xl z-50 p-2 overflow-hidden"
+                    >
+                      {sortOptions.map((opt) => (
+                        <button
+                          key={opt}
+                          onClick={() => {
+                            setSortBy(opt);
+                            setActiveDropdown(null);
+                          }}
+                          className={`w-full px-4 py-3 rounded-sm transition-all text-left font-mono text-[10px] uppercase tracking-widest ${
+                            sortBy === opt ? "bg-white/10 text-white" : "text-white/40 hover:bg-white/5 hover:text-white"
+                          }`}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           </div>
           
@@ -261,7 +378,7 @@ export default function EventsPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 relative z-10 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 lg:gap-12 relative z-10 items-start mt-8 md:mt-0">
           <div className="flex flex-col gap-8 lg:gap-12 w-full">
             {leftColumnEvents.map((event) => (
               <EventParallaxCard
