@@ -72,7 +72,6 @@ function normalizeModel(object: THREE.Object3D, targetSize: number) {
   object.position.y -= center.y;
   object.position.z -= center.z;
   box.setFromObject(object);
-  // object.position.y -= box.min.y; (Removing for center-axis rotation)
   return object;
 }
 
@@ -140,7 +139,6 @@ export default function SpaceLanding() {
   const mouseY = useMotionValue(0.5);
   const time = useTime();
   
-  // Subtle drift values based on time
   const driftX = useTransform(time, (t) => Math.sin(t / 2000) * 0.02);
   const driftY = useTransform(time, (t) => Math.cos(t / 1800) * 0.02);
 
@@ -806,7 +804,7 @@ async function createScene({
   const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 160);
   camera.position.set(0, 0.8, 15.5);
 
-  const ambientLight = new THREE.AmbientLight("#ffffff", 0.5); // Reduced for realistic contrast
+  const ambientLight = new THREE.AmbientLight("#ffffff", 0.5);
   scene.add(ambientLight);
 
   const gltfLoader = new GLTFLoader();
@@ -944,14 +942,65 @@ async function createScene({
     return raycaster.intersectObjects(interactiveTargets, true)[0]?.object?.userData?.planetSlug ?? "";
   };
 
-  const handlePointerMove  = (e: PointerEvent) => { const slug = findPlanetAtPointer(e.clientX, e.clientY); hoveredSlugRef.current = slug; canvas.style.cursor = slug ? "pointer" : "default"; };
-  const handlePointerLeave = () => { hoveredSlugRef.current = ""; canvas.style.cursor = "default"; };
-  const handlePointerDown  = (e: PointerEvent) => { const slug = findPlanetAtPointer(e.clientX, e.clientY); if (slug) onPlanetClick(slug); };
+  let isDragging = false;
+  let hasDragged = false;
+  let dragLastX = 0;
+  let dragLastY = 0;
+
+  const handlePointerDown = (e: PointerEvent) => { 
+    isDragging = true;
+    hasDragged = false;
+    dragLastX = e.clientX;
+    dragLastY = e.clientY;
+    canvas.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: PointerEvent) => { 
+    const slug = findPlanetAtPointer(e.clientX, e.clientY); 
+    hoveredSlugRef.current = slug; 
+    
+    if (isDragging) {
+      const deltaX = e.clientX - dragLastX;
+      const deltaY = e.clientY - dragLastY;
+      if (Math.abs(deltaX) > 4 || Math.abs(deltaY) > 4) {
+        hasDragged = true;
+      }
+      if (hasDragged) {
+        window.scrollBy({ top: -deltaX * 2.5 - deltaY * 2.5, left: 0, behavior: "instant" });
+        dragLastX = e.clientX;
+        dragLastY = e.clientY;
+        canvas.style.cursor = "grabbing";
+      }
+    } else {
+      canvas.style.cursor = slug ? "pointer" : "grab"; 
+    }
+  };
+
+  const handlePointerUp = (e: PointerEvent) => { 
+    if (!isDragging) return;
+    isDragging = false;
+    canvas.releasePointerCapture(e.pointerId);
+    if (!hasDragged) {
+      const slug = findPlanetAtPointer(e.clientX, e.clientY); 
+      if (slug) onPlanetClick(slug); 
+    }
+    const slug = findPlanetAtPointer(e.clientX, e.clientY); 
+    canvas.style.cursor = slug ? "pointer" : "grab"; 
+  };
+  
+  const handlePointerLeave = () => { 
+    hoveredSlugRef.current = ""; 
+    isDragging = false;
+    canvas.style.cursor = "grab"; 
+  };
 
   window.addEventListener("resize", applyLayout);
-  canvas.addEventListener("pointermove",  handlePointerMove);
+  canvas.addEventListener("pointermove", handlePointerMove);
+  canvas.addEventListener("pointerdown", handlePointerDown);
+  canvas.addEventListener("pointerup", handlePointerUp);
+  canvas.addEventListener("pointercancel", handlePointerUp);
   canvas.addEventListener("pointerleave", handlePointerLeave);
-  canvas.addEventListener("pointerdown",  handlePointerDown);
+  canvas.style.cursor = "grab";
   applyLayout();
   onReady();
 
@@ -1032,7 +1081,7 @@ async function createScene({
 
       const targetX = Math.sin(currentAngle) * currentRadiusX;
       const targetZ = currentCenterZ + Math.cos(currentAngle) * currentRadiusZ;
-      const targetY = frontTargetY + (1 - Math.cos(currentAngle)) * (mob ? 2.5 : 4.4);
+      const targetY = -1;
 
       const angleScale = Math.max(0, Math.cos(currentAngle));
       const frontBoost = Math.pow(angleScale, 5.0);
@@ -1157,9 +1206,11 @@ async function createScene({
   return () => {
     window.cancelAnimationFrame(animationFrame);
     window.removeEventListener("resize", applyLayout);
-    canvas.removeEventListener("pointermove",  handlePointerMove);
+    canvas.removeEventListener("pointermove", handlePointerMove);
+    canvas.removeEventListener("pointerup", handlePointerUp);
+    canvas.removeEventListener("pointercancel", handlePointerUp);
     canvas.removeEventListener("pointerleave", handlePointerLeave);
-    canvas.removeEventListener("pointerdown",  handlePointerDown);
+    canvas.removeEventListener("pointerdown", handlePointerDown);
     canvas.style.cursor = "default";
     for (const g of starGeometries) g.dispose();
     for (const m of starMaterials)  m.dispose();
