@@ -88,7 +88,7 @@ export default function SubPageLayout({ children, title, subtitle, showHero = tr
       <AboutFooter />
 
       {/* Subtle Bottom Fade */}
-      <div className="fixed bottom-0 left-0 w-full h-[20vh] bg-gradient-to-t from-black to-transparent pointer-events-none z-5" />
+      <div className="fixed bottom-0 left-0 w-full h-[20vh] bg-linear-to-t from-black to-transparent pointer-events-none z-5" />
     </div>
   );
 }
