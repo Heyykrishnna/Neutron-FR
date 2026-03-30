@@ -72,7 +72,7 @@ function normalizeModel(object: THREE.Object3D, targetSize: number) {
   object.position.y -= center.y;
   object.position.z -= center.z;
   box.setFromObject(object);
-  object.position.y -= box.min.y;
+  // object.position.y -= box.min.y; (Removing for center-axis rotation)
   return object;
 }
 
@@ -182,6 +182,8 @@ export default function SpaceLanding() {
       startTransition(() => { 
         if (slug === "mars") {
           router.push("/about"); 
+        } else if (slug === "moon") {
+          router.push("/profile");
         } else {
           router.push(`/planets/${slug}`);
         }
@@ -197,7 +199,15 @@ export default function SpaceLanding() {
   }, []);
 
   useEffect(() => {
-    for (const planet of PLANET_RECORDS) router.prefetch(`/planets/${planet.slug}`);
+    for (const planet of PLANET_RECORDS) {
+      if (planet.slug === "mars") {
+        router.prefetch("/about");
+      } else if (planet.slug === "moon") {
+        router.prefetch("/profile");
+      } else {
+        router.prefetch(`/planets/${planet.slug}`);
+      }
+    }
   }, [router]);
 
   const handleBlackHoleClick = useCallback(() => {
@@ -687,7 +697,6 @@ export default function SpaceLanding() {
           <div className="pointer-events-none fixed inset-0 z-25 transition-opacity duration-1000" style={{ opacity: 1 }}>
             {[
               { label: "Terms",   href: "/terms",   drift: "star-link-a 9s ease-in-out infinite",  delay: "0s"   },
-              { label: "Privacy", href: "/privacy", drift: "star-link-b 11s ease-in-out infinite", delay: "1.4s" },
               { label: "Contact", href: "/contact", drift: "star-link-c 13s ease-in-out infinite", delay: "0.6s" },
               { label: "About",   href: "/about",   drift: "star-link-d 10s ease-in-out infinite", delay: "2s"   },
               { label: "FAQ",     href: "/faq",     drift: "star-link-e 12s ease-in-out infinite", delay: "0.9s" },
@@ -787,6 +796,8 @@ async function createScene({
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.8));
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = false;
 
   const scene = new THREE.Scene();
@@ -795,8 +806,58 @@ async function createScene({
   const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 160);
   camera.position.set(0, 0.8, 15.5);
 
-  const ambientLight = new THREE.AmbientLight("#ffffff", 3.0);
+  const ambientLight = new THREE.AmbientLight("#ffffff", 0.5); // Reduced for realistic contrast
   scene.add(ambientLight);
+
+  const gltfLoader = new GLTFLoader();
+  const objLoader  = new OBJLoader();
+  const texLoader  = new THREE.TextureLoader();
+
+  const loadGLTF = (url: string) => new Promise<any>((res, rej) => gltfLoader.load(url, res, undefined, rej));
+  const loadOBJ  = (url: string) => new Promise<any>((res, rej) => objLoader.load(url, res, undefined, rej));
+
+  const sunPos = new THREE.Vector3(0, -1, -5); 
+  const sunLight = new THREE.PointLight("#ff8c1a", 165, 120, 0.8);
+  sunLight.position.copy(sunPos);
+  scene.add(sunLight);
+
+  const sunGLTF = await loadGLTF("/3D/planets/sun.glb");
+  const sunModel = normalizeModel(sunGLTF.scene, 4.4); 
+  sunModel.position.copy(sunPos);
+  scene.add(sunModel);
+
+  const sunRuntime = { model: sunModel };
+
+  const sunGlowMat = new THREE.MeshBasicMaterial({
+    color: "#cc5500",
+    transparent: true,
+    opacity: 0.12,
+  });
+  const sunGlow1 = new THREE.Mesh(new THREE.SphereGeometry(3.5, 32, 32), sunGlowMat);
+  const sunGlow2 = new THREE.Mesh(new THREE.SphereGeometry(6.0, 32, 32), sunGlowMat.clone());
+  sunGlow2.material.opacity = 0.04;
+  sunGlow1.position.copy(sunPos);
+  sunGlow2.position.copy(sunPos);
+  scene.add(sunGlow1, sunGlow2);
+
+  const planetsRig = new THREE.Group();
+  scene.add(planetsRig);
+
+  const ringA = new THREE.Mesh(
+    new THREE.TorusGeometry(8.2, 0.008, 16, 128),
+    new THREE.MeshBasicMaterial({ color: "#ffe0a0", transparent: true, opacity: 0.12 })
+  );
+  ringA.position.set(0, -1, -5);
+  ringA.rotation.x = Math.PI / 2;
+  
+  const ringB = new THREE.Mesh(
+    new THREE.TorusGeometry(12.5, 0.008, 16, 128),
+    new THREE.MeshBasicMaterial({ color: "#ffd56e", transparent: true, opacity: 0.08 })
+  );
+  ringB.position.set(0, -1, -6);
+  ringB.rotation.x = Math.PI / 2;
+  ringB.rotation.y = 0.08; 
+  planetsRig.add(ringA, ringB);
 
   const starsNear = createStarField(1100, 72, 0.034, "#ffe0a0");
   const starsMid  = createStarField(720,  90, 0.024, "#ffcc80");
@@ -806,13 +867,6 @@ async function createScene({
   (starsFar.material  as THREE.PointsMaterial).opacity = 0.20;
   (starsWarm.material as THREE.PointsMaterial).opacity = 0.22;
   scene.add(starsFar, starsMid, starsNear, starsWarm);
-
-  const planetsRig = new THREE.Group();
-  scene.add(planetsRig);
-
-  const gltfLoader = new GLTFLoader();
-  const objLoader  = new OBJLoader();
-  const texLoader  = new THREE.TextureLoader();
 
   const textures:           THREE.Texture[]     = [];
   const interactiveTargets: THREE.Object3D[]    = [];
@@ -831,9 +885,6 @@ async function createScene({
   const starGeometries = [starsNear.geometry, starsMid.geometry, starsFar.geometry, starsWarm.geometry];
   const starMaterials  = [starsNear.material as THREE.Material, starsMid.material as THREE.Material, starsFar.material as THREE.Material, starsWarm.material as THREE.Material];
 
-  const loadGLTF = (url: string) => new Promise<any>((res, rej) => gltfLoader.load(url, res, undefined, rej));
-  const loadOBJ  = (url: string) => new Promise<any>((res, rej) => objLoader.load(url, res, undefined, rej));
-
   const addPlanet = async (index: number) => {
     const planet = PLANET_RECORDS[index];
     const root   = new THREE.Group();
@@ -851,7 +902,7 @@ async function createScene({
       textures.push(texture);
       obj.traverse((child: THREE.Object3D) => {
         const mesh = child as THREE.Mesh;
-        if (mesh.isMesh) mesh.material = new THREE.MeshStandardMaterial({ map: texture, roughness: 1.0, metalness: 0 });
+        if (mesh.isMesh) mesh.material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.55, metalness: 0.1 });
       });
       target = normalizeModel(obj, planet.size);
     }
@@ -932,6 +983,11 @@ async function createScene({
     planetsRig.rotation.x  = Math.sin(elapsed * 0.085) * 0.016;
     planetsRig.rotation.z  = Math.cos(elapsed * 0.065) * 0.007;
 
+    // --- ROTATE SUN ---
+    if (sunRuntime.model) {
+      sunRuntime.model.rotation.y += delta * 0.15;
+    }
+
     const N = PLANET_RECORDS.length;
     const cycleProgress    = Math.max(0, scrolledVH) / 380;
     const globalAngleOffset = cycleProgress * (Math.PI * 2);
@@ -946,18 +1002,23 @@ async function createScene({
       const revealIn    = 1;
       const visibility  = 1;
 
+      // Group 0,1 into Orbit A, and Group 2,3 into Orbit B
+      const isOrbitB   = index >= 2;
+      const currentRadiusX = isOrbitB ? 12.5 : 8.2;
+      const currentRadiusZ = isOrbitB ? 12.5 : 8.2;
+      const currentCenterZ = isOrbitB ? -6.0 : -5.0;
+
       let currentAngle = (index * (Math.PI * 2) / N) - globalAngleOffset;
       if (currentAngle >  Math.PI) currentAngle -= Math.PI * 2;
       if (currentAngle < -Math.PI) currentAngle += Math.PI * 2;
 
-      const targetX = Math.sin(currentAngle) * ringRadiusX;
-      const targetZ = ringCenterZ + Math.cos(currentAngle) * ringRadiusZ;
+      const targetX = Math.sin(currentAngle) * currentRadiusX;
+      const targetZ = currentCenterZ + Math.cos(currentAngle) * currentRadiusZ;
       const targetY = frontTargetY + (1 - Math.cos(currentAngle)) * (mob ? 2.5 : 4.4);
 
       const angleScale = Math.max(0, Math.cos(currentAngle));
       const frontBoost = Math.pow(angleScale, 5.0);
       const emphasis   = 1.0 + frontBoost * (mob ? 1.4 : 1.8);
-      const exitDrift  = exit * (index % 2 === 0 ? -2.4 : 2.4);
 
       entry.basePosition.set(targetX, targetY, targetZ);
       entry.pivot.position.x = THREE.MathUtils.lerp(entry.basePosition.x * 0.08, entry.basePosition.x, spread);
@@ -967,12 +1028,19 @@ async function createScene({
         revealIn
       );
       entry.pivot.position.z = THREE.MathUtils.lerp(10 + index * 0.6, entry.basePosition.z + Math.sin(elapsed * 0.35 + index) * 0.09, visibility);
-      entry.pivot.rotation.y += delta * (0.60 + index * 0.025);
-      entry.pivot.rotation.x  = Math.sin(elapsed * 0.22 + index * 0.88) * 0.038 + Math.cos(elapsed * 0.14 + index * 0.55) * 0.015;
-      entry.target.rotation.y += delta * (0.18 + index * 0.018);
-      entry.target.rotation.x  = Math.sin(elapsed * 0.09 + index * 0.72) * 0.06;
-      entry.root.position.y    = Math.sin(elapsed * 0.62 + index * 1.28) * 0.085 + Math.cos(elapsed * 0.31 + index * 0.78) * 0.030;
+      
+      // SELF ROTATION ( axis rotation ) - Increased speed and logic check
+      const rotationSpeed = (0.75 + index * 0.35) * delta; 
+      entry.target.rotation.y += rotationSpeed; 
+      
+      entry.pivot.rotation.y += delta * (0.10 + index * 0.015);
+      entry.pivot.rotation.x  = Math.sin(elapsed * 0.22 + index * 0.88) * 0.038;
+      
+      // Keep other cosmetic rotations subtle
+      entry.target.rotation.x  = Math.sin(elapsed * 0.09 + index * 0.72) * 0.04;
+      entry.root.position.y    = Math.sin(elapsed * 0.62 + index * 1.28) * 0.085;
       entry.root.position.x    = Math.sin(elapsed * 0.25 + index * 1.08) * 0.032;
+      
       entry.scale              = THREE.MathUtils.lerp(entry.scale, visibility * emphasis, 0.068);
       entry.root.scale.setScalar(Math.max(entry.scale, 0.001));
     });

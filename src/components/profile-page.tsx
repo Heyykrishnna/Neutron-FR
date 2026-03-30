@@ -1,13 +1,45 @@
 "use client";
 
-import React, { useState, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useRef, useEffect } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { 
+  Plus, 
+  Trash2, 
+  X, 
+  ChevronRight, 
+  Bell, 
+  Layout, 
+  User, 
+  Target, 
+  Mail, 
+  Download, 
+  CheckCircle2, 
+  AlertCircle,
+  MoreVertical,
+  Upload,
+  Calendar,
+  Zap,
+  Award,
+  ChevronLeft
+} from "lucide-react";
 import Link from "next/link";
 import { COMPETITIONS_DATA } from "@/lib/competitions-data";
 import { EVENTS_DATA } from "@/lib/events-data";
 import ProfileCard from "./ProfileCard";
 
-type NavItem = "profile" | "competitions" | "events" | "inbox";
+type NavItem = "profile" | "competitions" | "events" | "calendar" | "inbox";
+
+const DashboardContext = React.createContext<{
+  showToast: (msg: string, type?: "success" | "error" | "info") => void;
+  setExpandedID: (val: boolean) => void;
+}>({ 
+  showToast: () => {}, 
+  setExpandedID: () => {} 
+});
+
+function useDashboard() {
+  return React.useContext(DashboardContext);
+}
 
 interface TeamMember {
   id: string;
@@ -82,21 +114,49 @@ const MOCK_GLOBAL_USERS = [
 ];
 
 function isTeamEvent(teamSize: string): boolean {
-  // e.g. "1-3 Members", "2 Members", "4 Members", "Solo"
   const match = teamSize.match(/\d+/g);
   if (!match) return false;
   const max = parseInt(match[match.length - 1]);
   return max > 1;
 }
 
-function EditableField({
+function Toast({ message, type, onClose }: { message: string; type: "success" | "error" | "info"; onClose: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 20, scale: 0.95 }}
+      className="fixed bottom-8 left-1/2 -translate-x-1/2 z-1000 px-4 py-2.5 rounded-xl border border-white/10 bg-[#080808]/90 backdrop-blur-xl shadow-2xl flex items-center gap-2.5 min-w-[200px] max-w-[320px]"
+    >
+      <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+        type === "success" ? "bg-emerald-500/10 text-emerald-400" : 
+        type === "error" ? "bg-rose-500/10 text-rose-400" : 
+        "bg-blue-500/10 text-blue-400"
+      }`}>
+        {type === "success" && <CheckCircle2 size={14} />}
+        {type === "error" && <AlertCircle size={14} />}
+        {type === "info" && <Bell size={14} />}
+      </div>
+      <p className="text-[10px] font-bold text-white tracking-wide truncate flex-1">{message}</p>
+      <button onClick={onClose} className="text-white/20 hover:text-white transition-colors p-1">
+        <X size={12} />
+      </button>
+    </motion.div>
+  );
+}
+
+function EditableRow({
   label,
   value,
   onChange,
   locked = false,
   type = "text",
   placeholder = "",
-  hint,
 }: {
   label: string;
   value: string;
@@ -104,7 +164,6 @@ function EditableField({
   locked?: boolean;
   type?: string;
   placeholder?: string;
-  hint?: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -115,58 +174,48 @@ function EditableField({
   };
 
   return (
-    <div className="group">
-      <div className="flex items-center justify-between mb-1">
-        <label className="text-[10px] uppercase tracking-wider text-white/25 font-mono">
-          {label}
-        </label>
-        {!locked && !editing && (
-          <button
-            onClick={() => { setDraft(value); setEditing(true); }}
-            className="text-[10px] text-white/20 hover:text-white/50 transition-colors opacity-0 group-hover:opacity-100 flex items-center gap-1"
-          >
-            <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" />
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" />
-            </svg>
-            Edit
-          </button>
-        )}
-        {locked && (
-          <span className="text-[9px] text-white/15 font-mono">locked</span>
+    <div className="flex items-center justify-between py-3 border-b border-white/5 last:border-0 group">
+      <span className="text-[10px] uppercase tracking-widest text-white/30 font-mono w-1/3 shrink-0">
+        {label}
+      </span>
+      
+      <div className="flex-1 flex items-center justify-end gap-3 text-right">
+        {editing ? (
+          <div className="flex items-center gap-2 w-full max-w-[240px]">
+            <input
+              type={type}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
+              autoFocus
+              className="w-full bg-white/5 border border-white/20 rounded-md px-3 py-1.5 text-xs text-white outline-none focus:border-white/40 transition-all font-mono"
+            />
+            <button onClick={save} className="text-emerald-400 hover:text-emerald-300 transition-colors">
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+            <button onClick={() => setEditing(false)} className="text-white/30 hover:text-white/60 transition-colors">
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+             <span className={`text-[12px] font-medium leading-none ${locked ? "text-white/40" : "text-white/80"}`}>
+              {value || placeholder || "—"}
+            </span>
+            {!locked && (
+              <button
+                onClick={() => { setDraft(value); setEditing(true); }}
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-white/20 hover:text-white/50"
+              >
+                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" />
+                </svg>
+              </button>
+            )}
+          </div>
         )}
       </div>
-
-      {editing ? (
-        <div className="flex gap-2">
-          <input
-            type={type}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
-            autoFocus
-            placeholder={placeholder}
-            className="flex-1 bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-white/30 focus:bg-white/8 transition-all"
-          />
-          <button
-            onClick={save}
-            className="px-3 py-2 bg-white text-black text-xs font-semibold rounded-lg hover:bg-white/90 transition-colors shrink-0"
-          >
-            Save
-          </button>
-          <button
-            onClick={() => setEditing(false)}
-            className="px-3 py-2 bg-white/5 border border-white/10 text-white/50 text-xs rounded-lg hover:bg-white/10 transition-colors shrink-0"
-          >
-            ✕
-          </button>
-        </div>
-      ) : (
-        <p className={`text-sm mt-0.5 ${locked ? "text-white/40" : "text-white/80"} ${!value ? "text-white/25 italic" : ""}`}>
-          {value || placeholder || "—"}
-        </p>
-      )}
-      {hint && <p className="text-[10px] text-white/20 mt-1">{hint}</p>}
     </div>
   );
 }
@@ -219,44 +268,126 @@ function SelectField({
   );
 }
 
-function IdUploadField({ label, hint }: { label: string; hint?: string }) {
-  const [preview, setPreview] = useState<string | null>(null);
+function DocumentCard({ 
+  label, 
+  type, 
+  date, 
+  onUpload 
+}: { 
+  label: string; 
+  type: string; 
+  date: string; 
+  onUpload: (name: string) => void 
+}) {
+  const { showToast } = useDashboard();
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    setPreview(url);
+    const f = e.target.files?.[0];
+    if (!f) return;
+    
+    setUploading(true);
+    setTimeout(() => {
+      setFile(f);
+      setUploading(false);
+      onUpload(f.name);
+    }, 1500);
   };
 
   return (
-    <div>
-      <label className="text-[10px] uppercase tracking-wider text-white/25 font-mono block mb-2">{label}</label>
-      {hint && <p className="text-[10px] text-white/20 mb-2">{hint}</p>}
-      <div
-        onClick={() => inputRef.current?.click()}
-        className="relative border border-dashed border-white/15 rounded-xl overflow-hidden cursor-pointer hover:border-white/30 transition-colors group"
-        style={{ height: preview ? "auto" : "90px" }}
-      >
-        <input ref={inputRef} type="file" accept="image/*,.pdf" className="hidden" onChange={handleFile} />
-        {preview ? (
-          <div className="relative">
-            <img src={preview} alt={label} className="w-full max-h-40 object-cover" />
-            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <span className="text-xs text-white">Change</span>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full gap-1.5 text-white/25 group-hover:text-white/40 transition-colors">
-            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span className="text-[11px]">Click to upload</span>
-            <span className="text-[9px]">JPG, PNG or PDF</span>
-          </div>
-        )}
+    <div className={`bg-white/2 border border-white/8 rounded-2xl p-4 flex flex-col gap-3 group/doc hover:border-white/20 hover:bg-white/5 transition-all duration-300 relative ${file ? "border-emerald-500/20" : ""}`}>
+      <input ref={inputRef} type="file" className="hidden" onChange={handleFile} />
+      <div className="w-full aspect-video rounded-xl bg-[#111] border border-white/5 overflow-hidden relative cursor-pointer" onClick={() => !uploading && inputRef.current?.click()}>
+        <div className="absolute inset-0 flex items-center justify-center">
+            {uploading ? (
+               <div className="flex flex-col items-center gap-2">
+                  <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                  <p className="text-[8px] text-white/40 uppercase tracking-widest font-mono">Uploading...</p>
+               </div>
+            ) : file ? (
+               <div className="w-full h-full bg-linear-to-br from-emerald-500/10 to-teal-500/10 flex flex-col items-center justify-center p-4 text-center">
+                  <CheckCircle2 size={24} className="text-emerald-400 mb-2" />
+                  <p className="text-[8px] text-white/50 truncate w-full font-mono">{file.name}</p>
+               </div>
+            ) : (
+               <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover/doc:bg-white/10 transition-all">
+                  <Upload size={18} className="text-white/20 group-hover/doc:text-white" />
+               </div>
+            )}
+        </div>
       </div>
+      <div>
+        <div className="flex items-center justify-between">
+           <h4 className="text-[11px] font-bold text-white uppercase tracking-wider">{label}</h4>
+           <div className="relative">
+              <button 
+                onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
+                className="w-7 h-7 rounded-lg hover:bg-white/5 flex items-center justify-center text-white/20 hover:text-white transition-all cursor-pointer"
+              >
+                <MoreVertical size={14} />
+              </button>
+              
+              <AnimatePresence>
+                {menuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-100" onClick={() => setMenuOpen(false)} />
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: 5 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: 5 }}
+                      className="absolute bottom-full right-0 mb-2 w-32 bg-[#0c0c0c] border border-white/10 rounded-xl shadow-2xl z-101 overflow-hidden"
+                    >
+                      {[
+                        { label: "View", icon: Layout, action: () => showToast("Viewer restricted in beta.", "info") },
+                        { label: "Download", icon: Download, action: () => showToast("Download started...", "success") },
+                        { label: "Delete", icon: Trash2, action: () => { setFile(null); showToast("File deleted."); }, destructive: true }
+                      ].map((item) => (
+                        <button
+                          key={item.label}
+                          onClick={(e) => { e.stopPropagation(); item.action(); setMenuOpen(false); }}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 text-[10px] font-bold uppercase tracking-widest transition-colors text-left ${item.destructive ? "text-rose-400 hover:bg-rose-500/10" : "text-white/40 hover:text-white hover:bg-white/5"}`}
+                        >
+                          <item.icon size={12} />
+                          {item.label}
+                        </button>
+                      ))}
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+           </div>
+        </div>
+        <div className="flex items-center justify-between mt-1">
+          <p className="text-[9px] text-white/30 font-mono uppercase tracking-widest leading-none">
+            {file ? (file.size / 1024 / 1024).toFixed(1) + " MB" : type} &bull; {file ? "Just now" : date}
+          </p>
+          {file && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DashboardWidget({ 
+  title, 
+  children, 
+  className = "", 
+  onManage 
+}: { 
+  title: string; 
+  children: React.ReactNode; 
+  className?: string;
+  onManage: () => void;
+}) {
+  return (
+    <div className={`bg-white/3 border border-white/8 rounded-3xl p-6 backdrop-blur-2xl transition-all duration-300 hover:border-white/15 h-full ${className}`}>
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-white/40 font-mono">{title}</h3>
+      </div>
+      {children}
     </div>
   );
 }
@@ -268,6 +399,7 @@ function TeamModal({
   item: EnrolledItem;
   onClose: () => void;
 }) {
+  const { showToast } = useDashboard();
   const [inviteEmail, setInviteEmail] = useState("");
   const [members, setMembers] = useState<TeamMember[]>(item.team || []);
 
@@ -277,6 +409,7 @@ function TeamModal({
 
   const [inviteError, setInviteError] = useState("");
   const [isFocused, setIsFocused] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<TeamMember | null>(null);
 
   const suggestions = MOCK_GLOBAL_USERS.filter(u => 
     inviteEmail.trim() && 
@@ -303,6 +436,7 @@ function TeamModal({
       setMembers((prev) => [...prev, newMember]);
       setInviteEmail("");
       setIsFocused(false);
+      showToast(`Invited ${selectedUser.name} to the team.`, "success");
       return;
     }
 
@@ -314,245 +448,168 @@ function TeamModal({
       return;
     }
     
-    const isGlobal = !val.includes("@");
-    const newMember: TeamMember = {
-      id: `u-${Date.now()}`,
-      name: isGlobal ? val : val.split("@")[0],
-      email: isGlobal ? `${val}@neutron.in` : val,
-      role: "member",
-      status: "pending",
-      avatar: `https://i.pravatar.cc/150?u=${val}`,
-    };
-    setMembers((prev) => [...prev, newMember]);
+    showToast(`Invite sent to ${val}.`, "success");
     setInviteEmail("");
-    setIsFocused(false);
-  };
-
-  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
-
-  const removeMember = (id: string) => {
-    setMembers((prev) => prev.filter((m) => m.id !== id || m.role === "leader"));
-    setConfirmRemoveId(null);
   };
 
   return (
-    <AnimatePresence>
+    <div className="fixed inset-0 z-100 flex items-center justify-center p-6">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 z-100 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+        className="absolute inset-0 bg-black/80 backdrop-blur-xl"
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="relative w-full max-w-2xl bg-[#080808] border border-white/10 rounded-[2.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.8)] overflow-hidden"
       >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.92, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.92, y: 20 }}
-          transition={{ type: "spring", damping: 28, stiffness: 350 }}
-          onClick={(e) => e.stopPropagation()}
-          className="w-full max-w-lg bg-[#0c0c0c] border border-white/10 rounded-3xl shadow-2xl relative"
-        >
-          {/* Header */}
-          <div className="relative overflow-hidden rounded-t-3xl p-6 pb-5 border-b border-white/6">
-            <div className="absolute top-0 right-0 w-40 h-40 bg-purple-600/10 rounded-full blur-[60px]" />
-            <div className="flex items-start justify-between relative">
-              <div>
-                <p className="text-[10px] uppercase tracking-widest text-white/30 font-mono mb-1">Team Management</p>
-                <h3 className="text-lg font-semibold text-white leading-tight">{item.title}</h3>
-                <p className="text-xs text-white/40 mt-1">{item.teamSize}</p>
-              </div>
-              <button
-                onClick={onClose}
-                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all"
-              >
-                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Capacity bar */}
-            <div className="mt-4">
-              <div className="flex justify-between text-[10px] text-white/30 font-mono mb-1.5">
-                <span>{members.length} / {maxMembers} members</span>
-                <span>{canAdd ? "slots available" : "team full"}</span>
-              </div>
-              <div className="h-1 bg-white/8 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-linear-to-r from-purple-500 to-indigo-400 rounded-full transition-all duration-500"
-                  style={{ width: `${(members.length / maxMembers) * 100}%` }}
-                />
-              </div>
-            </div>
+        <div className="p-8 pb-4 flex items-center justify-between border-b border-white/5">
+          <div>
+            <h2 className="text-2xl font-bold text-white tracking-tight">{item.title}</h2>
+            <p className="text-xs text-white/30 mt-1 font-mono uppercase tracking-widest">Team Management &bull; {members.length}/{maxMembers} Slots</p>
           </div>
+          <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all">
+            <X size={20} />
+          </button>
+        </div>
 
-          {/* Members list */}
-          <div className="p-5 space-y-2 max-h-60 overflow-y-auto">
-            {members.map((m) => (
-              <div key={m.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/3 border border-white/6 group">
-                <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 border border-white/10">
-                  <img src={m.avatar} alt={m.name} className="w-full h-full object-cover" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-white font-medium truncate">{m.name}</p>
-                  <p className="text-[11px] text-white/35 truncate">{m.email}</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {m.role === "leader" ? (
-                    <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 uppercase tracking-widest font-mono">
-                      Leader
-                    </span>
-                  ) : (
-                    <span
-                      className={`text-[9px] px-2 py-0.5 rounded-full border uppercase tracking-widest font-mono ${
-                        m.status === "confirmed"
-                          ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                          : "bg-white/5 border-white/10 text-white/30"
-                      }`}
+        <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto overflow-x-visible custom-scrollbar">
+          {/* Members List */}
+          <div className="space-y-4">
+            <h3 className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/20 font-mono">Active Members</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {members.map((member) => (
+                <div key={member.id} className="flex items-center gap-3 p-3 rounded-2xl bg-white/3 border border-white/5 group hover:border-white/10 transition-all">
+                  <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 shrink-0">
+                    <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-white truncate">{member.name}</p>
+                    <p className="text-[10px] text-white/30 uppercase tracking-widest font-mono mt-0.5">{member.role}</p>
+                  </div>
+                  {member.role !== "leader" && (
+                    <button 
+                      onClick={() => setMemberToRemove(member)}
+                      className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center hover:bg-rose-500/20"
                     >
-                      {m.status}
-                    </span>
-                  )}
-                  {m.role !== "leader" && (
-                    <button
-                      onClick={() => setConfirmRemoveId(m.id)}
-                      className="text-white/20 hover:text-rose-400 transition-colors opacity-0 group-hover:opacity-100"
-                    >
-                      <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
-                      </svg>
+                      <Trash2 size={14} />
                     </button>
                   )}
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
-          {/* Invite input */}
-          <div className="p-5 pt-4 border-t border-white/5 mt-2">
-            <div className={`transition-opacity ${!canAdd ? "opacity-40 pointer-events-none" : ""}`}>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] uppercase tracking-widest text-white/25 font-mono">Invite to Team</p>
-                <span className="text-[9px] text-white/20 font-mono bg-white/5 px-2 py-0.5 rounded-full">Global Search Enabled</span>
-              </div>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-white/30">
-                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3" strokeLinecap="round"/></svg>
-                  </div>
-                  <input
-                    type="text"
-                    value={inviteEmail}
-                    onChange={(e) => {
-                      setInviteEmail(e.target.value);
-                      setInviteError("");
-                    }}
-                    onFocus={() => setIsFocused(true)}
-                    onBlur={() => setTimeout(() => setIsFocused(false), 200)}
-                    onKeyDown={(e) => e.key === "Enter" && handleInvite()}
-                    placeholder="Email or Neutron ID..."
-                    className={`w-full bg-white/5 border ${inviteError ? "border-rose-500/50" : "border-white/10"} rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder:text-white/20 outline-none focus:border-white/25 focus:bg-white/10 transition-all`}
-                  />
-                  
-                  {/* Autocomplete Dropdown */}
-                  <AnimatePresence>
-                    {isFocused && inviteEmail.trim().length > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -5 }}
-                        className="absolute top-full mt-1.5 left-0 right-0 bg-[#1a1a1a]/95 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50 flex flex-col"
-                      >
-                        {suggestions.length > 0 ? (
-                          suggestions.map(s => (
-                            <button
-                              key={s.id}
-                              onClick={() => handleInvite(s)}
-                              className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/10 transition-colors text-left border-b border-white/5 last:border-0"
-                            >
-                              <img src={s.avatar} alt={s.name} className="w-7 h-7 rounded-full object-cover shrink-0 border border-white/10" />
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium text-white truncate leading-tight">{s.name}</p>
-                                <p className="text-[10px] text-white/40 truncate leading-tight">{s.email}</p>
-                              </div>
-                            </button>
-                          ))
-                        ) : (
-                          <div className="px-3 py-4 text-center">
-                            <p className="text-xs text-white/40">No user found matching &quot;{inviteEmail}&quot;</p>
-                          </div>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-                <button
-                  onClick={() => handleInvite()}
-                  className="px-4 py-2.5 bg-white text-black text-xs font-bold rounded-xl hover:bg-white/90 transition-colors shrink-0 h-[42px]"
-                >
-                  Invite
-                </button>
-              </div>
-              {inviteError && (
-                <motion.p
-                  initial={{ opacity: 0, y: -5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-[11px] text-rose-400 mt-2 pl-2"
-                >
-                  {inviteError}
-                </motion.p>
-              )}
-            </div>
-            {!canAdd && (
-              <p className="text-[11px] text-amber-400/70 mt-2 text-center">Team is full. Remove a member to invite someone new.</p>
-            )}
-          </div>
-          
-          {/* Confirm Overlay */}
           <AnimatePresence>
-            {confirmRemoveId && (
+            {memberToRemove && (
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="absolute inset-0 z-60 bg-black/95 flex items-center justify-center p-8"
               >
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                  className="bg-[#111] border border-white/10 rounded-2xl p-6 w-full max-w-xs text-center shadow-xl"
-                >
-                  <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center justify-center mx-auto mb-4">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
-                    </svg>
+                <div className="text-center max-w-xs">
+                  <div className="w-16 h-16 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center justify-center mx-auto mb-6">
+                    <Trash2 size={24} />
                   </div>
-                  <h4 className="text-white font-medium mb-2">Remove Member?</h4>
-                  <p className="text-[11px] text-white/50 mb-6 leading-relaxed">
-                    Are you sure you want to remove this member? This action cannot be undone.
-                  </p>
-                  <div className="flex gap-3 justify-center">
-                    <button
-                      onClick={() => setConfirmRemoveId(null)}
-                      className="flex-1 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl text-xs font-semibold transition-colors"
+                  <h4 className="text-lg font-bold text-white">Remove {memberToRemove.name}?</h4>
+                  <p className="text-xs text-white/40 mt-2 leading-relaxed">This will revoke their access to this project immediately.</p>
+                  <div className="flex gap-3 mt-8">
+                    <button 
+                      onClick={() => setMemberToRemove(null)}
+                      className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:bg-white/10 transition-all"
                     >
                       Cancel
                     </button>
-                    <button
-                      onClick={() => removeMember(confirmRemoveId)}
-                      className="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-xs font-semibold transition-colors"
+                    <button 
+                      onClick={() => {
+                        setMembers(prev => prev.filter(m => m.id !== memberToRemove.id));
+                        showToast(`${memberToRemove.name} removed.`, "info");
+                        setMemberToRemove(null);
+                      }}
+                      className="flex-1 py-3 rounded-xl bg-rose-500 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-rose-600 transition-all"
                     >
                       Remove
                     </button>
                   </div>
-                </motion.div>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
-        </motion.div>
+
+          {/* Invitation Section */}
+          <div className="space-y-4 pt-4 border-t border-white/5">
+             <div className="flex items-center justify-between">
+                <h3 className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/20 font-mono">Invite Peers</h3>
+                <span className={`text-[9px] uppercase tracking-widest font-mono ${canAdd ? "text-emerald-400" : "text-rose-400"}`}>
+                  {canAdd ? "Available Slots Open" : "Limit Reached"}
+                </span>
+             </div>
+
+             <div className="relative">
+                <div className={`p-1.5 rounded-2.5xl border transition-all flex items-center gap-2 ${isFocused ? "bg-white/5 border-white/20" : "bg-white/3 border-white/5"}`}>
+                   <div className="pl-3 text-white/20"><Mail size={18} /></div>
+                   <input 
+                      type="text"
+                      placeholder="Enter name or email..."
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      onFocus={() => setIsFocused(true)}
+                      onBlur={() => setTimeout(() => setIsFocused(false), 200)}
+                      disabled={!canAdd}
+                      className="bg-transparent border-none outline-none flex-1 py-3 text-sm text-white placeholder:text-white/10 font-medium"
+                   />
+                   <button 
+                      onClick={() => handleInvite()}
+                      disabled={!canAdd || !inviteEmail.trim()}
+                      className="h-10 px-6 rounded-2xl bg-white text-black text-[10px] font-extrabold uppercase tracking-widest hover:bg-white/90 transition-all disabled:opacity-20 disabled:grayscale"
+                   >
+                      Send
+                   </button>
+                </div>
+
+                <AnimatePresence>
+                  {isFocused && suggestions.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="absolute bottom-full left-0 right-0 mb-3 z-50 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-[0_-20px_50px_rgba(0,0,0,0.5)] overflow-hidden divide-y divide-white/5"
+                    >
+                       {suggestions.map((user) => (
+                         <button 
+                           key={user.id}
+                           onClick={() => handleInvite(user)}
+                           className="w-full flex items-center gap-4 p-4 hover:bg-white/5 transition-colors group text-left"
+                         >
+                            <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-xl border border-white/10" />
+                            <div className="flex-1 min-w-0">
+                               <p className="text-sm font-bold text-white group-hover:text-emerald-400 transition-colors truncate">{user.name}</p>
+                               <p className="text-[10px] text-white/30 truncate mt-0.5">{user.email}</p>
+                            </div>
+                            <div className="text-white/20 group-hover:text-emerald-400 transition-colors">
+                               <Plus size={16} />
+                            </div>
+                         </button>
+                       ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+             </div>
+             {inviteError && <p className="text-[10px] text-rose-400 font-mono ml-2">{inviteError}</p>}
+          </div>
+        </div>
+
+        <div className="px-8 py-6 bg-white/2 border-t border-white/5 flex items-center justify-between">
+           <p className="text-[9px] text-white/10 font-mono uppercase tracking-[0.3em]">Integrity verified &bull; 2m ago</p>
+           <button onClick={onClose} className="px-6 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/10 transition-all">Done</button>
+        </div>
       </motion.div>
-    </AnimatePresence>
+    </div>
   );
 }
 
@@ -643,7 +700,649 @@ function EnrolledCard({
   );
 }
 
-function ProfilePanel() {
+function MemberProfileModal({
+  member,
+  onClose,
+}: {
+  member: TeamMember | any;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-200 flex items-center justify-center p-6 px-4 sm:px-6">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-black/90 backdrop-blur-2xl"
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9, y: 30 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 30 }}
+        className="relative w-full max-w-sm bg-[#080808] border border-white/10 rounded-[2.5rem] shadow-[0_40px_100px_rgba(0,0,0,0.8)] overflow-hidden"
+      >
+        <div className="p-8 flex flex-col items-center text-center">
+          <div className="relative group">
+            <div className="w-24 h-24 rounded-3xl overflow-hidden border-2 border-white/10 mb-6 shadow-2xl transition-transform group-hover:scale-105 duration-500">
+               <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" />
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-4 border-[#080808]"></div>
+          </div>
+          
+          <h2 className="text-2xl font-bold text-white tracking-tight">{member.name}</h2>
+          <p className="text-[10px] text-white/30 uppercase tracking-[0.3em] font-mono mt-2">{member.role || "Member"}</p>
+          
+          <div className="w-full h-px bg-white/5 my-8"></div>
+          
+          <div className="w-full space-y-5 text-left">
+             <div>
+                <p className="text-[10px] uppercase font-bold text-white/20 tracking-widest font-mono mb-2">About & Bio</p>
+                <p className="text-xs text-white/50 leading-relaxed font-medium">Expert in {member.role || "this field"} with a focus on collaborative problem solving and innovative design thinking.</p>
+             </div>
+             <div>
+                <p className="text-[10px] uppercase font-bold text-white/20 tracking-widest font-mono mb-3">Presence</p>
+                <div className="flex gap-3">
+                   {["Github", "X", "LinkedIn"].map(sn => (
+                     <div key={sn} className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/5 text-[9px] text-white/40 font-mono uppercase tracking-widest hover:text-white hover:bg-white/10 transition-all cursor-pointer">
+                        {sn}
+                     </div>
+                   ))}
+                </div>
+             </div>
+          </div>
+          
+          <button 
+            onClick={onClose}
+            className="mt-10 w-full py-4 rounded-2xl bg-white text-black text-[10px] font-extrabold uppercase tracking-widest shadow-[0_10px_30px_rgba(255,255,255,0.1)] hover:shadow-[0_15px_40px_rgba(255,255,255,0.2)] hover:-translate-y-0.5 transition-all"
+          >
+            Close Member Profile
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+function ProfilePanel({ 
+  profile, 
+  set,
+  onViewMember 
+}: { 
+  profile: any, 
+  set: (key: any) => (val: string) => void,
+  onViewMember: (m: any) => void
+}) {
+  const { showToast, setExpandedID } = useDashboard();
+
+  const GENDERS = ["Male", "Female", "Non-binary", "Prefer not to say"];
+
+  const INDIAN_STATES = [
+    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
+    "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
+    "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
+    "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu",
+    "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
+    "Delhi", "Ladakh", "Jammu & Kashmir",
+  ];
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+      {/* Top Row */}
+      <div className="lg:col-span-8">
+        <DashboardWidget 
+          title="Personal information" 
+          onManage={() => showToast("Profile archival and history logs are currently restricted.", "info")}
+        >
+           <div className="flex flex-col">
+              <EditableRow label="Full Name" value={profile.name} onChange={set("name")} locked />
+              <EditableRow label="Date of birth" value="March 15th, 2004" onChange={() => showToast("DOB updated successfully.")} />
+              <EditableRow label="Gender" value={profile.gender} onChange={set("gender")} />
+              <EditableRow label="Phone" value={profile.whatsapp} onChange={set("whatsapp")} placeholder="+91 XXXXX XXXXX" />
+              <EditableRow label="Email" value={profile.email} onChange={set("email")} locked />
+              <EditableRow label="Address" value={profile.city + ", " + profile.state} onChange={() => {}} />
+           </div>
+        </DashboardWidget>
+      </div>
+
+      <div className="lg:col-span-4">
+        <DashboardWidget 
+          title="Documents" 
+          onManage={() => showToast("Document verification engine is running in the background.", "info")}
+        >
+           <div className="grid grid-cols-2 gap-4">
+              <DocumentCard label="College ID" type="Card" date="Mar 2026" onUpload={(name) => showToast(`College ID "${name}" uploaded.`)} />
+              <DocumentCard label="Aadhaar" type="Card" date="Mar 2026" onUpload={(name) => showToast(`Aadhaar "${name}" uploaded.`)} />
+              <DocumentCard label="Certificate" type="PDF" date="Feb 2026" onUpload={(name) => showToast(`Certificate "${name}" uploaded.`)} />
+              <div 
+                onClick={() => showToast("Additional slots will be available after verification.", "info")}
+                className="border-2 border-dashed border-white/5 rounded-2xl flex items-center justify-center aspect-video group cursor-pointer hover:border-white/10 transition-all"
+              >
+                  <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/20 group-hover:text-white/40 transition-all">
+                     <Plus size={14} />
+                  </div>
+              </div>
+           </div>
+        </DashboardWidget>
+      </div>
+
+      <div className="lg:col-span-4">
+         <DashboardWidget 
+          title="Identity Card" 
+          className="flex flex-col justify-center items-center py-10"
+          onManage={() => showToast("ID Customization coming soon in v4.0.", "info")}
+         >
+            <div className="w-full max-w-[280px] cursor-pointer active:scale-[0.98] transition-all hover:brightness-110" onClick={() => setExpandedID(true)}>
+              <ProfileCard
+                name={profile.name}
+                title={profile.college}
+                handle="yatharth.k"
+                status={profile.year}
+                contactText="VIEW FULL ID"
+                avatarUrl="https://ik.imagekit.io/YatharthKhandelwal/AVAT.jpeg"
+                showUserInfo={false}
+                enableTilt={true}
+                enableMobileTilt={false}
+                behindGlowColor="rgba(125, 190, 255, 0.4)"
+                iconUrl="https://static.vecteezy.com/system/resources/thumbnails/010/332/153/small_2x/code-flat-color-outline-icon-free-png.png"
+                behindGlowEnabled
+                innerGradient="linear-gradient(145deg,#2e106510 0%,#1e3a8a20 100%)"
+              />
+            </div>
+         </DashboardWidget>
+      </div>
+
+      <div className="lg:col-span-4">
+         <DashboardWidget 
+          title="Team structure" 
+          onManage={() => showToast("Synchronizing team roles with global registry.", "info")}
+         >
+            <div className="space-y-4">
+               {[
+                 { id: 't1', name: "Arjun Mehta", role: "Frontend Lead", avatar: "https://i.pravatar.cc/150?img=11" },
+                 { id: 't2', name: "Priya Sen", role: "AI Research", avatar: "https://i.pravatar.cc/150?img=47" },
+                 { id: 't3', name: "Yatharth K.", role: "Full Stack", avatar: "https://ik.imagekit.io/YatharthKhandelwal/AVAT.jpeg", isMe: true },
+                 { id: 't4', name: "Karan Tiwari", role: "UI Designer", avatar: "https://i.pravatar.cc/150?img=33" },
+               ].map((member, i) => (
+                 <div key={member.name} className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer ${member.isMe ? "bg-white/10 border-white/20" : "bg-white/5 border-white/5 hover:bg-white/8 hover:scale-[1.02]"}`} onClick={() => onViewMember(member)}>
+                    <img src={member.avatar} alt={member.name} className="w-10 h-10 rounded-xl object-cover border border-white/10" />
+                    <div>
+                       <p className="text-[12px] font-bold text-white leading-tight">{member.name}</p>
+                       <p className="text-[10px] text-white/30 font-mono mt-0.5">{member.role}</p>
+                    </div>
+                    {member.isMe && (
+                      <div className="ml-auto w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                    )}
+                 </div>
+               ))}
+            </div>
+         </DashboardWidget>
+      </div>
+
+      <div className="lg:col-span-4">
+         <DashboardWidget 
+          title="Data completion 2/5" 
+          onManage={() => showToast("Analysis complete. You are in the top 5% of verified users.", "info")}
+         >
+            <div className="space-y-4">
+               {[
+                 { label: "Personal data & resume", done: true },
+                 { label: "Education", done: true },
+                 { label: "Email address", done: true },
+                 { label: "Work experience", done: true },
+                 { label: "Personal statement and consent", done: false },
+                 { label: "Certification", done: false },
+               ].map((item) => (
+                 <div key={item.label} className="flex items-center gap-3 group cursor-pointer" onClick={() => showToast(`Requirement: ${item.label} (${item.done ? "Fulfilled" : "Pending"})`, "info")}>
+                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${item.done ? "bg-emerald-500/20 border-emerald-500 text-emerald-500" : "bg-white/5 border-white/10 text-white/5 group-hover:border-white/20"}`}>
+                       {item.done && <CheckCircle2 size={12} strokeWidth={3} />}
+                    </div>
+                    <span className={`text-[11px] font-medium transition-colors ${item.done ? "text-white/60" : "text-white/30 group-hover:text-white/50"}`}>{item.label}</span>
+                 </div>
+               ))}
+            </div>
+            <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between">
+                <div>
+                   <p className="text-[10px] uppercase font-bold text-white/20 tracking-widest font-mono">Profile Score</p>
+                   <p className="text-xl font-bold text-white mt-1">85%</p>
+                </div>
+                <div className="w-12 h-12 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 flex items-center justify-center text-[10px] text-white font-bold">85%</div>
+            </div>
+         </DashboardWidget>
+      </div>
+    </div>
+  );
+}
+
+function CompetitionsPanel() {
+  const { showToast } = useDashboard();
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+      <div className="lg:col-span-8">
+        <DashboardWidget 
+          title="My Competitions" 
+          onManage={() => showToast("Competition migration logs in progress.", "info")}
+        >
+           <div className="space-y-4">
+              {MOCK_COMPETITIONS.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-white/5 py-12 text-center">
+                  <p className="text-sm text-white/20 italic font-mono uppercase tracking-widest leading-relaxed">No registrations found.</p>
+                  <Link href="/competitions" className="mt-4 inline-block text-[10px] font-bold text-white/50 hover:text-white uppercase tracking-[0.2em] transition-all">Explore all &rarr;</Link>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {MOCK_COMPETITIONS.map((c) => (
+                    <EnrolledCard key={c.slug} item={c} href={`/competitions/${c.slug}`} />
+                  ))}
+                </div>
+              )}
+           </div>
+        </DashboardWidget>
+      </div>
+      
+      <div className="lg:col-span-4">
+        <DashboardWidget 
+          title="Stats & Filters" 
+          onManage={() => showToast("Custom analytics views are being built.", "info")}
+        >
+           <div className="space-y-4">
+              {[
+                { label: "Active", value: "3", color: "emerald-400" },
+                { label: "Completed", value: "2", color: "blue-400" },
+                { label: "Rank", value: "Top 1%", color: "amber-400" },
+              ].map((stat) => (
+                <div key={stat.label} className="bg-white/3 border border-white/5 rounded-2xl p-4 flex items-center justify-between group cursor-pointer active:bg-white/5 transition-colors" onClick={() => showToast(`Detailed stats for ${stat.label} coming soon.`, "info")}>
+                   <div>
+                      <p className="text-[10px] uppercase font-bold text-white/20 tracking-widest font-mono">{stat.label}</p>
+                      <p className="text-xl font-bold text-white mt-1">{stat.value}</p>
+                   </div>
+                   <div className={`w-1.5 h-6 rounded-full bg-${stat.color} opacity-40 shadow-[0_0_12px_rgba(255,255,255,0.1)] group-hover:opacity-100 transition-opacity`}></div>
+                </div>
+              ))}
+           </div>
+        </DashboardWidget>
+      </div>
+    </div>
+  );
+}
+
+function EventsPanel({ setActive }: { setActive?: (v: any) => void }) {
+  const { showToast } = useDashboard();
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+      <div className="lg:col-span-8">
+        <DashboardWidget 
+          title="Enrolled Events" 
+          onManage={() => showToast("Reviewing event enrollment history.", "info")}
+        >
+           <div className="space-y-4">
+              {MOCK_EVENTS.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-white/5 py-12 text-center">
+                  <p className="text-sm text-white/20 italic font-mono uppercase tracking-widest leading-relaxed">No events found.</p>
+                  <Link href="/events" className="mt-4 inline-block text-[10px] font-bold text-white/50 hover:text-white uppercase tracking-[0.2em] transition-all">Browse Events &rarr;</Link>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {MOCK_EVENTS.map((e) => (
+                    <EnrolledCard key={e.slug} item={e} href={`/events/${e.slug}`} />
+                  ))}
+                </div>
+              )}
+           </div>
+        </DashboardWidget>
+      </div>
+      
+      <div className="lg:col-span-4">
+        <DashboardWidget 
+          title="Calendar View" 
+          onManage={() => showToast("Syncing with Google Calendar...", "info")}
+        >
+           <div className="aspect-square bg-white/3 border border-white/5 rounded-3xl p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-white/5 transition-colors" onClick={() => setActive?.("calendar")}>
+              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex flex-col items-center justify-center mb-4">
+                 <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest font-mono">MAR</p>
+                 <p className="text-2xl font-bold text-white uppercase tracking-tighter">30</p>
+              </div>
+              <p className="text-xs font-bold text-white uppercase tracking-widest">No Events Today</p>
+              <p className="text-[10px] text-white/20 mt-2 font-mono uppercase tracking-[0.2em]">Next: Web3 Summit (Apr 4)</p>
+           </div>
+        </DashboardWidget>
+      </div>
+    </div>
+  );
+}
+
+function CalendarPanel() {
+  const { showToast } = useDashboard();
+  const [viewMode, setViewMode] = useState<'schedule' | 'month'>('schedule');
+  const [currentDate, setCurrentDate] = useState(new Date(2026, 2, 1)); // March 2026
+  
+  const generateGoogleCalLink = (title: string, dateStr: string) => {
+    const baseUrl = "https://www.google.com/calendar/render?action=TEMPLATE";
+    const text = encodeURIComponent(title);
+    const dayMatch = dateStr.match(/\d+/);
+    const day = dayMatch ? dayMatch[0] : "01";
+    const isApril = dateStr.toLowerCase().includes("apr");
+    const month = isApril ? "04" : "03";
+    const dateParam = `2026${month}${day.padStart(2, '0')}T100000Z/2026${month}${day.padStart(2, '0')}T120000Z`;
+    return `${baseUrl}&text=${text}&dates=${dateParam}&details=Neutron+Event+Registry`;
+  };
+
+  const schedule = [
+    ...MOCK_COMPETITIONS.map(c => ({ ...c, type: 'Competition' })),
+    ...MOCK_EVENTS.map(e => ({ ...e, type: 'Event' }))
+  ].sort((a, b) => {
+    const dateA = new Date(a.date);
+    const dateB = new Date(b.date);
+    return dateA.getTime() - dateB.getTime();
+  });
+
+  const groupedSchedule = schedule.reduce((acc, item) => {
+    if (!acc[item.date]) acc[item.date] = [];
+    acc[item.date].push(item);
+    return acc;
+  }, {} as Record<string, typeof schedule>);
+
+  const sortedDates = Object.keys(groupedSchedule)
+    .filter(dateStr => {
+        const d = new Date(dateStr);
+        return d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear();
+    })
+    .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
+  const getDaysInMonthGrid = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1).getDay(); 
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    
+    const days = [];
+    for (let i = 0; i < firstDay; i++) {
+        days.push({ day: null, full: null });
+    }
+    for (let i = 1; i <= totalDays; i++) {
+        const fullDate = new Date(year, month, i).toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        days.push({ day: i, full: fullDate });
+    }
+    while (days.length < 42) {
+        days.push({ day: null, full: null });
+    }
+    return days;
+  };
+
+  const handlePrevMonth = () => {
+    setCurrentDate(prev => {
+        const next = new Date(prev);
+        next.setMonth(next.getMonth() - 1);
+        if (next.getFullYear() < 2026) return prev;
+        return next;
+    });
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(prev => {
+        const next = new Date(prev);
+        next.setMonth(next.getMonth() + 1);
+        if (next.getFullYear() > 2026) return prev;
+        return next;
+    });
+  };
+
+  const currentMonthName = currentDate.toLocaleString('en-US', { month: 'long' });
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+      <div className="lg:col-span-12">
+        <DashboardWidget title="Schedule Dashboard" onManage={() => showToast("Syncing with Google Calendar API...", "info")}>
+           <div className="max-w-5xl mx-auto py-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 px-4 gap-6">
+                <div className="flex items-center gap-6">
+                  <h2 className="text-2xl font-bold text-white tracking-tight">
+                    {viewMode === 'schedule' ? 'Timeline' : currentMonthName} <span className="text-white/20 ml-2 font-light">2026</span>
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <button onClick={handlePrevMonth} className="p-2 rounded-full hover:bg-white/5 text-white/40 hover:text-white transition-all"><ChevronLeft size={20} /></button>
+                    <button onClick={handleNextMonth} className="p-2 rounded-full hover:bg-white/5 text-white/40 hover:text-white transition-all"><ChevronRight size={20} /></button>
+                  </div>
+                </div>
+                <div className="hidden md:flex items-center bg-white/5 p-1.5 rounded-2xl border border-white/10 gap-1">
+                   <button 
+                    onClick={() => setViewMode('schedule')}
+                    className={`px-5 py-2 rounded-xl text-[10px] uppercase tracking-widest font-extrabold transition-all ${viewMode === 'schedule' ? 'bg-white text-black shadow-xl' : 'text-white/40 hover:text-white'}`}
+                   >
+                     Schedule
+                   </button>
+                   <button 
+                    onClick={() => setViewMode('month')}
+                    className={`px-5 py-2 rounded-xl text-[10px] uppercase tracking-widest font-extrabold transition-all ${viewMode === 'month' ? 'bg-white text-black shadow-xl' : 'text-white/40 hover:text-white'}`}
+                   >
+                     Month
+                   </button>
+                </div>
+              </div>
+
+              <AnimatePresence mode="wait">
+                {viewMode === 'schedule' ? (
+                  <motion.div 
+                    key="schedule"
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 10 }}
+                    className="space-y-16 px-4"
+                  >
+                    <div className="flex items-center gap-4 mb-4 opacity-50">
+                      <div className="h-px flex-1 bg-linear-to-r from-white/10 to-transparent"></div>
+                      <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-[0.4em] font-mono">{currentMonthName} 2026</h3>
+                      <div className="h-px flex-1 bg-linear-to-l from-white/10 to-transparent"></div>
+                    </div>
+
+                    {sortedDates.length === 0 ? (
+                      <div className="py-24 flex flex-col items-center justify-center text-center">
+                         <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-6">
+                            <Calendar size={24} className="text-white/10" />
+                         </div>
+                         <p className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] font-mono">No events aligned for this month</p>
+                         <button onClick={handleNextMonth} className="mt-6 text-[9px] font-bold text-white/40 hover:text-white uppercase tracking-widest transition-all">Next Month &rarr;</button>
+                      </div>
+                    ) : (
+                      sortedDates.map((dateStr) => {
+                        const dayEvents = groupedSchedule[dateStr];
+                        const dateObj = new Date(dateStr);
+                        const month = dateObj.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+                        const day = dateObj.getDate();
+                        const isToday = false;
+
+                        return (
+                          <div key={dateStr} className="flex flex-col md:flex-row gap-6 md:gap-12 relative group">
+                             <div className="md:w-28 shrink-0 md:text-right md:sticky md:top-24 h-fit">
+                                <div className="flex md:flex-col items-baseline md:items-end gap-2 md:gap-0">
+                                   <p className="text-[11px] font-bold text-emerald-500 uppercase tracking-[0.3em] font-mono mb-1">{month}</p>
+                                   <p className="text-4xl md:text-5xl font-light text-white tracking-tighter leading-none">
+                                      {day}<span className="text-sm md:text-base ml-1 opacity-20 font-mono">th</span>
+                                   </p>
+                                </div>
+                             </div>
+
+                             <div className="flex-1 space-y-6 pb-4 border-l-2 md:border-l-2 border-white/5 pl-8 md:pl-12 relative">
+                                <div className="absolute -left-px top-4 bottom-0 w-0.5 bg-linear-to-b from-white/10 via-white/5 to-transparent"></div>
+                                
+                                {dayEvents.map((item) => (
+                                   <div key={item.slug} className="relative group/item">
+                                      <div className="absolute -left-[37px] md:-left-[53px] top-5 w-4 h-4 rounded-full border-4 border-[#000000] bg-white/10 group-hover/item:bg-emerald-500 group-hover/item:scale-125 transition-all duration-300 z-10 shadow-[0_0_15px_rgba(16,185,129,0)] group-hover/item:shadow-[0_0_15px_rgba(16,185,129,0.5)]"></div>
+                                      
+                                      <div className="bg-white/2 border border-white/8 rounded-3xl p-6 md:p-8 hover:border-white/20 hover:bg-white/4 transition-all duration-500 flex flex-col lg:flex-row lg:items-center justify-between gap-8 group/card overflow-hidden relative">
+                                         <div className="absolute inset-0 bg-linear-to-br from-white/2 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity"></div>
+                                         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 relative z-10">
+                                            <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl overflow-hidden border border-white/10 shrink-0 group-hover/card:scale-105 transition-transform duration-500">
+                                              <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+                                            </div>
+                                            <div>
+                                               <div className="flex flex-wrap items-center gap-3 mb-3">
+                                                  <span className={`text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full border ${item.type === 'Competition' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'}`}>{item.type}</span>
+                                                  <div className="flex items-center gap-2 text-white/30 text-[10px] font-mono"><Target size={12} className="text-white/20" /><span>10:00 — 18:00 IST</span></div>
+                                               </div>
+                                               <h4 className="text-xl md:text-2xl font-bold text-white tracking-tight group-hover/card:text-emerald-400 transition-colors duration-300">{item.title}</h4>
+                                               <div className="flex items-center gap-4 mt-3">
+                                                  <p className="text-[10px] text-white/40 uppercase tracking-[0.3em] font-mono">{item.category}</p>
+                                                  <span className="w-1 h-1 rounded-full bg-white/10"></span>
+                                                  <p className="text-[10px] text-white/40 uppercase tracking-[0.3em] font-mono">Global Entry</p>
+                                               </div>
+                                            </div>
+                                         </div>
+                                         <div className="flex items-center gap-3 relative z-10">
+                                            <button onClick={() => { const link = generateGoogleCalLink(item.title, item.date); window.open(link, '_blank'); showToast("Syncing with Google Calendar...", "success"); }} className="h-12 px-6 rounded-2xl bg-white/5 border border-white/10 text-white/60 hover:bg-white hover:text-black hover:border-white transition-all duration-300 text-[11px] font-bold uppercase tracking-widest flex items-center gap-3 group/btn"><Calendar size={16} className="group-hover/btn:scale-110 transition-transform" /><span className="hidden sm:inline">Add to Calendar</span><span className="sm:hidden">Sync</span></button>
+                                            <Link href={`/${item.type === 'Competition' ? 'competitions' : 'events'}/${item.slug}`} className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-all"><ChevronRight size={20} /></Link>
+                                         </div>
+                                      </div>
+                                   </div>
+                                ))}
+                             </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </motion.div>
+                ) : (
+                  <motion.div 
+                    key="month"
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    className="px-4"
+                  >
+                    <div className="grid grid-cols-7 gap-px bg-white/10 border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
+                       {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                         <div key={d} className="bg-[#050505] p-4 text-center border-b border-white/10">
+                            <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest font-mono">{d}</span>
+                         </div>
+                       ))}
+                       {getDaysInMonthGrid(currentDate).map((d, i) => {
+                          const hasEvents = d.full ? groupedSchedule[d.full] : null;
+                          return (
+                            <div key={`${d.full}-${i}`} className={`bg-[#030303] min-h-[120px] p-4 border-r border-b border-white/5 group hover:bg-white/2 transition-all relative ${d.day ? 'cursor-pointer' : 'opacity-10 pointer-events-none'}`} onClick={() => hasEvents && setViewMode('schedule')}>
+                               <span className="text-sm font-light text-white/20 group-hover:text-white transition-colors">{d.day}</span>
+                               <div className="mt-4 space-y-1.5">
+                                  {hasEvents?.slice(0, 2).map(ev => (
+                                    <div key={ev.slug} className={`h-1.5 w-full rounded-full ${ev.type === 'Competition' ? 'bg-amber-500' : 'bg-emerald-500'} opacity-40 group-hover:opacity-100 transition-opacity`}></div>
+                                  ))}
+                                  {(hasEvents?.length || 0) > 2 && (
+                                    <div className="h-1 text-[8px] font-bold text-white/10 group-hover:text-white/40 font-mono text-center">+{hasEvents!.length - 2} MORE</div>
+                                  )}
+                               </div>
+                            </div>
+                          );
+                       })}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+           </div>
+        </DashboardWidget>
+      </div>
+    </div>
+  );
+}
+
+function InboxPanel() {
+  const { showToast } = useDashboard();
+  const invites = [
+    { id: 1, type: "received", title: "Global Hackathon 2026", user: "Arjun Mehta", time: "2h ago", role: "Frontend Dev" },
+    { id: 2, type: "received", title: "AI Ideathon", user: "Priya Sen", time: "1d ago", role: "AI Engineer" },
+  ];
+  
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+      <div className="lg:col-span-12">
+        <DashboardWidget 
+          title="Team Invites" 
+          onManage={() => showToast("Scanning global network for pending invites...", "info")}
+        >
+           <div className="space-y-3 max-w-4xl mx-auto py-4">
+              {invites.map((inv) => (
+                <div key={inv.id} className="bg-white/3 border border-white/8 rounded-2xl p-5 flex flex-col sm:flex-row gap-5 sm:items-center justify-between hover:border-white/20 hover:bg-white/5 transition-all duration-300">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl overflow-hidden shrink-0 border border-white/10">
+                      <img src={`https://i.pravatar.cc/150?u=${inv.user}`} alt={inv.user} className="w-full h-full object-cover" />
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-bold text-white">{inv.user} <span className="text-white/30 font-normal ml-1">invited you to join</span></p>
+                      <p className="text-[11px] text-amber-400 font-bold mt-1 uppercase tracking-wider">{inv.title}</p>
+                      <div className="flex items-center gap-2.5 mt-2">
+                        <span className="text-[9px] text-white/20 font-mono uppercase tracking-widest">{inv.time}</span>
+                        <span className="w-1 h-1 rounded-full bg-white/10"></span>
+                        <span className="text-[9px] text-white/50 border border-white/10 rounded-lg px-2 py-0.5 bg-white/5 font-bold uppercase tracking-widest">{inv.role}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <button 
+                      onClick={() => showToast(`Successfully declined ${inv.user}'s invite.`, "error")}
+                      className="h-10 px-5 bg-white/5 border border-white/10 text-white hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/20 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all"
+                    >Decline</button>
+                    <button 
+                      onClick={() => showToast(`Welcome to the team! Accepted ${inv.user}'s invite.`, "success")}
+                      className="h-10 px-5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all"
+                    >Accept Invite</button>
+                  </div>
+                </div>
+              ))}
+           </div>
+        </DashboardWidget>
+      </div>
+    </div>
+  );
+}
+
+function SidebarNav({ active, setActive }: { active: any; setActive: (v: any) => void }) {
+  const items = [
+    { id: "profile", label: "Profile", icon: User },
+    { id: "competitions", label: "Competitions", icon: Award },
+    { id: "events", label: "Events", icon: Zap },
+    { id: "calendar", label: "Calendar", icon: Calendar },
+    { id: "inbox", label: "Inbox", icon: Mail },
+  ];
+
+  return (
+    <nav className="flex flex-col gap-1.5">
+      {items.map((item) => (
+        <button
+          key={item.id}
+          onClick={() => setActive(item.id)}
+          className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-300 relative group overflow-hidden ${
+            active === item.id ? "text-white" : "text-white/30 hover:text-white/60"
+          }`}
+        >
+          {active === item.id && (
+            <motion.div
+              layoutId="sidebar-active-pill"
+              className="absolute inset-0 bg-white/5 border border-white/10 rounded-xl"
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            />
+          )}
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className={`text-[12px] font-extrabold uppercase tracking-widest ${active === item.id ? "text-white" : "text-white/40 group-hover:text-white/80"}`}>{item.label}</p>
+            </div>
+            {active === item.id && (
+              <div className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]"></div>
+            )}
+          </div>
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+export default function ProfilePage() {
+  const [active, setActive] = useState<NavItem>("profile");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  // Toast System
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+  const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
+    setToast(null);
+    setTimeout(() => setToast({ message, type }), 10);
+  };
+
+  // Profile State (Lifted for global access)
   const [profile, setProfile] = useState({
     name: "Yatharth Khandelwal",
     email: "yatharth@neutron.in",
@@ -662,321 +1361,78 @@ function ProfilePanel() {
   const set = (key: keyof typeof profile) => (val: string) =>
     setProfile((p) => ({ ...p, [key]: val }));
 
-  const GENDERS = ["Male", "Female", "Non-binary", "Prefer not to say"];
+  // Header Button States
+  const [exporting, setExporting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [expandedID, setExpandedID] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<any | null>(null);
 
-  const INDIAN_STATES = [
-    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
-    "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
-    "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
-    "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu",
-    "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
-    "Delhi", "Ladakh", "Jammu & Kashmir",
-  ];
+  const handleExport = () => {
+    setExporting(true);
+    setTimeout(() => {
+      setExporting(false);
+      showToast("Profile exported as PDF successfully.");
+    }, 2500);
+  };
 
-  return (
-    <motion.div
-      key="profile"
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-      className="space-y-5 pb-10"
-    >
-
-      <div className="w-full flex justify-center py-4">
-        <div className="w-full max-w-[320px] sm:max-w-sm">
-          <ProfileCard
-            name={profile.name}
-            title={profile.college + " · " + profile.year}
-            handle="yatharth.k"
-            status="Online"
-            contactText="Contact Me"
-            avatarUrl="https://ik.imagekit.io/YatharthKhandelwal/AVAT.jpeg"
-            showUserInfo={false}
-            enableTilt={true}
-            enableMobileTilt={false}
-            onContactClick={() => {}}
-            behindGlowColor="rgba(125, 190, 255, 0.67)"
-            iconUrl="https://static.vecteezy.com/system/resources/thumbnails/010/332/153/small_2x/code-flat-color-outline-icon-free-png.png"
-            behindGlowEnabled
-            innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {[
-          { label: "Competitions", value: "5", sub: "Registered" },
-          { label: "Events", value: "3", sub: "Enrolled" },
-          { label: "Shortlisted", value: "2", sub: "This season" },
-        ].map(({ label, value, sub }, i) => (
-          <div 
-            key={label} 
-            className={`bg-white/3 border border-white/8 rounded-2xl p-4 ${
-              i === 2 ? "col-span-2 sm:col-span-1" : ""
-            }`}
-          >
-            <span className="text-[10px] uppercase tracking-widest text-white/25 font-mono block">{label}</span>
-            <span className="text-2xl font-bold text-white mt-1 block">{value}</span>
-            <span className="text-xs text-white/35">{sub}</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="rounded-2xl border border-white/8 bg-white/3 p-6">
-        <h3 className="text-xs uppercase tracking-widest text-white/25 font-mono mb-5">Personal Information</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
-          <EditableField label="Full Name" value={profile.name} onChange={set("name")} locked />
-          <EditableField label="Email Address" value={profile.email} onChange={set("email")} locked />
-          <EditableField label="Bio" value={profile.bio} onChange={set("bio")} placeholder="Tell us about yourself…" />
-          <SelectField label="Gender" value={profile.gender} options={GENDERS} onChange={set("gender")} />
-          <EditableField label="WhatsApp Number" value={profile.whatsapp} onChange={set("whatsapp")} type="tel" placeholder="+91 XXXXX XXXXX" hint="Used for competition notifications only" />
-          <EditableField label="City" value={profile.city} onChange={set("city")} placeholder="e.g. Bengaluru" />
-          <SelectField label="State" value={profile.state} options={INDIAN_STATES} onChange={set("state")} />
-          <div /> 
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-white/8 bg-white/3 p-6">
-        <h3 className="text-xs uppercase tracking-widest text-white/25 font-mono mb-5">Academic Details</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
-          <EditableField label="College / University" value={profile.college} onChange={set("college")} placeholder="e.g. IIT Delhi" />
-          <EditableField label="Year & Branch" value={profile.year} onChange={set("year")} placeholder="e.g. 2nd Year · ECE" />
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-white/8 bg-white/3 p-6">
-        <h3 className="text-xs uppercase tracking-widest text-white/25 font-mono mb-1">Identity Documents</h3>
-        <p className="text-[11px] text-white/25 mb-5">Required for prize disbursement verification. All uploads are encrypted.</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <IdUploadField label="College ID Card" hint="Front side of your college-issued identity card" />
-          <IdUploadField label="Government ID" hint="Aadhaar, PAN, Passport or Driving License" />
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-white/8 bg-white/3 p-6">
-        <h3 className="text-xs uppercase tracking-widest text-white/25 font-mono mb-5">Social Links</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
-          <EditableField label="GitHub" value={profile.github} onChange={set("github")} type="url" placeholder="https://github.com/username" />
-          <EditableField label="LinkedIn" value={profile.linkedin} onChange={set("linkedin")} type="url" placeholder="https://linkedin.com/in/username" />
-          <EditableField label="Twitter / X" value={profile.twitter} onChange={set("twitter")} type="url" placeholder="https://x.com/username" />
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-function CompetitionsPanel() {
-  return (
-    <motion.div
-      key="competitions"
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-      className="space-y-4 pb-10"
-    >
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-white">My Competitions</h2>
-          <p className="text-xs text-white/30 mt-0.5">Competitions you&apos;ve registered for</p>
-        </div>
-        <Link href="/competitions" className="text-xs text-white/40 hover:text-white transition-colors">
-          Browse all →
-        </Link>
-      </div>
-
-      {MOCK_COMPETITIONS.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-white/10 p-12 text-center">
-          <p className="text-sm text-white/30">You haven&apos;t registered for any competitions yet.</p>
-          <Link href="/competitions" className="mt-3 inline-block text-xs text-white/50 hover:text-white transition-colors">
-            Explore competitions →
-          </Link>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {MOCK_COMPETITIONS.map((c) => (
-            <EnrolledCard key={c.slug} item={c} href={`/competitions/${c.slug}`} />
-          ))}
-        </div>
-      )}
-    </motion.div>
-  );
-}
-
-function EventsPanel() {
-  return (
-    <motion.div
-      key="events"
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-      className="space-y-4 pb-10"
-    >
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-white">My Events</h2>
-          <p className="text-xs text-white/30 mt-0.5">Events you&apos;ve enrolled in</p>
-        </div>
-        <Link href="/events" className="text-xs text-white/40 hover:text-white transition-colors">
-          Browse all →
-        </Link>
-      </div>
-
-      {MOCK_EVENTS.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-white/10 p-12 text-center">
-          <p className="text-sm text-white/30">You haven&apos;t enrolled in any events yet.</p>
-          <Link href="/events" className="mt-3 inline-block text-xs text-white/50 hover:text-white transition-colors">
-            Explore events →
-          </Link>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {MOCK_EVENTS.map((e) => (
-            <EnrolledCard key={e.slug} item={e} href={`/events/${e.slug}`} />
-          ))}
-        </div>
-      )}
-    </motion.div>
-  );
-}
-
-function InboxPanel() {
-  const invites = [
-    { id: 1, type: "received", title: "Global Hackathon 2026", user: "Arjun Mehta", time: "2h ago", role: "Frontend Dev" },
-    { id: 2, type: "received", title: "AI Ideathon", user: "Priya Sen", time: "1d ago", role: "AI Engineer" },
-  ];
-  
-  const sent = [
-    { id: 3, type: "sent", title: "Neutron 3.0", user: "Meera Joshi", time: "3d ago", status: "pending" },
-    { id: 4, type: "sent", title: "Global Hackathon 2026", user: "Karan Tiwari", time: "1w ago", status: "accepted" },
-  ];
+  const handleSave = () => {
+    setSaving(true);
+    setTimeout(() => {
+      setSaving(false);
+      showToast("All changes have been saved.");
+    }, 1800);
+  };
 
   return (
-    <motion.div
-      key="inbox"
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-      className="space-y-8 pb-10"
-    >
-      <div className="flex items-center justify-between pl-1">
-        <div>
-          <h2 className="text-lg font-semibold text-white">Invites & Messages</h2>
-          <p className="text-xs text-white/30 mt-0.5">Manage your team invitations</p>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <h3 className="text-[10px] uppercase tracking-widest text-white/40 font-mono ml-1">Received Invites</h3>
-        {invites.map((inv) => (
-          <div key={inv.id} className="bg-white/3 border border-white/8 rounded-2xl p-4 flex flex-col sm:flex-row gap-4 sm:items-center justify-between hover:border-white/15 transition-colors">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-white/10">
-                <img src={`https://i.pravatar.cc/150?u=${inv.user}`} alt={inv.user} className="w-full h-full object-cover" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-white">{inv.user} <span className="text-white/40 font-normal">invited you to join</span></p>
-                <p className="text-xs text-amber-400 font-medium mt-0.5">{inv.title}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[10px] text-white/20 capitalize">{inv.time}</span>
-                  <span className="w-1 h-1 rounded-full bg-white/10"></span>
-                  <span className="text-[10px] text-white/40 border border-white/10 rounded-md px-1.5 py-0.5 bg-white/5">{inv.role}</span>
-                </div>
-              </div>
+    <DashboardContext.Provider value={{ showToast, setExpandedID }}>
+      <div className="min-h-screen bg-black text-white selection:bg-white/20 relative">
+        <AnimatePresence>
+          {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+          {selectedMember && <MemberProfileModal member={selectedMember} onClose={() => setSelectedMember(null)} />}
+          {expandedID && (
+            <div className="fixed inset-0 z-200 flex items-center justify-center p-6">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setExpandedID(false)}
+                className="absolute inset-0 bg-black/95 backdrop-blur-2xl"
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8, rotateY: 30 }}
+                animate={{ opacity: 1, scale: 1, rotateY: 0 }}
+                exit={{ opacity: 0, scale: 0.8, rotateY: 30 }}
+                transition={{ type: "spring", damping: 20 }}
+                className="relative z-10 w-full max-w-md perspective-2000"
+              >
+                <ProfileCard
+                  name={profile.name}
+                  title={profile.college}
+                  handle="yatharth.k"
+                  status={profile.year}
+                  contactText="DOWNLOAD ID"
+                  avatarUrl="https://ik.imagekit.io/YatharthKhandelwal/AVAT.jpeg"
+                  showUserInfo={false}
+                  enableTilt={true}
+                  enableMobileTilt={true}
+                  behindGlowColor="rgba(125, 190, 255, 0.6)"
+                  iconUrl="https://static.vecteezy.com/system/resources/thumbnails/010/332/153/small_2x/code-flat-color-outline-icon-free-png.png"
+                  behindGlowEnabled
+                  innerGradient="linear-gradient(145deg,#2e106520 0%,#1e3a8a40 100%)"
+                />
+                <button 
+                  onClick={() => setExpandedID(false)}
+                  className="mt-12 mx-auto flex items-center gap-2 text-[10px] font-bold text-white/20 hover:text-rose-400 uppercase tracking-widest transition-all group"
+                >
+                  <X size={14} className="group-hover:rotate-90 transition-transform" />
+                  Close Identity Viewer
+                </button>
+              </motion.div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button className="px-4 py-2 bg-white/5 border border-white/10 text-white hover:bg-white/10 rounded-xl text-xs font-medium transition-colors">Decline</button>
-              <button className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 rounded-xl text-xs font-semibold transition-colors">Accept</button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="space-y-3">
-        <h3 className="text-[10px] uppercase tracking-widest text-white/40 font-mono ml-1 mt-6">Sent Invites</h3>
-        {sent.map((inv) => (
-          <div key={inv.id} className="bg-white/3 border border-white/5 rounded-2xl p-4 flex items-center justify-between opacity-70 hover:opacity-100 transition-opacity">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 border border-white/10 opacity-70">
-                <img src={`https://i.pravatar.cc/150?u=${inv.user}`} alt={inv.user} className="w-full h-full object-cover grayscale" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-white/80">You invited <span className="text-white">{inv.user}</span></p>
-                <p className="text-[11px] text-white/30 mt-0.5">{inv.title} · {inv.time}</p>
-              </div>
-            </div>
-            <div className="shrink-0">
-              {inv.status === "pending" && <span className="text-[9px] uppercase tracking-widest font-mono text-white/40 border border-white/10 bg-white/5 px-2 py-1 rounded-full">{inv.status}</span>}
-              {inv.status === "accepted" && <span className="text-[9px] uppercase tracking-widest font-mono text-emerald-400 border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 rounded-full">{inv.status}</span>}
-              {inv.status === "declined" && <span className="text-[9px] uppercase tracking-widest font-mono text-rose-400 border border-rose-500/20 bg-rose-500/10 px-2 py-1 rounded-full">{inv.status}</span>}
-            </div>
-          </div>
-        ))}
-      </div>
-    </motion.div>
-  );
-}
-
-function SidebarNav({
-  active,
-  setActive,
-}: {
-  active: NavItem;
-  setActive: (v: NavItem) => void;
-}) {
-  const items: { id: NavItem; label: string; sub: string; badge?: number }[] = [
-    { id: "profile", label: "Profile", sub: "Personal details" },
-    { id: "competitions", label: "Competitions", sub: "Your registrations" },
-    { id: "events", label: "Events", sub: "Your enrollments" },
-    { id: "inbox", label: "Invites & Messages", sub: "Pending invitations", badge: 2 },
-  ];
-
-  return (
-    <nav className="flex flex-col gap-1">
-      {items.map((item) => (
-        <button
-          key={item.id}
-          onClick={() => setActive(item.id)}
-          className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 relative group ${
-            active === item.id ? "bg-white/8 text-white" : "text-white/40 hover:text-white/70 hover:bg-white/5"
-          }`}
-        >
-          {active === item.id && (
-            <motion.div
-              layoutId="sidebar-pill"
-              className="absolute inset-0 rounded-xl border border-white/10 bg-white/5"
-              transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            />
           )}
-          <div className="relative z-10 flex items-center justify-between">
-            <div>
-              <span className="block text-sm font-medium">{item.label}</span>
-              <span className="block text-[10px] text-white/25 mt-0.5">{item.sub}</span>
-            </div>
-            {item.badge && (
-              <span className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-400 text-[10px] font-bold flex items-center justify-center border border-rose-500/20">
-                {item.badge}
-              </span>
-            )}
-          </div>
-        </button>
-      ))}
-    </nav>
-  );
-}
+        </AnimatePresence>
 
-export default function ProfilePage() {
-  const [active, setActive] = useState<NavItem>("profile");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  return (
-    <div className="min-h-screen bg-[#030303] text-white selection:bg-white/20 relative overflow-hidden">
-      <div className="pointer-events-none fixed inset-0 z-0">
-        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-purple-900/10 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-indigo-900/8 rounded-full blur-[100px]" />
+        <div className="pointer-events-none fixed inset-0 z-0 bg-[#000000]">
         <div
           className="absolute inset-0 opacity-20"
           style={{
@@ -1028,7 +1484,7 @@ export default function ProfilePage() {
             exit={{ opacity: 0, y: -20 }}
             className="fixed inset-0 top-14 z-40 bg-[#0c0c0c] flex flex-col p-6 overflow-y-auto md:hidden"
           >
-            <SidebarNav active={active} setActive={(v) => { setActive(v); setMobileMenuOpen(false); }} />
+            <SidebarNav active={active} setActive={(v: any) => { setActive(v); setMobileMenuOpen(false); }} />
             
             <div className="mt-8 pt-6 border-t border-white/10 flex flex-col gap-3">
               <Link href="/competitions" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
@@ -1044,10 +1500,10 @@ export default function ProfilePage() {
         )}
       </AnimatePresence>
 
-      <div className="flex h-screen pt-14 relative z-10 w-full">
-        <aside className="w-56 shrink-0 h-full border-r border-white/6 bg-[#030303]/60 backdrop-blur-xl hidden md:flex flex-col px-3 py-6 overflow-y-auto">
-          <div className="flex items-center gap-3 px-3 pb-5 mb-4 border-b border-white/6">
-            <div className="w-9 h-9 rounded-xl overflow-hidden border border-white/15 shrink-0">
+      <div className="flex pt-14 relative z-10 w-full min-h-[calc(100vh-3.5rem)]">
+        <aside className="w-64 shrink-0 h-[calc(100vh-3.5rem)] border-r border-white/6 bg-[#030303]/40 backdrop-blur-3xl hidden md:flex flex-col px-4 py-8 sticky top-14">
+          <div className="flex items-center gap-3 px-3 pb-8 mb-6 border-b border-white/6">
+            <div className="w-10 h-10 rounded-2xl overflow-hidden border border-white/10 shrink-0">
               <img
                 src="https://ik.imagekit.io/YatharthKhandelwal/AVAT.jpeg"
                 alt="Yatharth"
@@ -1055,22 +1511,26 @@ export default function ProfilePage() {
               />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-white truncate">Yatharth Khandelwal</p>
-              <p className="text-[10px] text-white/30 truncate">1st Year · CS & AI</p>
+              <p className="text-sm font-bold text-white truncate">Yatharth K.</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                <p className="text-[9px] uppercase tracking-widest text-white/30 font-mono">Verified</p>
+              </div>
             </div>
           </div>
 
           <SidebarNav active={active} setActive={setActive} />
 
-          <div className="mt-auto flex flex-col gap-1 pt-4 border-t border-white/6">
+          <div className="mt-auto flex flex-col gap-1.5 pt-6 border-t border-white/6">
             {[
-              { href: "/competitions", label: "All Competitions" },
-              { href: "/events", label: "All Events" },
+              { href: "/competitions", label: "Dashboard" },
+              { href: "/settings", label: "Settings" },
+              { href: "/help", label: "Help Center" },
             ].map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
-                className="flex items-center justify-between px-4 py-2.5 rounded-xl text-xs text-white/25 hover:text-white/55 hover:bg-white/5 transition-all duration-200"
+                className="flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] uppercase tracking-widest font-mono text-white/20 hover:text-white/60 transition-all duration-300"
               >
                 {label}
                 <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -1081,17 +1541,35 @@ export default function ProfilePage() {
           </div>
         </aside>
 
-        <main className="flex-1 w-full overflow-y-auto overflow-x-hidden">
-          <div className="max-w-3xl mx-auto px-4 sm:px-8 lg:px-10 py-6 sm:py-8 w-full">
+        <main className="flex-1 w-full overflow-x-hidden min-h-screen bg-[#030303]/20">
+          <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-10 w-full">
+            <div className="flex items-center justify-between mb-10">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight text-white capitalize">{active}</h1>
+                <p className="text-xs text-white/30 mt-1.5 font-mono uppercase tracking-widest">Dashboard &bull; {active}</p>
+              </div>
+            </div>
+
             <AnimatePresence mode="wait">
-              {active === "profile" && <ProfilePanel />}
-              {active === "competitions" && <CompetitionsPanel />}
-              {active === "events" && <EventsPanel />}
-              {active === "inbox" && <InboxPanel />}
+              <motion.div
+                key={active}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                className="w-full"
+              >
+                {active === "profile" && <ProfilePanel profile={profile} set={set} onViewMember={(m) => setSelectedMember(m)} />}
+                {active === "competitions" && <CompetitionsPanel />}
+                {active === "events" && <EventsPanel setActive={setActive} />}
+                {active === "calendar" && <CalendarPanel />}
+                {active === "inbox" && <InboxPanel />}
+              </motion.div>
             </AnimatePresence>
           </div>
         </main>
       </div>
     </div>
-  );
+  </DashboardContext.Provider>
+);
 }

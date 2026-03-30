@@ -88,7 +88,7 @@ export const PLANET_RECORDS: PlanetRecord[] = [
   // },
   {
     slug: "moon",
-    name: "Gallery",
+    name: "Profile",
     accent: "#dfe7ff",
     size: 2,
     kind: "obj",

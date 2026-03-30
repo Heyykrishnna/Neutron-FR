@@ -86,10 +86,12 @@ export default function MobileLanding({ onMenuToggle, isMenuOpen }: MobileLandin
           className="relative overflow-hidden shadow-[0_20px_80px_rgba(0,0,0,0.8)] border-x border-b border-white/5"
         >
           <motion.div style={{ scale: heroScale }} className="relative w-full h-full">
-            <img
+            <Image
               src="https://ik.imagekit.io/YatharthKhandelwal/Phone.png"
               alt="The future of aviation"
+              fill
               className="object-cover"
+              priority
             />
           </motion.div>
           
