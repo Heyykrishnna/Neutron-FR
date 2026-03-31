@@ -1,12 +1,105 @@
 "use client";
 
+import * as THREE from 'three';
 import React, { useRef, useEffect, useState, useMemo } from "react";
-import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
+import { motion, useScroll, useTransform, AnimatePresence, useSpring, useMotionValue } from "framer-motion";
 import Link from "next/link";
 import BlurHeading from "./blur-heading";
-import { EVENTS_DATA } from "@/lib/events-data";
-import gsap from "gsap";
-import {Filter, CircleDot, ArrowDownUp, ChevronDown } from "lucide-react";
+import { Filter, CircleDot, ArrowDownUp, ChevronDown } from "lucide-react";
+
+const playSciFiClick = () => {
+  try {
+    const audio = new Audio("https://actions.google.com/sounds/v1/science_fiction/sci_fi_beep.ogg");
+    audio.volume = 0.2;
+    audio.play().catch(() => {});
+  } catch (e) {}
+};
+
+const ThreeStarsBackground = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2("#000000", 0.001);
+    
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 2000);
+    camera.position.z = 800;
+    
+    const renderer = new THREE.WebGLRenderer({ canvas: canvasRef.current, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    
+    const txLoader = new THREE.TextureLoader();
+    const starImg1 = txLoader.load("https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/sprites/spark1.png");
+    const starImg2 = txLoader.load("https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/sprites/circle.png");
+    const starImg3 = txLoader.load("https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/sprites/snowflake1.png");
+    
+    const createLayer = (count: number, size: number, texture: THREE.Texture, color: string, zRange: number) => {
+       const geo = new THREE.BufferGeometry();
+       const pos = [];
+       for(let i=0; i<count; i++) {
+         pos.push((Math.random() - 0.5)*2500, (Math.random() - 0.5)*2500, (Math.random() - 0.5)*zRange);
+       }
+       geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+       const mat = new THREE.PointsMaterial({ size, map: texture, transparent: true, blending: THREE.AdditiveBlending, color, depthWrite: false });
+       return new THREE.Points(geo, mat);
+    };
+    
+    const layer1 = createLayer(800, 3, starImg1, "#88aaff", 1000);
+    layer1.position.z = -600;
+    scene.add(layer1);
+    
+    const layer2 = createLayer(400, 7, starImg2, "#ffd7aa", 800);
+    layer2.position.z = -200;
+    scene.add(layer2);
+    
+    const layer3 = createLayer(150, 14, starImg3, "#ffffff", 600);
+    layer3.position.z = 100;
+    scene.add(layer3);
+    
+    let targetScrollY = window.scrollY;
+    let currentScrollY = window.scrollY;
+    
+    const onScroll = () => { targetScrollY = window.scrollY; };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    
+    const resize = () => {
+      camera.aspect = window.innerWidth/window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    };
+    window.addEventListener('resize', resize);
+    
+    let animFrame = 0;
+    let time = 0;
+    const tick = () => {
+       time += 0.005;
+       currentScrollY += (targetScrollY - currentScrollY) * 0.08;
+       
+       layer1.position.y = currentScrollY * 0.08;
+       layer2.position.y = currentScrollY * 0.25;
+       layer3.position.y = currentScrollY * 0.6;
+       
+       layer1.rotation.y = time * 0.05;
+       layer2.rotation.y = time * 0.08;
+       layer3.rotation.y = time * 0.15;
+       
+       renderer.render(scene, camera);
+       animFrame = requestAnimationFrame(tick);
+    };
+    tick();
+    
+    return () => {
+        window.removeEventListener('scroll', onScroll);
+        window.removeEventListener('resize', resize);
+        cancelAnimationFrame(animFrame);
+        renderer.dispose();
+    }
+  }, []);
+  
+  return <canvas ref={canvasRef} className="fixed inset-0 z-0 pointer-events-none w-full h-full mix-blend-screen opacity-70" />;
+}
 
 type CardProps = {
   title: string;
@@ -22,55 +115,101 @@ type CardProps = {
 
 function EventParallaxCard({ title, description, image, heightClass, delay = 0, slug, category, teamSize, status }: CardProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ["start end", "end start"],
-  });
+  
+  const [isHovered, setIsHovered] = useState(false);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  
+  const mx = useMotionValue(0.5);
+  const my = useMotionValue(0.5);
+  const springConfig = { stiffness: 400, damping: 30 };
+  const springX = useSpring(mx, springConfig);
+  const springY = useSpring(my, springConfig);
+  
+  const rotateX = useTransform(springY, [0, 1], [15, -15]);
+  const rotateY = useTransform(springX, [0, 1], [-15, 15]);
+  
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    mx.set(x / rect.width);
+    my.set(y / rect.height);
+    setMousePosition({ x, y });
+  };
+  
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    mx.set(0.5);
+    my.set(0.5);
+  };
 
-  const y = useTransform(scrollYProgress, [0, 1], ["-15%", "15%"]);
+  const handleCardClick = () => {
+    playSciFiClick();
+  };
 
   return (
-    <Link href={`/events/${slug}`} className="block w-full">
+    <Link href={`/events/${slug}`} className="block w-full perspective-[1500px]" onClick={handleCardClick}>
       <motion.div
-        initial={{ opacity: 0, y: 50 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay, ease: [0.16, 1, 0.3, 1] }}
         ref={ref}
-        className={`relative w-full overflow-hidden group rounded-sm ${heightClass}`}
+        onMouseMove={handleMouseMove}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={handleMouseLeave}
+        initial={{ opacity: 0, y: 150, scale: 0.95 }}
+        whileInView={{ opacity: 1, y: 0, scale: 1 }}
+        viewport={{ once: true, margin: "-100px" }}
+        transition={{ duration: 1.2, delay: delay * 0.1, ease: [0.16, 1, 0.3, 1] }}
+        style={{
+          rotateX,
+          rotateY,
+          transformStyle: "preserve-3d",
+        }}
+        className={`relative w-full overflow-hidden group rounded-xl border border-white/5 ${heightClass} shadow-[0_0_30px_rgba(0,0,0,0.8)] will-change-transform`}
       >
         <motion.div
-          className="absolute inset-0 z-0 bg-cover bg-center"
+          className="pointer-events-none absolute inset-0 z-50 mix-blend-screen transition-opacity duration-300"
           style={{
-            backgroundImage: `url(${image})`,
-            y,
-            scale: 1.25, 
-            filter: "grayscale(100%) contrast(1.1) brightness(0.8)",
+            opacity: isHovered ? 1 : 0,
+            background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(255,255,255,0.18), transparent 40%)`
           }}
         />
 
-        <div className="absolute inset-0 z-10 bg-linear-to-t from-black/80 via-black/20 to-transparent transition-opacity duration-500 group-hover:from-black/95" />
+        <motion.div
+          className="absolute inset-0 z-0 bg-cover bg-center transition-transform duration-1000 group-hover:scale-110"
+          style={{
+            backgroundImage: `url(${image})`,
+            filter: "grayscale(80%) contrast(1.1) brightness(0.6)",
+            transform: "translateZ(-30px)"
+          }}
+        />
 
-        <div className="absolute bottom-0 left-0 right-0 z-20 p-8 md:p-10 flex flex-col items-start transition-transform duration-500 group-hover:-translate-y-2">
-          <h3 className="text-4xl font-bold tracking-tighter leading-tight mb-4 text-white uppercase wrap-break-word">
+        <div className="absolute inset-0 z-10 bg-linear-to-t from-black/95 via-black/40 to-transparent transition-opacity duration-500 group-hover:from-black" />
+
+        <div 
+          className="absolute bottom-0 left-0 right-0 z-20 p-8 md:p-10 flex flex-col items-start transition-all duration-500 group-hover:-translate-y-4"
+          style={{ transform: "translateZ(40px)" }}
+        >
+          <h2 className="text-3xl md:text-[2.6rem] font-bold tracking-tight leading-[1.05] mb-4 text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.8)]">
             {title}
-          </h3>
+          </h2>
           {description && (
-            <p className="text-gray-400 text-sm md:text-[15px] leading-relaxed max-w-[90%] font-light mb-6">
+            <p className="text-gray-300 text-sm md:text-[15px] leading-relaxed max-w-[90%] font-light mb-6 opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500 delay-100">
               {description}
             </p>
           )}
 
-          <div className="flex flex-wrap gap-2 mt-auto">
-            <span className="px-2 py-1 rounded-sm bg-white/5 border border-white/10 text-[10px] uppercase tracking-wider text-white/50 font-mono">
+          <div className="flex flex-wrap gap-3 mt-auto transform-gpu">
+            <span className="px-3 py-1.5 rounded-sm bg-white/5 border border-white/10 text-[10px] uppercase tracking-wider text-white/50 font-mono backdrop-blur-md">
               {category}
             </span>
-            <span className="px-2 py-1 rounded-sm bg-white/5 border border-white/10 text-[10px] uppercase tracking-wider text-white/50 font-mono">
+            <span className="px-3 py-1.5 rounded-sm bg-white/5 border border-white/10 text-[10px] uppercase tracking-wider text-white/50 font-mono backdrop-blur-md">
               {teamSize}
             </span>
-            <span className={`px-2 py-1 rounded-sm border text-[10px] uppercase tracking-wider font-mono ${
-              status === 'open' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
-              status === 'closed' ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' :
-              status === 'postponed' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
+            <span className={`px-3 py-1.5 rounded-sm border text-[10px] uppercase tracking-wider font-mono backdrop-blur-md ${
+              status === 'open' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
+              status === 'closed' ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' :
+              status === 'postponed' ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' :
               'bg-white/5 border-white/10 text-white/30'
             }`}>
               {status}
@@ -78,7 +217,10 @@ function EventParallaxCard({ title, description, image, heightClass, delay = 0, 
           </div>
         </div>
 
-        <div className="absolute bottom-8 right-8 z-30 bg-white text-black p-3 rounded-sm opacity-0 translate-y-4 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0 hover:scale-105">
+        <div 
+          className="absolute top-8 right-8 z-30 p-4 border border-white/10 bg-black/40 backdrop-blur-md text-white rounded-full opacity-0 -translate-y-4 transition-all duration-500 group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-105"
+          style={{ transform: "translateZ(50px)" }}
+        >
           <svg
             width="20"
             height="20"
@@ -87,6 +229,7 @@ function EventParallaxCard({ title, description, image, heightClass, delay = 0, 
             stroke="currentColor"
             strokeWidth="2"
             strokeLinecap="square"
+            className="rotate-45 group-hover:rotate-0 transition-transform duration-500"
           >
             <path d="M7 17L17 7M17 7H7M17 7V17" />
           </svg>
@@ -95,6 +238,8 @@ function EventParallaxCard({ title, description, image, heightClass, delay = 0, 
     </Link>
   );
 }
+
+import { EVENTS_DATA } from "@/lib/events-data";
 
 export default function EventsPage() {
   const { scrollYProgress } = useScroll();
@@ -122,7 +267,6 @@ export default function EventsPage() {
     const cats = Array.from(new Set(EVENTS_DATA.map(e => e.category)));
     return ["All Categories", ...cats];
   }, []);
-
 
   const statuses = ["All Status", "open", "closed", "postponed", "cancelled"];
   const sortOptions = ["Default", "Title (A-Z)", "Title (Z-A)", "Date (Newest)", "Date (Oldest)"];
@@ -152,7 +296,6 @@ export default function EventsPage() {
     } else if (sortBy === "Title (Z-A)") {
       result.sort((a, b) => b.title.localeCompare(a.title));
     } else if (sortBy === "Date (Newest)") {
-      // Assuming ISO date or comparable string format
       result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     } else if (sortBy === "Date (Oldest)") {
       result.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -164,6 +307,16 @@ export default function EventsPage() {
   const leftColumnEvents = filteredEvents.filter((_, i) => i % 2 === 0);
   const rightColumnEvents = filteredEvents.filter((_, i) => i % 2 !== 0);
 
+  const handleDropdownClick = (type: string) => {
+    playSciFiClick();
+    setActiveDropdown(activeDropdown === type ? null : type);
+  };
+  
+  const handleDropdownSelect = () => {
+    playSciFiClick();
+    setActiveDropdown(null);
+  }
+
   return (
     <div className="min-h-screen bg-[#030303] text-white selection:bg-white/20 relative overflow-hidden">
       
@@ -173,43 +326,56 @@ export default function EventsPage() {
           backgroundImage: "url('https://4kwallpapers.com/images/wallpapers/stars-galaxy-3840x2160-10307.jpg')",
           backgroundSize: "cover",
           backgroundPosition: "center",
-          filter: "brightness(0.4) saturate(1.3)",
+          filter: "brightness(0.35) saturate(1.2)",
           scale: 1.15,
           y: bgY,
         }}
       />
-      <div className="pointer-events-none fixed inset-0 z-0 bg-linear-to-b from-transparent via-[#030303]/40 to-[#030303]/95" />
+      <div className="pointer-events-none fixed inset-0 z-0 bg-linear-to-b from-[#030303]/20 via-[#030303]/60 to-[#030303]" />
+      
+      <ThreeStarsBackground />
 
       <div className="fixed top-6 left-6 z-50 pointer-events-auto flex flex-row items-center gap-4">
-        <Link href="/">
+        <Link href="/" onClick={playSciFiClick}>
           <img 
             src="/neutron.png" 
             alt="Logo" 
-            className="h-12 w-12 opacity-90 transition-transform duration-300 hover:scale-110"
+            className="h-12 w-12 opacity-90 transition-transform duration-300 hover:scale-110 drop-shadow-[0_0_15px_rgba(255,200,80,0.4)]"
           />
         </Link>
         <Link 
           href="/?phase=planets"
-          className="group flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded-full backdrop-blur-md transition-all hover:bg-white/10 hover:border-white/20"
+          onClick={playSciFiClick}
+          className="group flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded-full backdrop-blur-md transition-all hover:bg-white/15 hover:border-white/30 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)]"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="group-hover:-translate-x-1 transition-transform duration-300">
             <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
-          <span className="text-xs font-mono uppercase tracking-widest text-white/70 group-hover:text-white transition-colors">Planets</span>
+          <span className="text-[10px] font-mono uppercase tracking-widest text-white/70 group-hover:text-white transition-colors">Planets</span>
         </Link>
       </div>
 
-      <main className="max-w-[1400px] mx-auto px-6 md:px-12 lg:px-20 pt-32 pb-40">
-        <div className="mb-12 md:mb-24 mt-4 md:mt-10 max-w-4xl relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-12">
+      <main className="max-w-[1400px] mx-auto px-6 md:px-12 lg:px-20 pt-36 pb-40">
+        <motion.div 
+          className="mb-16 md:mb-28 mt-4 md:mt-10 max-w-4xl relative z-10"
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
+        >
           <BlurHeading
             text={"Explore the\ncosmic events\nat neutron"}
-            className="text-4xl sm:text-5xl md:text-[5.5rem] lg:text-[7rem] font-bold uppercase tracking-[-0.03em] leading-[0.92]"
+            className="text-4xl sm:text-5xl md:text-[5.5rem] lg:text-[7rem] font-bold uppercase tracking-[-0.03em] leading-[0.92] drop-shadow-[0_0_30px_rgba(255,255,255,0.15)]"
           />
-        </div>
+        </motion.div>
 
-        <div className="relative z-20 mb-16 flex flex-col gap-6" ref={filterRef}>
+        <div className="relative z-20 mb-20 flex flex-col gap-6" ref={filterRef}>
           <div className="flex flex-col md:flex-row gap-4 items-center">
-            <div className="relative w-full md:w-[400px]">
+            <motion.div 
+              className="relative w-full md:w-[400px]"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+            >
               <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/30">
                   <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
@@ -217,25 +383,30 @@ export default function EventsPage() {
               </div>
               <input 
                 type="text" 
-                placeholder="Search events, categories..."
+                placeholder="Search cosmic signals..."
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
                   setActiveDropdown(null);
                 }}
-                className="w-full h-14 bg-white/5 border border-white/10 rounded-sm pl-12 pr-4 text-white placeholder:text-white/20 focus:outline-hidden focus:border-white/30 transition-all font-mono text-sm"
+                onFocus={playSciFiClick}
+                className="w-full h-14 bg-black/40 backdrop-blur-md border border-white/10 rounded-sm pl-12 pr-4 text-white placeholder:text-white/30 focus:outline-none focus:border-white/40 focus:bg-white/5 transition-all font-mono text-sm tracking-wide shadow-inner"
               />
-            </div>
+            </motion.div>
 
-            <div className="flex flex-row flex-wrap gap-3 w-full md:w-auto overflow-visible py-2">
-              {/* Category Filter */}
+            <motion.div 
+              className="flex flex-row flex-wrap gap-3 w-full md:w-auto overflow-visible py-2"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.3 }}
+            >
               <div className="relative">
                 <button
-                  onClick={() => setActiveDropdown(activeDropdown === 'category' ? null : 'category')}
+                  onClick={() => handleDropdownClick('category')}
                   className={`h-14 px-6 flex items-center gap-3 rounded-sm border transition-all cursor-pointer font-mono text-[10px] uppercase tracking-widest ${
                     activeDropdown === 'category' || selectedCategory !== "All Categories"
                       ? "bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.2)]" 
-                      : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
+                      : "bg-black/40 backdrop-blur-md border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   <Filter size={18} strokeWidth={activeDropdown === 'category' ? 2.5 : 1.5} />
@@ -245,40 +416,38 @@ export default function EventsPage() {
                 <AnimatePresence>
                   {activeDropdown === 'category' && (
                     <motion.div 
-                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      initial={{ opacity: 0, y: 15, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      className="absolute top-full left-0 mt-2 w-64 bg-[#0a0a0a]/95 backdrop-blur-xl border border-white/10 rounded-sm shadow-2xl z-50 p-2 overflow-hidden"
+                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                      className="absolute top-full left-0 mt-3 w-64 bg-black/80 backdrop-blur-2xl border border-white/20 rounded-md shadow-[0_10px_40px_rgba(0,0,0,0.8)] z-50 p-2 overflow-hidden"
                     >
-                      {categories.map((cat) => {
-                        return (
-                          <button
-                            key={cat}
-                            onClick={() => {
-                              setSelectedCategory(cat);
-                              setActiveDropdown(null);
-                            }}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm transition-all text-left group ${
-                              selectedCategory === cat ? "bg-white/10 text-white" : "text-white/40 hover:bg-white/5 hover:text-white"
-                            }`}
-                          >
-                            <span className="font-mono text-[10px] uppercase tracking-widest">{cat === "All Categories" ? "All events" : cat}</span>
-                          </button>
-                        );
-                      })}
+                      {categories.map((cat) => (
+                        <button
+                          key={cat}
+                          onClick={() => {
+                            setSelectedCategory(cat);
+                            handleDropdownSelect();
+                          }}
+                          className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm transition-all text-left group ${
+                            selectedCategory === cat ? "bg-white/15 text-white" : "text-white/40 hover:bg-white/10 hover:text-white"
+                          }`}
+                        >
+                          <span className="font-mono text-[10px] uppercase tracking-widest">{cat === "All Categories" ? "All Events" : cat}</span>
+                        </button>
+                      ))}
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
 
-              {/* Status Filter */}
               <div className="relative">
                 <button
-                  onClick={() => setActiveDropdown(activeDropdown === 'status' ? null : 'status')}
+                  onClick={() => handleDropdownClick('status')}
                   className={`h-14 px-6 flex items-center gap-3 rounded-sm border transition-all cursor-pointer font-mono text-[10px] uppercase tracking-widest ${
                     activeDropdown === 'status' || selectedStatus !== "All Status"
                       ? "bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.2)]" 
-                      : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
+                      : "bg-black/40 backdrop-blur-md border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   <CircleDot size={18} strokeWidth={activeDropdown === 'status' ? 2.5 : 1.5} />
@@ -288,26 +457,27 @@ export default function EventsPage() {
                 <AnimatePresence>
                   {activeDropdown === 'status' && (
                     <motion.div 
-                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      initial={{ opacity: 0, y: 15, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      className="absolute top-full left-0 mt-2 w-48 bg-[#0a0a0a]/95 backdrop-blur-xl border border-white/10 rounded-sm shadow-2xl z-50 p-2 overflow-hidden"
+                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                      className="absolute top-full left-0 mt-3 w-48 bg-black/80 backdrop-blur-2xl border border-white/20 rounded-md shadow-[0_10px_40px_rgba(0,0,0,0.8)] z-50 p-2 overflow-hidden"
                     >
                       {statuses.map((status) => (
                         <button
                           key={status}
                           onClick={() => {
                             setSelectedStatus(status);
-                            setActiveDropdown(null);
+                            handleDropdownSelect();
                           }}
                           className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm transition-all text-left ${
-                            selectedStatus === status ? "bg-white/10 text-white" : "text-white/40 hover:bg-white/5 hover:text-white"
+                            selectedStatus === status ? "bg-white/15 text-white" : "text-white/40 hover:bg-white/10 hover:text-white"
                           }`}
                         >
-                          <div className={`w-2 h-2 rounded-full ${
-                             status === 'open' ? 'bg-emerald-500' : 
-                             status === 'closed' ? 'bg-rose-500' : 
-                             status === 'postponed' ? 'bg-amber-500' : 'bg-white/20'
+                          <div className={`w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] ${
+                             status === 'open' ? 'bg-emerald-500 text-emerald-500' : 
+                             status === 'closed' ? 'bg-rose-500 text-rose-500' : 
+                             status === 'postponed' ? 'bg-amber-500 text-amber-500' : 'bg-white/20 text-white/20'
                           }`} />
                           <span className="font-mono text-[10px] uppercase tracking-widest">{status === "All Status" ? "All Status" : status}</span>
                         </button>
@@ -317,14 +487,13 @@ export default function EventsPage() {
                 </AnimatePresence>
               </div>
 
-              {/* Sort Filter */}
               <div className="relative">
                 <button
-                  onClick={() => setActiveDropdown(activeDropdown === 'sort' ? null : 'sort')}
+                  onClick={() => handleDropdownClick('sort')}
                   className={`h-14 px-6 flex items-center gap-3 rounded-sm border transition-all cursor-pointer font-mono text-[10px] uppercase tracking-widest ${
                     activeDropdown === 'sort' || sortBy !== "Default"
                       ? "bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.2)]" 
-                      : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
+                      : "bg-black/40 backdrop-blur-md border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   <ArrowDownUp size={18} strokeWidth={activeDropdown === 'sort' ? 2.5 : 1.5} />
@@ -334,20 +503,21 @@ export default function EventsPage() {
                 <AnimatePresence>
                   {activeDropdown === 'sort' && (
                     <motion.div 
-                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      initial={{ opacity: 0, y: 15, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      className="absolute top-full right-0 mt-2 w-48 bg-[#0a0a0a]/95 backdrop-blur-xl border border-white/10 rounded-sm shadow-2xl z-50 p-2 overflow-hidden"
+                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                      className="absolute top-full right-0 mt-3 w-52 bg-black/80 backdrop-blur-2xl border border-white/20 rounded-md shadow-[0_10px_40px_rgba(0,0,0,0.8)] z-50 p-2 overflow-hidden"
                     >
                       {sortOptions.map((opt) => (
                         <button
                           key={opt}
                           onClick={() => {
                             setSortBy(opt);
-                            setActiveDropdown(null);
+                            handleDropdownSelect();
                           }}
                           className={`w-full px-4 py-3 rounded-sm transition-all text-left font-mono text-[10px] uppercase tracking-widest ${
-                            sortBy === opt ? "bg-white/10 text-white" : "text-white/40 hover:bg-white/5 hover:text-white"
+                            sortBy === opt ? "bg-white/15 text-white" : "text-white/40 hover:bg-white/10 hover:text-white"
                           }`}
                         >
                           {opt}
@@ -357,30 +527,35 @@ export default function EventsPage() {
                   )}
                 </AnimatePresence>
               </div>
-            </div>
+            </motion.div>
           </div>
           
           {filteredEvents.length === 0 && (
-            <div className="mt-20 text-center py-20 border border-dashed border-white/10 rounded-sm">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mt-20 text-center py-20 border border-dashed border-white/20 rounded-lg bg-black/20 backdrop-blur-md"
+            >
               <p className="text-white/40 font-mono uppercase tracking-[0.2em] text-sm">No cosmic signals detected matching your criteria.</p>
               <button 
                 onClick={() => {
+                  playSciFiClick();
                   setSearchQuery("");
                   setSelectedCategory("All Categories");
                   setSelectedStatus("All Status");
                   setSortBy("Default");
                 }}
-                className="mt-6 px-6 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full transition-all text-[10px] font-mono uppercase tracking-widest text-white/60"
+                className="mt-8 px-6 py-3 hover:scale-105 bg-white text-black hover:bg-gray-200 border border-transparent rounded-full transition-all text-[11px] font-mono font-bold uppercase tracking-widest"
               >
-                Reset Sensors
+                Recalibrate Sensors
               </button>
-            </div>
+            </motion.div>
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 lg:gap-12 relative z-10 items-start mt-8 md:mt-0">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 lg:gap-16 relative z-10 items-start mt-8 md:mt-0">
           <div className="flex flex-col gap-8 lg:gap-12 w-full">
-            {leftColumnEvents.map((event) => (
+            {leftColumnEvents.map((event, index) => (
               <EventParallaxCard
                 key={event.slug}
                 slug={event.slug}
@@ -388,7 +563,7 @@ export default function EventsPage() {
                 description={event.description}
                 image={event.image}
                 heightClass={event.heightClass}
-                delay={event.delay}
+                delay={index}
                 category={event.category}
                 teamSize={event.teamSize}
                 status={event.status}
@@ -396,8 +571,8 @@ export default function EventsPage() {
             ))}
           </div>
 
-          <div className="flex flex-col gap-8 lg:gap-12 w-full pt-0 md:pt-40">
-            {rightColumnEvents.map((event) => (
+          <div className="flex flex-col gap-8 lg:gap-12 w-full pt-0 md:pt-40 lg:pt-56">
+            {rightColumnEvents.map((event, index) => (
               <EventParallaxCard
                 key={event.slug}
                 slug={event.slug}
@@ -405,7 +580,7 @@ export default function EventsPage() {
                 description={event.description}
                 image={event.image}
                 heightClass={event.heightClass}
-                delay={event.delay}
+                delay={index}
                 category={event.category}
                 teamSize={event.teamSize}
                 status={event.status}
