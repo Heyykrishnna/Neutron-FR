@@ -1523,8 +1523,6 @@ export default function ProfilePage() {
 
           <div className="mt-auto flex flex-col gap-1.5 pt-6 border-t border-white/6">
             {[
-              { href: "/competitions", label: "Dashboard" },
-              { href: "/settings", label: "Settings" },
               { href: "/contact", label: "Contact Us" },
             ].map(({ href, label }) => (
               <Link
