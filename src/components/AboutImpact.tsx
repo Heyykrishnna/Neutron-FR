@@ -194,7 +194,11 @@ export default function AboutImpact() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: i * 0.1 }}
               viewport={{ once: true }}
-              className="p-8 md:p-10 rounded-[2rem] bg-white/3 border border-white/10 hover:border-white/20 transition-all duration-300 group"
+              className="p-8 md:p-10 rounded-4xl bg-black/30 border border-cyan-500/20 hover:border-cyan-400/40 transition-all duration-500 group backdrop-blur-md relative overflow-hidden"
+              style={{
+                boxShadow: '0 0 20px rgba(0,255,200,0.04), inset 0 1px 0 rgba(255,255,255,0.05)',
+                animation: `hero-float ${6 + i * 0.8}s ease-in-out infinite`,
+              }}
             >
               <div className="flex flex-col gap-1">
                 <span className="text-white/40 font-mono text-xs uppercase tracking-[0.2em]">
@@ -209,6 +213,13 @@ export default function AboutImpact() {
               </div>
               
               <ImpactChart data={stat.data} labels={stat.labels} />
+              {/* HUD bracket corners */}
+              <div className="absolute top-3 left-3 w-5 h-5 border-t border-l border-cyan-400/30 rounded-tl-sm pointer-events-none" />
+              <div className="absolute top-3 right-3 w-5 h-5 border-t border-r border-cyan-400/30 rounded-tr-sm pointer-events-none" />
+              <div className="absolute bottom-3 left-3 w-5 h-5 border-b border-l border-cyan-400/30 rounded-bl-sm pointer-events-none" />
+              <div className="absolute bottom-3 right-3 w-5 h-5 border-b border-r border-cyan-400/30 rounded-br-sm pointer-events-none" />
+              {/* Holographic scanline effect */}
+              <div className="absolute inset-0 pointer-events-none opacity-[0.03] mix-blend-overlay" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,200,0.3) 2px, rgba(0,255,200,0.3) 3px)' }} />
             </motion.div>
           ))}
         </div>

@@ -14,6 +14,7 @@ import {
 import { AnimatePresence, MotionConfig, motion, useSpring, useMotionValue, useTransform, useTime } from "framer-motion";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as THREE from "three";
 
@@ -113,10 +114,29 @@ export default function SpaceLanding() {
   const router = useRouter();
 
   const canvasRef       = useRef<HTMLCanvasElement | null>(null);
+  const loaderCardRef   = useRef<HTMLDivElement | null>(null);
+  const loaderSheenRef  = useRef<HTMLDivElement | null>(null);
+  const loaderMotionRef = useRef<{
+    rotateX: ((value: number) => gsap.core.Tween) | null;
+    rotateY: ((value: number) => gsap.core.Tween) | null;
+    shiftX: ((value: number) => gsap.core.Tween) | null;
+    shiftY: ((value: number) => gsap.core.Tween) | null;
+    sheenX: ((value: number) => gsap.core.Tween) | null;
+    sheenY: ((value: number) => gsap.core.Tween) | null;
+  }>({
+    rotateX: null,
+    rotateY: null,
+    shiftX: null,
+    shiftY: null,
+    sheenX: null,
+    sheenY: null,
+  });
   const progressRef     = useRef(0);
   const activePlanetRef = useRef(PLANET_RECORDS[0].slug);
   const navigatingRef   = useRef(false);
   const routeTimeoutRef = useRef<number | null>(null);
+  const zoomTargetRef   = useRef<string | null>(null);
+  const showScrollIndicatorRef = useRef(true);
 
   const searchParams = useSearchParams();
   const initPhase = searchParams?.get("phase");
@@ -126,6 +146,7 @@ export default function SpaceLanding() {
   const [activePlanet, setActivePlanet]       = useState(PLANET_RECORDS[0].slug);
   const [runtimeState, setRuntimeState]       = useState<"loading" | "ready" | "error">("loading");
   const [navigatingPlanet, setNavigatingPlanet] = useState<string | null>(null);
+  const [transitionState, setTransitionState] = useState<{slug: string; accent: string; phase: 'zoom' | 'atmosphere' | 'fade'} | null>(null);
   const [planetPositions, setPlanetPositions] = useState<PlanetScreenPos[]>([]);
   const [hoveredPlanet, setHoveredPlanet]     = useState<string | null>(null);
   const [isMobile, setIsMobile]               = useState(false);
@@ -134,6 +155,7 @@ export default function SpaceLanding() {
   const [isEntering, setIsEntering]           = useState(false);
   const [flashOverlay, setFlashOverlay]       = useState(false);
   const [showScrollIndicator, setShowScrollIndicator] = useState(true);
+  const [loadProgress, setLoadProgress]       = useState(0);
 
   const mouseX = useMotionValue(0.5);
   const mouseY = useMotionValue(0.5);
@@ -156,6 +178,30 @@ export default function SpaceLanding() {
   );
   const onMouseLeave = useCallback(() => { mouseX.set(0.5); mouseY.set(0.5); }, [mouseX, mouseY]);
 
+  const handleLoaderPointerMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pointerX = (e.clientX - rect.left) / rect.width - 0.5;
+    const pointerY = (e.clientY - rect.top) / rect.height - 0.5;
+    const motion = loaderMotionRef.current;
+
+    motion.rotateX?.(pointerY * -12);
+    motion.rotateY?.(pointerX * 16);
+    motion.shiftX?.(pointerX * 8);
+    motion.shiftY?.(pointerY * 6);
+    motion.sheenX?.(pointerX * 120);
+    motion.sheenY?.(pointerY * 90);
+  }, []);
+
+  const handleLoaderPointerLeave = useCallback(() => {
+    const motion = loaderMotionRef.current;
+    motion.rotateX?.(0);
+    motion.rotateY?.(0);
+    motion.shiftX?.(0);
+    motion.shiftY?.(0);
+    motion.sheenX?.(0);
+    motion.sheenY?.(0);
+  }, []);
+
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
     check();
@@ -165,17 +211,32 @@ export default function SpaceLanding() {
 
   const currentPlanet = PLANET_RECORDS.find((p) => p.slug === activePlanet) ?? PLANET_RECORDS[0];
 
-  const syncActivePlanet = useEffectEvent((slug: string) => {
+  const syncActivePlanet = useCallback((slug: string) => {
     activePlanetRef.current = slug;
     setActivePlanet((cur) => (cur === slug ? cur : slug));
-  });
+  }, []);
 
-  const handlePlanetSelect = useEffectEvent((slug: string) => {
+  const handlePlanetSelect = useCallback((slug: string) => {
     if (navigatingRef.current) return;
     syncActivePlanet(slug);
     navigatingRef.current = true;
     setNavigatingPlanet(slug);
     saveScrollY();
+
+    const planet = PLANET_RECORDS.find(p => p.slug === slug);
+    const accent = planet?.accent ?? '#ffffff';
+
+    zoomTargetRef.current = slug;
+    setTransitionState({ slug, accent, phase: 'zoom' });
+
+    setTimeout(() => {
+      setTransitionState(prev => prev ? { ...prev, phase: 'atmosphere' } : null);
+    }, 700);
+
+    setTimeout(() => {
+      setTransitionState(prev => prev ? { ...prev, phase: 'fade' } : null);
+    }, 1100);
+
     routeTimeoutRef.current = window.setTimeout(() => {
       startTransition(() => { 
         if (slug === "mars") {
@@ -186,8 +247,12 @@ export default function SpaceLanding() {
           router.push(`/planets/${slug}`);
         }
       });
-    }, 420);
-  });
+    }, 1500);
+  }, [router, syncActivePlanet]);
+
+  useEffect(() => {
+    showScrollIndicatorRef.current = showScrollIndicator;
+  }, [showScrollIndicator]);
 
   useEffect(() => {
     const saved = popSavedScrollY();
@@ -228,6 +293,75 @@ export default function SpaceLanding() {
   }, [scenePhase, isEntering]);
 
   useEffect(() => {
+    const card = loaderCardRef.current;
+    if (!card || scenePhase !== "planets" || runtimeState === "ready") return;
+
+    const sheen = loaderSheenRef.current;
+    const orbitLayer = card.querySelector<HTMLElement>("[data-loader-orbits]");
+    const scanLine = card.querySelector<HTMLElement>("[data-loader-scan]");
+    const progressLight = card.querySelector<HTMLElement>("[data-loader-progress-light]");
+    const motion = loaderMotionRef.current;
+
+    motion.rotateX = gsap.quickTo(card, "rotationX", { duration: 0.45, ease: "power3.out" });
+    motion.rotateY = gsap.quickTo(card, "rotationY", { duration: 0.45, ease: "power3.out" });
+    motion.shiftX = gsap.quickTo(card, "x", { duration: 0.45, ease: "power3.out" });
+    motion.shiftY = gsap.quickTo(card, "y", { duration: 0.45, ease: "power3.out" });
+
+    if (sheen) {
+      motion.sheenX = gsap.quickTo(sheen, "x", { duration: 0.35, ease: "power3.out" });
+      motion.sheenY = gsap.quickTo(sheen, "y", { duration: 0.35, ease: "power3.out" });
+    }
+
+    const floatTween = gsap.to(card, {
+      y: -10,
+      duration: 2.8,
+      ease: "sine.inOut",
+      repeat: -1,
+      yoyo: true,
+    });
+
+    const orbitTween = orbitLayer
+      ? gsap.to(orbitLayer, {
+          rotation: 360,
+          duration: 26,
+          ease: "none",
+          repeat: -1,
+        })
+      : null;
+
+    const scanTween = scanLine
+      ? gsap.fromTo(
+          scanLine,
+          { xPercent: -160 },
+          { xPercent: 180, duration: 3.2, ease: "power1.inOut", repeat: -1 },
+        )
+      : null;
+
+    const progressTween = progressLight
+      ? gsap.fromTo(
+          progressLight,
+          { xPercent: -160 },
+          { xPercent: 220, duration: 2.4, ease: "none", repeat: -1 },
+        )
+      : null;
+
+    return () => {
+      floatTween.kill();
+      orbitTween?.kill();
+      scanTween?.kill();
+      progressTween?.kill();
+      motion.rotateX = null;
+      motion.rotateY = null;
+      motion.shiftX = null;
+      motion.shiftY = null;
+      motion.sheenX = null;
+      motion.sheenY = null;
+      gsap.set(card, { clearProps: "x,y,rotationX,rotationY" });
+      if (sheen) gsap.set(sheen, { clearProps: "x,y" });
+    };
+  }, [runtimeState, scenePhase]);
+
+  useEffect(() => {
     if (scenePhase !== "planets") return;
     if (!canvasRef.current) return;
 
@@ -240,9 +374,11 @@ export default function SpaceLanding() {
           canvas:           canvasRef.current!,
           progressRef,
           activePlanetRef,
+          zoomTargetRef,
           onPlanetHover:    (slug) => setHoveredPlanet(slug || null),
           onPlanetClick:    handlePlanetSelect,
           onReady:          () => setRuntimeState("ready"),
+          onProgress:       (p) => setLoadProgress(p),
           onScreenPositions:(positions) => setPlanetPositions([...positions]),
         });
         if (disposed) { sceneCleanup(); return; }
@@ -258,7 +394,7 @@ export default function SpaceLanding() {
       cleanup();
       if (routeTimeoutRef.current) window.clearTimeout(routeTimeoutRef.current);
     };
-  }, [scenePhase]);
+  }, [scenePhase, handlePlanetSelect]);
 
   useEffect(() => {
     if (scenePhase !== "planets") return;
@@ -293,7 +429,8 @@ export default function SpaceLanding() {
             const next          = PLANET_RECORDS[activeIndex]?.slug ?? PLANET_RECORDS[0].slug;
             if (next !== lastPlanet) { lastPlanet = next; syncActivePlanet(next); }
 
-            if (progress > 0.005 && showScrollIndicator) {
+            if (progress > 0.005 && showScrollIndicatorRef.current) {
+              showScrollIndicatorRef.current = false;
               setShowScrollIndicator(false);
             }
           },
@@ -305,7 +442,7 @@ export default function SpaceLanding() {
       ctx.revert();
       gsap.ticker.remove(tick);
     };
-  }, [scenePhase]);
+  }, [scenePhase, syncActivePlanet]);
 
 
   const [activePlanetLabel] = useState(PLANET_RECORDS[0].name);
@@ -333,6 +470,7 @@ export default function SpaceLanding() {
           @keyframes bh-pulse       { 0%,100%{transform:scale(1);opacity:0.4} 50%{transform:scale(1.12);opacity:0.7} }
           @keyframes bh-fadeflicker { 0%,100%{opacity:0.55} 50%{opacity:1} }
           @keyframes hero-float     { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+          @keyframes loader-dot-pulse { 0%,100%{opacity:0.28;transform:scale(0.92)} 50%{opacity:1;transform:scale(1.14)} }
         `}</style>
 
         {isMobile && (
@@ -550,7 +688,7 @@ export default function SpaceLanding() {
           )}
         </AnimatePresence>
 
-        <a href="/" className="fixed top-6 left-6 z-50 transition-transform duration-300 hover:scale-110" aria-label="Neutron Home">
+        <Link href="/" className="fixed top-6 left-6 z-50 transition-transform duration-300 hover:scale-110" aria-label="Neutron Home">
           <Image
             src="/neutron.png"
             alt="Neutron Logo"
@@ -560,19 +698,56 @@ export default function SpaceLanding() {
             style={{ filter: "drop-shadow(0 0 14px rgba(220,140,30,0.55)) drop-shadow(0 0 4px rgba(255,200,80,0.3))" }}
             priority
           />
-        </a>
+        </Link>
 
         <AnimatePresence>
-          {navigatingPlanet && (
+          {transitionState && (
             <motion.div
-              key={navigatingPlanet}
-              className="fixed inset-0 z-40"
-              style={{ background: "radial-gradient(circle at center,rgba(180,90,10,0.14),transparent 22%),linear-gradient(180deg,rgba(8,3,0,0.18),rgba(8,3,0,0.96))" }}
+              key={`transition-${transitionState.slug}`}
+              className="fixed inset-0 z-40 pointer-events-none"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-            />
+              transition={{ duration: 0.35 }}
+            >
+              <motion.div
+                className="absolute inset-0"
+                initial={{ opacity: 0 }}
+                animate={{
+                  opacity: transitionState.phase === 'zoom' ? 0.4 : transitionState.phase === 'atmosphere' ? 0.85 : 1,
+                }}
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                style={{
+                  background: `radial-gradient(ellipse 60% 50% at 50% 50%, ${transitionState.accent}55, ${transitionState.accent}22 50%, rgba(0,0,0,0.98) 80%)`,
+                }}
+              />
+              <motion.div
+                className="absolute inset-0"
+                initial={{ opacity: 0, scale: 0.3 }}
+                animate={{
+                  opacity: transitionState.phase === 'atmosphere' ? 0.6 : transitionState.phase === 'fade' ? 0.2 : 0,
+                  scale: transitionState.phase === 'atmosphere' ? 1.8 : transitionState.phase === 'fade' ? 2.5 : 0.3,
+                }}
+                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                style={{
+                  background: `radial-gradient(circle at 50% 50%, transparent 20%, ${transitionState.accent}33 40%, transparent 60%)`,
+                }}
+              />
+              {transitionState.phase === 'atmosphere' && (
+                <div
+                  className="absolute inset-0 mix-blend-overlay opacity-15"
+                  style={{
+                    backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.05) 2px, rgba(255,255,255,0.05) 4px)',
+                  }}
+                />
+              )}
+              <motion.div
+                className="absolute inset-0 bg-black"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: transitionState.phase === 'fade' ? 1 : 0 }}
+                transition={{ duration: 0.45, ease: "easeIn" }}
+              />
+            </motion.div>
           )}
         </AnimatePresence>
 
@@ -595,14 +770,25 @@ export default function SpaceLanding() {
           const isActive  = activePlanet === pos.slug;
 
           return (
-            <motion.div
+            <div
               key={pos.slug}
-              style={{ position: "fixed", left: pos.x, top: pos.y, transform: "translate(-50%,0)", zIndex: 15, pointerEvents: "auto", cursor: "pointer", userSelect: "none" }}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: pos.visible ? (isActive ? 1 : 0.62) : 0, y: 0, scale: isActive ? 1.03 : 1 }}
-              transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
-              onClick={() => handlePlanetSelect(pos.slug)}
+              style={{
+                position: "fixed",
+                left: 0,
+                top: 0,
+                transform: `translate3d(calc(${pos.x}px - 50%), ${pos.y}px, 0)`,
+                zIndex: 15,
+                pointerEvents: pos.visible ? "auto" : "none",
+                willChange: "transform",
+              }}
             >
+              <motion.div
+                style={{ cursor: "pointer", userSelect: "none" }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: pos.visible ? (isActive ? 1 : 0.62) : 0, y: 0, scale: isActive ? 1.03 : 1 }}
+                transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+                onClick={() => handlePlanetSelect(pos.slug)}
+              >
               <div
                 className="flex flex-col items-center gap-[0.42rem] px-[0.9rem] py-[0.55rem] whitespace-nowrap"
                 style={{
@@ -619,7 +805,8 @@ export default function SpaceLanding() {
                   {pd.name}
                 </div>
               </div>
-            </motion.div>
+              </motion.div>
+            </div>
           );
         })}
 
@@ -670,102 +857,160 @@ export default function SpaceLanding() {
           </motion.div>
         )}
 
-        <AnimatePresence>
-          {scenePhase === "planets" && runtimeState !== "ready" && (
-            <motion.div
-              key="space-loader"
-              className="pointer-events-none fixed inset-0 z-30 flex flex-col items-center justify-center overflow-hidden bg-[#030303]"
-              initial={{ opacity: 1 }}
-              exit={{ 
-                opacity: 0,
-                scale: 1.2,
-                filter: "blur(10px)",
-                transition: { duration: 1.2, ease: [0.76, 0, 0.24, 1] } 
-              }}
-            >
-              <div className="relative flex flex-col items-center justify-center w-full h-full">
-                <div className="md:hidden flex flex-col items-center justify-center font-black uppercase text-[#EFEFEF] leading-[0.85] -tracking-[0.06em]" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
-                  {["NEUT", "RON"].map((word, wordIdx) => (
-                    <motion.div 
-                      key={wordIdx}
-                      className="flex overflow-hidden"
-                      initial="hidden"
-                      animate="visible"
-                      variants={{
-                        hidden: {},
-                        visible: { transition: { staggerChildren: 0.1, delayChildren: wordIdx * 0.3 } }
-                      }}
-                    >
-                      {word.split("").map((char, i) => (
-                        <motion.span
-                          key={i}
-                          variants={{
-                            hidden: { y: "150%", rotateX: -60, opacity: 0, filter: "blur(10px)" },
-                            visible: { y: "0%", rotateX: 0, opacity: 1, filter: "blur(0px)", transition: { duration: 1.2, ease: [0.76, 0, 0.24, 1] } }
-                          }}
-                          className="text-[29vw] inline-block"
-                        >
-                          {char}
-                        </motion.span>
-                      ))}
-                    </motion.div>
-                  ))}
-                </div>
-
-                <motion.div 
-                  initial={{ opacity: 0, y: -20, scale: 0.8 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ duration: 1, delay: 0.8 }}
-                  className="mb-8 md:mb-12 relative w-16 h-16 md:w-24 md:h-24"
-                >
+        {scenePhase === "planets" && (
+          <div
+            className="fixed inset-0 z-30 flex items-center justify-center overflow-hidden bg-[#030303]"
+            style={{
+              opacity: runtimeState !== "ready" ? 1 : 0,
+              pointerEvents: runtimeState !== "ready" ? "auto" : "none",
+              transform: `scale(${runtimeState !== "ready" ? 1 : 1.06})`,
+              filter: runtimeState !== "ready" ? "blur(0px)" : "blur(8px)",
+              transition: "opacity 900ms cubic-bezier(0.22, 1, 0.36, 1), transform 900ms cubic-bezier(0.22, 1, 0.36, 1), filter 900ms cubic-bezier(0.22, 1, 0.36, 1)",
+            }}
+          >
+            <div className="relative w-[min(88vw,860px)] px-4" style={{ perspective: "1800px" }}>
+              <div
+                ref={loaderCardRef}
+                className="relative mx-auto cursor-pointer overflow-hidden"
+                onMouseMove={handleLoaderPointerMove}
+                onMouseLeave={handleLoaderPointerLeave}
+                style={{
+                  aspectRatio: "831 / 450",
+                  borderRadius: "2.1rem",
+                  border: "1.5px solid rgba(255,170,120,0.78)",
+                  boxShadow: "0 40px 120px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 0 1px rgba(255,153,92,0.15)",
+                  transformStyle: "preserve-3d",
+                  background: "linear-gradient(180deg, rgba(19,14,12,0.86), rgba(11,8,6,0.96))",
+                }}
+              >
+                <div className="absolute inset-0">
                   <Image
-                    src="/neutron.png"
-                    alt="Neutron Logo"
+                    src="/space-loader-logo.png"
+                    alt="Neutron 3.0 loader artwork"
                     fill
-                    className="object-contain drop-shadow-[0_0_15px_rgba(255,160,40,0.6)]"
+                    priority
+                    sizes="(max-width: 768px) 88vw, 820px"
+                    className="object-cover object-center"
                   />
-                </motion.div>
-
-                <div className="hidden md:flex flex-col items-center justify-center font-black uppercase text-[#EFEFEF] leading-none -tracking-[0.08em]" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
-                  <motion.div 
-                    className="flex overflow-hidden"
-                    initial="hidden"
-                    animate="visible"
-                    variants={{
-                      hidden: {},
-                      visible: { transition: { staggerChildren: 0.08, delayChildren: 0.2 } }
-                    }}
-                  >
-                    {"NEUTRON".split("").map((char, i) => (
-                      <motion.span
-                        key={i}
-                        variants={{
-                          hidden: { y: "150%", rotateX: -60, opacity: 0, filter: "blur(10px)" },
-                          visible: { y: "0%", rotateX: 0, opacity: 1, filter: "blur(0px)", transition: { duration: 1.2, ease: [0.76, 0, 0.24, 1] } }
-                        }}
-                        className="text-[17vw] inline-block"
-                        style={{ textShadow: "0 0 40px rgba(255,255,255,0.1)" }}
-                      >
-                        {char}
-                      </motion.span>
-                    ))}
-                  </motion.div>
                 </div>
 
-                <motion.div
-                  className="absolute bottom-16 md:bottom-24 w-1/2 md:w-1/4 h-1 bg-white/10 rounded-full overflow-hidden"
-                >
-                  <motion.div 
-                    className="w-full h-full bg-white/80 rounded-full origin-left"
-                    initial={{ scaleX: 0 }}
-                    animate={{ scaleX: 1 }}
-                    transition={{ duration: 4.5, ease: "easeOut", repeat: Infinity }}
-                  />
-                </motion.div>
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background: [
+                      "linear-gradient(180deg, rgba(8,6,5,0.18) 0%, rgba(8,6,5,0.12) 35%, rgba(8,6,5,0.55) 100%)",
+                      "radial-gradient(circle at 50% 120%, rgba(255,149,77,0.28), transparent 46%)",
+                      "radial-gradient(circle at 18% 14%, rgba(255,255,255,0.15), transparent 22%)",
+                    ].join(","),
+                  }}
+                />
+
+                <div data-loader-orbits className="pointer-events-none absolute inset-[-8%] opacity-[0.68]">
+                  <div className="absolute left-[-2%] top-[-8%] h-[86%] w-[88%] rounded-[50%] border border-[rgba(255,176,129,0.42)]" />
+                  <div className="absolute right-[-20%] top-[-6%] h-[102%] w-[92%] rounded-[50%] border-[1.5px] border-[rgba(255,176,129,0.78)]" />
+                  <div className="absolute right-[-10%] top-[6%] h-[90%] w-[72%] rounded-[50%] border border-[rgba(255,196,160,0.52)]" />
+                  <div className="absolute left-[4%] top-[7%] h-[13%] w-[13%] rounded-full border border-[rgba(255,228,210,0.3)]" />
+                  <div className="absolute left-[7%] top-[10%] h-[6%] w-[6%] rounded-full border border-[rgba(255,228,210,0.42)]" />
+                  <div className="absolute left-[10%] top-[13%] h-[1.6%] w-[1.6%] rounded-full bg-[rgba(255,243,232,0.92)] shadow-[0_0_12px_rgba(255,232,214,0.7)]" />
+                </div>
+
+                <div
+                  className="pointer-events-none absolute inset-0 opacity-[0.18] mix-blend-screen"
+                  style={{
+                    backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.92) 0.8px, transparent 1.2px)",
+                    backgroundSize: "32px 32px",
+                    backgroundPosition: "0 0",
+                  }}
+                />
+
+                <div
+                  ref={loaderSheenRef}
+                  className="pointer-events-none absolute left-1/2 top-1/2 h-[62%] w-[44%] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl"
+                  style={{
+                    background: "radial-gradient(circle, rgba(255,214,178,0.34), transparent 74%)",
+                    mixBlendMode: "screen",
+                    opacity: 0.7,
+                  }}
+                />
+
+                <div
+                  data-loader-scan
+                  className="pointer-events-none absolute inset-y-[-18%] left-[-24%] w-[20%] rotate-[18deg]"
+                  style={{
+                    background: "linear-gradient(180deg, rgba(255,255,255,0), rgba(255,230,205,0.42), rgba(255,255,255,0))",
+                    filter: "blur(8px)",
+                    opacity: 0.4,
+                  }}
+                />
+
+                <div className="absolute left-4 top-4 rounded-full border border-[#ffb081]/50 bg-black/35 px-3 py-1 text-[0.55rem] uppercase tracking-[0.34em] text-[#ffd8bc] backdrop-blur-md md:left-6 md:top-6 md:text-[0.64rem]">
+                  ORBITAL BOOT
+                </div>
+
+                <div className="absolute right-4 top-4 rounded-full border border-white/15 bg-black/30 px-3 py-1 text-[0.52rem] font-medium uppercase tracking-[0.26em] text-white/80 backdrop-blur-md md:right-6 md:top-6 md:text-[0.62rem]">
+                  Tilt to inspect
+                </div>
+
+                <div className="absolute bottom-4 left-4 right-4 flex flex-col gap-3 md:bottom-6 md:left-6 md:right-6">
+                  <div className="flex items-end justify-between gap-4">
+                    <div className="max-w-[24rem]">
+                      <div className="flex items-center gap-3">
+                        <p className="text-[0.58rem] uppercase tracking-[0.36em] text-[#ffd9c0]/72 md:text-[0.68rem]">
+                          Neutron 3.0
+                        </p>
+                        <span className="text-[0.6rem] font-mono font-bold text-[#ff9a62]">{Math.floor(loadProgress)}%</span>
+                      </div>
+                      <p className="mt-1 text-[0.72rem] leading-relaxed text-white/82 md:text-[0.92rem]">
+                        Synchronizing orbital routes and calibrating planetary anchors.
+                      </p>
+                    </div>
+
+                    <div className="hidden items-center gap-2 text-[0.72rem] uppercase tracking-[0.3em] text-[#ffd3b0] md:flex">
+                      <span className="block h-2 w-2 rounded-full bg-[#ff9a62] shadow-[0_0_14px_rgba(255,154,98,0.9)]" />
+                      LIVE
+                    </div>
+                  </div>
+
+                  <div className="rounded-full border border-white/10 bg-black/35 p-2 backdrop-blur-md">
+                    <div className="flex items-center gap-3">
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
+                        <div className="relative h-full w-full overflow-hidden rounded-full bg-[rgba(255,160,102,0.16)]">
+                          <div
+                            className="absolute inset-y-0 left-0 rounded-full transition-all duration-300 ease-out"
+                            style={{
+                              width: `${Math.max(5, loadProgress)}%`,
+                              background: "linear-gradient(90deg, rgba(255,151,88,0.18), rgba(255,221,196,0.96), rgba(255,151,88,0.25))",
+                              boxShadow: "0 0 24px rgba(255,190,150,0.42)",
+                            }}
+                          />
+                          <div
+                            data-loader-progress-light
+                            className="absolute inset-y-[-100%] left-[-35%] w-[35%] rounded-full"
+                            style={{
+                              background: "linear-gradient(90deg, rgba(255,255,255,0), rgba(255,240,225,0.94), rgba(255,255,255,0))",
+                              filter: "blur(10px)",
+                              opacity: 0.9,
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        {[0, 1, 2].map((index) => (
+                          <span
+                            key={index}
+                            className="block h-1.5 w-1.5 rounded-full bg-[#ffd7bf]"
+                            style={{ animation: `loader-dot-pulse 1.6s ${index * 0.2}s ease-in-out infinite` }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </div>
+          </div>
+        )}
 
         {scenePhase === "planets" && (
           <div className="pointer-events-none fixed inset-0 z-25 transition-opacity duration-1000" style={{ opacity: 1 }}>
@@ -781,7 +1026,14 @@ export default function SpaceLanding() {
                 <div
                   key={label}
                   className="fixed z-25 transition-opacity duration-500"
-                  style={{ left: pos.starX, top: pos.starY, opacity: pos.starVisible ? 1 : 0, pointerEvents: pos.starVisible ? "auto" : "none", transform: "translate(-50%, -50%)" }}
+                  style={{
+                    left: 0,
+                    top: 0,
+                    transform: `translate3d(calc(${pos.starX}px - 50%), calc(${pos.starY}px - 50%), 0)`,
+                    opacity: pos.starVisible ? 1 : 0,
+                    pointerEvents: pos.starVisible ? "auto" : "none",
+                    willChange: "transform, opacity",
+                  }}
                 >
                   <NebulaStar label={label} href={href} drift={drift} delay={delay} />
                 </div>
@@ -853,21 +1105,33 @@ async function createScene({
   canvas,
   progressRef,
   activePlanetRef,
+  zoomTargetRef,
   onPlanetHover,
   onPlanetClick,
   onReady,
+  onProgress,
   onScreenPositions,
 }: {
   canvas: HTMLCanvasElement;
   progressRef: MutableRefObject<number>;
   activePlanetRef: MutableRefObject<string>;
+  zoomTargetRef: MutableRefObject<string | null>;
   onPlanetHover: (slug: string) => void;
   onPlanetClick: (slug: string) => void;
   onReady: () => void;
+  onProgress: (progress: number) => void;
   onScreenPositions: (positions: PlanetScreenPos[]) => void;
 }) {
-  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: "high-performance" });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.8));
+  const dpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
+  const isLowEnd = typeof navigator !== 'undefined' && (navigator.hardwareConcurrency <= 4 || /Mobi|Android/i.test(navigator.userAgent));
+  
+  const renderer = new THREE.WebGLRenderer({ 
+    canvas, 
+    alpha: true, 
+    antialias: !isLowEnd, 
+    powerPreference: "high-performance" 
+  });
+  renderer.setPixelRatio(Math.min(dpr, isLowEnd ? 1.0 : 1.5));
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -883,9 +1147,14 @@ async function createScene({
   const ambientLight = new THREE.AmbientLight("#ffffff", 0.5);
   scene.add(ambientLight);
 
-  const gltfLoader = new GLTFLoader();
-  const objLoader  = new OBJLoader();
-  const texLoader  = new THREE.TextureLoader();
+  const manager = new THREE.LoadingManager();
+  manager.onProgress = (url, itemsLoaded, itemsTotal) => {
+    onProgress((itemsLoaded / itemsTotal) * 100);
+  };
+
+  const gltfLoader = new GLTFLoader(manager);
+  const objLoader  = new OBJLoader(manager);
+  const texLoader  = new THREE.TextureLoader(manager);
 
   const loadGLTF = (url: string) => new Promise<any>((res, rej) => gltfLoader.load(url, res, undefined, rej));
   const loadOBJ  = (url: string) => new Promise<any>((res, rej) => objLoader.load(url, res, undefined, rej));
@@ -937,10 +1206,10 @@ async function createScene({
   ringB.rotation.y = 0.08; 
   planetsRig.add(ringA, ringB);
 
-  const starsNear = createStarField(1100, 72, 0.034, "#ffe0a0");
-  const starsMid  = createStarField(720,  90, 0.024, "#ffcc80");
-  const starsFar  = createStarField(480, 110, 0.018, "#e0b060");
-  const starsWarm = createStarField(360, 100, 0.020, "#fff0c0");
+  const starsNear = createStarField(isLowEnd ? 400 : 1100, 72, 0.034, "#ffe0a0");
+  const starsMid  = createStarField(isLowEnd ? 200 : 720,  90, 0.024, "#ffcc80");
+  const starsFar  = createStarField(isLowEnd ? 150 : 480, 110, 0.018, "#e0b060");
+  const starsWarm = createStarField(isLowEnd ? 100 : 360, 100, 0.020, "#fff0c0");
   (starsMid.material  as THREE.PointsMaterial).opacity = 0.32;
   (starsFar.material  as THREE.PointsMaterial).opacity = 0.20;
   (starsWarm.material as THREE.PointsMaterial).opacity = 0.22;
@@ -1006,7 +1275,7 @@ async function createScene({
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.position.set(0, mobile ? 0.45 : 0.8, mobile ? 16.8 : 15.5);
     camera.updateProjectionMatrix();
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.8));
+    renderer.setPixelRatio(Math.min(dpr, isLowEnd ? 1.0 : 1.5));
     renderer.setSize(window.innerWidth, window.innerHeight, false);
   };
 
@@ -1145,10 +1414,9 @@ async function createScene({
       const revealIn    = 1;
       const visibility  = 1;
 
-      // Group 0,1 into Orbit A, and Group 2,3 into Orbit B
       const isOrbitB   = index >= 2;
-      const currentRadiusX = isOrbitB ? 12.5 : 8.2;
-      const currentRadiusZ = isOrbitB ? 12.5 : 8.2;
+      const currentRadiusX = 8.2;
+      const currentRadiusZ = 8.2;
       const currentCenterZ = orbitCenterZ;
 
       let currentAngle = (index * (Math.PI * 2) / N) - globalAngleOffset;
@@ -1216,6 +1484,21 @@ async function createScene({
     cameraLookAt.lerp(targetLookAt, 0.078);
     camera.lookAt(cameraLookAt);
 
+    if (zoomTargetRef.current) {
+      const zoomEntry = planetEntries.find(e => e.slug === zoomTargetRef.current);
+      if (zoomEntry) {
+        const zoomWorldPos = new THREE.Vector3();
+        zoomEntry.pivot.getWorldPosition(zoomWorldPos);
+        const mob = window.innerWidth < 768;
+        const zoomCamTarget = zoomWorldPos.clone().add(new THREE.Vector3(mob ? 0.3 : 0.6, 0.35, mob ? 2.0 : 2.8));
+        camera.position.lerp(zoomCamTarget, 0.07);
+        cameraLookAt.lerp(zoomWorldPos, 0.09);
+        camera.lookAt(cameraLookAt);
+        camera.fov = THREE.MathUtils.lerp(camera.fov, 28, 0.04);
+        camera.updateProjectionMatrix();
+      }
+    }
+
     starsNear.rotation.y +=  delta * 0.0065;
     starsMid.rotation.y  -=  delta * 0.0038;
     starsFar.rotation.y  +=  delta * 0.002;
@@ -1226,7 +1509,7 @@ async function createScene({
     renderer.render(scene, camera);
 
     frameCount++;
-    if (frameCount % 2 === 0) {
+    if (frameCount % (isLowEnd ? 4 : 3) === 0) {
       const screenPositions: PlanetScreenPos[] = planetEntries.map((entry, index) => {
         const worldPos = new THREE.Vector3();
         entry.pivot.getWorldPosition(worldPos);
