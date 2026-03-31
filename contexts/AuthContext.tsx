@@ -9,7 +9,7 @@ import {
   ReactNode,
 } from "react";
 import apiClient from "@/lib/axios";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   initSocket,
   connectSocket,
@@ -27,7 +27,14 @@ interface AuthUser {
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  login: (credentials: Record<string, any>) => Promise<{ success: boolean; user?: AuthUser; errorCode?: string; error?: string }>;
+  login: (
+    credentials: Record<string, any>,
+  ) => Promise<{
+    success: boolean;
+    user?: AuthUser;
+    errorCode?: string;
+    error?: string;
+  }>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   isAuthenticated: boolean;
@@ -56,14 +63,15 @@ const AUTH_REJECTION_ERRORS = new Set([
 ]);
 
 const isExplicitAuthRejection = (error: unknown): boolean => {
-  const err = error as { response?: { status?: number; data?: { error?: string } } };
+  const err = error as {
+    response?: { status?: number; data?: { error?: string } };
+  };
   const status = err?.response?.status;
   const code = err?.response?.data?.error;
 
   if (status !== 401 && status !== 403) return false;
   return code ? AUTH_REJECTION_ERRORS.has(code) : false;
 };
-
 
 const getCachedUser = (): AuthUser | null => {
   if (typeof window === "undefined") return null;
@@ -122,13 +130,10 @@ const getClientDeviceName = async (): Promise<string | null> => {
     return null;
   }
   try {
-   
     if ((navigator as any).userAgentData?.getHighEntropyValues) {
-
-      const values = await (navigator as any).userAgentData.getHighEntropyValues([
-        "model",
-        "platform",
-      ]);
+      const values = await (
+        navigator as any
+      ).userAgentData.getHighEntropyValues(["model", "platform"]);
       const model = values?.model?.trim();
       const platform = values?.platform?.trim();
       if (model) {
@@ -150,7 +155,6 @@ const getClientDeviceName = async (): Promise<string | null> => {
   return buildFallbackDeviceName(navigator.userAgent);
 };
 
-
 interface AuthProviderProps {
   children: ReactNode;
 }
@@ -160,13 +164,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState<boolean>(true);
   const [isSocketReady, setIsSocketReady] = useState<boolean>(false);
   const router = useRouter();
+  const pathname = usePathname();
+
+  const getAuthRedirectPath = useCallback(() => {
+    return pathname?.startsWith("/admin") ? "/admin/auth" : "/auth/signin";
+  }, [pathname]);
 
   const clearUserAndRedirect = useCallback((): void => {
     setUser(null);
     cacheUser(null);
     disconnectSocket();
-    router.push("/admin/auth");
-  }, [router]);
+    router.push(getAuthRedirectPath());
+  }, [getAuthRedirectPath, router]);
 
   useEffect(() => {
     initSocket({
@@ -241,7 +250,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (isExplicitAuthRejection(error)) {
         setUser(null);
         cacheUser(null);
-      } else if ((error as any).response?.status >= 500 || !(error as any).response) {
+      } else if (
+        (error as any).response?.status >= 500 ||
+        !(error as any).response
+      ) {
         console.warn("Auth check skipped due to backend/network issue.");
       } else if ((error as any).response?.status !== 401) {
         console.error("Auth check failed:", error);
@@ -251,7 +263,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const login = async (credentials: Record<string, any>): Promise<{ success: boolean; user?: AuthUser; errorCode?: string; error?: string }> => {
+  const login = async (
+    credentials: Record<string, any>,
+  ): Promise<{
+    success: boolean;
+    user?: AuthUser;
+    errorCode?: string;
+    error?: string;
+  }> => {
     try {
       const deviceName = await getClientDeviceName();
       const response = await apiClient.post("/auth/login", {
@@ -266,7 +285,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return { success: true, user: response.data.data.user };
       }
     } catch (error: unknown) {
-      const err = error as { response?: { data?: { error?: string; message?: string } } };
+      const err = error as {
+        response?: { data?: { error?: string; message?: string } };
+      };
       return {
         success: false,
         errorCode: err.response?.data?.error,
@@ -289,7 +310,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       disconnectSocket();
       setUser(null);
       cacheUser(null);
-      router.push("/admin/auth");
+      router.push(getAuthRedirectPath());
     }
   };
 

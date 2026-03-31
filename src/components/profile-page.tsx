@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 import ProfileCard from "./ProfileCard";
 import { useAuthMe } from "@/src/hooks/api/useAuth";
 import {
@@ -1949,6 +1950,7 @@ function SidebarNav({
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { logout } = useAuth();
   const authMeQuery = useAuthMe();
   const updateProfileMutation = useUpdateUserProfile();
   const myRegistrationsQuery = useMyRegistrations(Boolean(authMeQuery.data));
@@ -1958,6 +1960,7 @@ export default function ProfilePage() {
 
   const [active, setActive] = useState<NavItem>("profile");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Toast System
   const [toast, setToast] = useState<{
@@ -2381,31 +2384,45 @@ export default function ProfilePage() {
             <SidebarNav active={active} setActive={setActive} />
 
             <div className="mt-auto flex flex-col gap-1.5 pt-6 border-t border-white/6">
-              {[{ href: "/contact", label: "Contact Us" }].map(
-                ({ href, label }) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    className="flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] uppercase tracking-widest font-mono text-white/20 hover:text-white/60 transition-all duration-300"
-                  >
-                    {label}
-                    <svg
-                      width="10"
-                      height="10"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        d="M5 12h14M12 5l7 7-7 7"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </Link>
-                ),
-              )}
+              <button
+                onClick={async () => {
+                  if (isLoggingOut) return;
+                  setIsLoggingOut(true);
+                  try {
+                    await logout();
+                  } finally {
+                    setIsLoggingOut(false);
+                  }
+                }}
+                disabled={isLoggingOut}
+                className="flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] uppercase tracking-widest font-mono text-white/20 hover:text-rose-400 transition-all duration-300 disabled:opacity-50"
+              >
+                {isLoggingOut ? "Logging out..." : "Logout"}
+                <svg
+                  width="10"
+                  height="10"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    d="M9 5H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M16 17l5-5-5-5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M21 12H9"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
             </div>
           </aside>
 
