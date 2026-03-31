@@ -9,6 +9,7 @@ import ScrollReveal from "./ScrollReveal";
 import RulesSection from "./rules-section";
 import { MobileStackedCards } from "./mobile-stacked-cards";
 import { EventRecord } from "@/lib/events-data";
+import { SectionTransition } from "./section-transition";
 
 export default function EventSectionWrapper({ event }: { event: EventRecord }) {
   const targetRef = React.useRef<HTMLDivElement>(null);
@@ -33,7 +34,7 @@ export default function EventSectionWrapper({ event }: { event: EventRecord }) {
 
   return (
     <div className="flex flex-col space-y-32">
-      <div className="relative animate-fade-in-up group/header">
+      <SectionTransition className="relative group/header">
         <div className="absolute -inset-x-24 -top-48 -bottom-24 z-0 pointer-events-none overflow-hidden">
           <div 
             className="absolute inset-0 bg-cover bg-center scale-110 opacity-40 mix-blend-screen animate-[slow-pan_40s_linear_infinite_alternate]"
@@ -81,7 +82,7 @@ export default function EventSectionWrapper({ event }: { event: EventRecord }) {
             </div>
           </div>
         </div>
-      </div>
+      </SectionTransition>
       <div ref={targetRef} className="relative h-auto lg:h-[400vh] w-full">
         <div className="relative lg:sticky lg:top-0 lg:h-screen flex items-center">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 w-full items-start">

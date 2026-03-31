@@ -114,7 +114,7 @@ export default function EventRegistration({
           href={`/auth/signin?callbackUrl=${encodeURIComponent(pathname)}`}
           className="inline-block bg-white text-black px-8 py-3 rounded-full font-medium hover:scale-105 transition-transform duration-300 w-full md:w-auto cursor-pointer"
         >
-          Sign In Now
+          Initiate Launch Sequence
         </Link>
       </div>
     );

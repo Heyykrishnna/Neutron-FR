@@ -8,7 +8,7 @@ import { StickyScrollCards } from "./sticky-scroll-cards";
 import ScrollReveal from "./ScrollReveal";
 import RulesSection from "./rules-section";
 import { MobileStackedCards } from "./mobile-stacked-cards";
-
+import { SectionTransition } from "./section-transition";
 export default function SectionWrapper({ competition }: { competition: any }) {
   const targetRef = React.useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
@@ -32,7 +32,7 @@ export default function SectionWrapper({ competition }: { competition: any }) {
 
   return (
     <div className="flex flex-col space-y-32">
-      <div className="relative animate-fade-in-up group/header">
+      <SectionTransition className="relative group/header">
         <div className="absolute -inset-x-24 -top-48 -bottom-24 z-0 pointer-events-none overflow-hidden">
           <div 
             className="absolute inset-0 bg-cover bg-center scale-110 opacity-40 mix-blend-screen animate-[slow-pan_40s_linear_infinite_alternate]"
@@ -80,10 +80,10 @@ export default function SectionWrapper({ competition }: { competition: any }) {
             </div>
           </div>
         </div>
-      </div>
+      </SectionTransition>
       <div ref={targetRef} className="relative h-auto lg:h-[400vh] w-full">
         <div className="relative lg:sticky lg:top-0 lg:h-screen flex items-center">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 w-full items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-40 w-full items-start">
             <div className="relative h-auto lg:h-screen px-4 py-12 md:py-32 overflow-hidden">
                <motion.div 
                  style={{ 
@@ -100,7 +100,7 @@ export default function SectionWrapper({ competition }: { competition: any }) {
                   <ScrollReveal
                     baseOpacity={0}
                     blurStrength={10}
-                    textClassName="text-xl md:text-2xl font-light leading-relaxed text-white/80"
+                    textClassName="text-lg md:text-xl font-light leading-relaxed text-white/80"
                     containerClassName="mb-8"
                   >
                     {competition.about}
@@ -112,7 +112,7 @@ export default function SectionWrapper({ competition }: { competition: any }) {
                   <ScrollReveal
                     baseOpacity={0}
                     blurStrength={10}
-                    textClassName="text-lg md:text-xl font-light leading-relaxed text-white/60"
+                    textClassName="text-md md:text-lg font-light leading-relaxed text-white/60"
                   >
                     As you venture deeper into the mission parameters, the gravity of the challenge becomes clear. Every decision counts, every calculation matters. We are looking for the elite, those who can survive the vacuum of space and the isolation of distant worlds.
                   </ScrollReveal>
@@ -120,7 +120,8 @@ export default function SectionWrapper({ competition }: { competition: any }) {
                   <ScrollReveal
                     baseOpacity={0}
                     blurStrength={10}
-                    textClassName="text-lg md:text-xl font-light leading-relaxed text-white/40"
+                    textClassName="text-md md:text-lg font-light leading-relaxed text-white/40"
+                    containerClassName="mb-8"
                   >
                     The mission lifecycle demands endurance and high cognitive function. You will be pushed to your limits, but the data harvested will pave the way for future generations. Prepare for launch sequence initiation.
                   </ScrollReveal>
