@@ -1,102 +1,145 @@
 "use client";
 
-import React, { useRef, useEffect, useState, useMemo, use } from "react";
-import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
-import * as THREE from 'three';
+import React, { useRef, useEffect, useState, useMemo } from "react";
+import {
+  motion,
+  useScroll,
+  useTransform,
+  AnimatePresence,
+  useMotionValue,
+  useSpring,
+} from "framer-motion";
+import * as THREE from "three";
 import Link from "next/link";
 import BlurHeading from "./blur-heading";
-import gsap from "gsap";
-import {Filter, CircleDot, ArrowDownUp, ChevronDown } from "lucide-react";
-import { useCompetition, useCompetitions } from "@/hooks/api/useCompetitions";
-import { useMotionValue } from "framer-motion";
-import { useSpring } from "framer-motion";
+import { Filter, CircleDot, ArrowDownUp, ChevronDown } from "lucide-react";
+import { useCompetitions } from "@/hooks/api/useCompetitions";
 import { playSciFiClick } from "./audio-controller";
 
 const ThreeStarsBackground = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  
+
   useEffect(() => {
     if (!canvasRef.current) return;
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2("#000000", 0.001);
-    
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 2000);
+
+    const camera = new THREE.PerspectiveCamera(
+      60,
+      window.innerWidth / window.innerHeight,
+      1,
+      2000,
+    );
     camera.position.z = 800;
-    
-    const renderer = new THREE.WebGLRenderer({ canvas: canvasRef.current, alpha: true, antialias: true });
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas: canvasRef.current,
+      alpha: true,
+      antialias: true,
+    });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
-    
+
     const txLoader = new THREE.TextureLoader();
-    const starImg1 = txLoader.load("https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/sprites/spark1.png");
-    const starImg2 = txLoader.load("https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/sprites/circle.png");
-    const starImg3 = txLoader.load("https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/sprites/snowflake1.png");
-    
-    const createLayer = (count: number, size: number, texture: THREE.Texture, color: string, zRange: number) => {
-       const geo = new THREE.BufferGeometry();
-       const pos = [];
-       for(let i=0; i<count; i++) {
-         pos.push((Math.random() - 0.5)*2500, (Math.random() - 0.5)*2500, (Math.random() - 0.5)*zRange);
-       }
-       geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-       const mat = new THREE.PointsMaterial({ size, map: texture, transparent: true, blending: THREE.AdditiveBlending, color, depthWrite: false });
-       return new THREE.Points(geo, mat);
+    const starImg1 = txLoader.load(
+      "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/sprites/spark1.png",
+    );
+    const starImg2 = txLoader.load(
+      "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/sprites/circle.png",
+    );
+    const starImg3 = txLoader.load(
+      "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/sprites/snowflake1.png",
+    );
+
+    const createLayer = (
+      count: number,
+      size: number,
+      texture: THREE.Texture,
+      color: string,
+      zRange: number,
+    ) => {
+      const geo = new THREE.BufferGeometry();
+      const pos = [];
+      for (let i = 0; i < count; i++) {
+        pos.push(
+          (Math.random() - 0.5) * 2500,
+          (Math.random() - 0.5) * 2500,
+          (Math.random() - 0.5) * zRange,
+        );
+      }
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+      const mat = new THREE.PointsMaterial({
+        size,
+        map: texture,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        color,
+        depthWrite: false,
+      });
+      return new THREE.Points(geo, mat);
     };
-    
+
     const layer1 = createLayer(800, 3, starImg1, "#88aaff", 1000);
     layer1.position.z = -600;
     scene.add(layer1);
-    
+
     const layer2 = createLayer(400, 7, starImg2, "#ffd7aa", 800);
     layer2.position.z = -200;
     scene.add(layer2);
-    
+
     const layer3 = createLayer(150, 14, starImg3, "#ffffff", 600);
     layer3.position.z = 100;
     scene.add(layer3);
-    
+
     let targetScrollY = window.scrollY;
     let currentScrollY = window.scrollY;
-    
-    const onScroll = () => { targetScrollY = window.scrollY; };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    
+
+    const onScroll = () => {
+      targetScrollY = window.scrollY;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+
     const resize = () => {
-      camera.aspect = window.innerWidth/window.innerHeight;
+      camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     };
-    window.addEventListener('resize', resize);
-    
+    window.addEventListener("resize", resize);
+
     let animFrame = 0;
     let time = 0;
     const tick = () => {
-       time += 0.005;
-       currentScrollY += (targetScrollY - currentScrollY) * 0.08;
-       
-       layer1.position.y = currentScrollY * 0.08;
-       layer2.position.y = currentScrollY * 0.25;
-       layer3.position.y = currentScrollY * 0.6;
-       
-       layer1.rotation.y = time * 0.05;
-       layer2.rotation.y = time * 0.08;
-       layer3.rotation.y = time * 0.15;
-       
-       renderer.render(scene, camera);
-       animFrame = requestAnimationFrame(tick);
+      time += 0.005;
+      currentScrollY += (targetScrollY - currentScrollY) * 0.08;
+
+      layer1.position.y = currentScrollY * 0.08;
+      layer2.position.y = currentScrollY * 0.25;
+      layer3.position.y = currentScrollY * 0.6;
+
+      layer1.rotation.y = time * 0.05;
+      layer2.rotation.y = time * 0.08;
+      layer3.rotation.y = time * 0.15;
+
+      renderer.render(scene, camera);
+      animFrame = requestAnimationFrame(tick);
     };
     tick();
-    
+
     return () => {
-        window.removeEventListener('scroll', onScroll);
-        window.removeEventListener('resize', resize);
-        cancelAnimationFrame(animFrame);
-        renderer.dispose();
-    }
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", resize);
+      cancelAnimationFrame(animFrame);
+      renderer.dispose();
+    };
   }, []);
-  
-  return <canvas ref={canvasRef} className="fixed inset-0 z-0 pointer-events-none w-full h-full mix-blend-screen opacity-70" />;
-}
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="fixed inset-0 z-0 pointer-events-none w-full h-full mix-blend-screen opacity-70"
+    />
+  );
+};
 
 type CardProps = {
   title: string;
@@ -110,35 +153,42 @@ type CardProps = {
   status: "OPEN" | "CLOSED" | "CANCELLED" | "POSTPONED";
 };
 
-
-
-
-function ParallaxCard({ title, description, image, heightClass, delay = 0, slug, category, teamSize, status }: CardProps) {
+function ParallaxCard({
+  title,
+  description,
+  image,
+  heightClass,
+  delay = 0,
+  slug,
+  category,
+  teamSize,
+  status,
+}: CardProps) {
   const ref = useRef<HTMLDivElement>(null);
-  
+
   const [isHovered, setIsHovered] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  
+
   const mx = useMotionValue(0.5);
   const my = useMotionValue(0.5);
   const springConfig = { stiffness: 400, damping: 30 };
   const springX = useSpring(mx, springConfig);
   const springY = useSpring(my, springConfig);
-  
+
   const rotateX = useTransform(springY, [0, 1], [15, -15]);
   const rotateY = useTransform(springX, [0, 1], [-15, 15]);
-  
+
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!ref.current) return;
     const rect = ref.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
+
     mx.set(x / rect.width);
     my.set(y / rect.height);
     setMousePosition({ x, y });
   };
-  
+
   const handleMouseLeave = () => {
     setIsHovered(false);
     mx.set(0.5);
@@ -150,7 +200,11 @@ function ParallaxCard({ title, description, image, heightClass, delay = 0, slug,
   };
 
   return (
-    <Link href={`/competitions/${slug}`} className="block w-full perspective-[1500px]" onClick={handleCardClick}>
+    <Link
+      href={`/competitions/${slug}`}
+      className="block w-full perspective-[1500px]"
+      onClick={handleCardClick}
+    >
       <motion.div
         ref={ref}
         onMouseMove={handleMouseMove}
@@ -159,7 +213,11 @@ function ParallaxCard({ title, description, image, heightClass, delay = 0, slug,
         initial={{ opacity: 0, y: 150, scale: 0.95 }}
         whileInView={{ opacity: 1, y: 0, scale: 1 }}
         viewport={{ once: true, margin: "-100px" }}
-        transition={{ duration: 1.2, delay: delay * 0.1, ease: [0.16, 1, 0.3, 1] }}
+        transition={{
+          duration: 1.2,
+          delay: delay * 0.1,
+          ease: [0.16, 1, 0.3, 1],
+        }}
         style={{
           rotateX,
           rotateY,
@@ -172,7 +230,7 @@ function ParallaxCard({ title, description, image, heightClass, delay = 0, slug,
           className="pointer-events-none absolute inset-0 z-50 mix-blend-screen transition-opacity duration-300"
           style={{
             opacity: isHovered ? 1 : 0,
-            background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(255,255,255,0.18), transparent 40%)`
+            background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(255,255,255,0.18), transparent 40%)`,
           }}
         />
 
@@ -181,13 +239,13 @@ function ParallaxCard({ title, description, image, heightClass, delay = 0, slug,
           style={{
             backgroundImage: `url(${image})`,
             filter: "grayscale(80%) contrast(1.1) brightness(0.6)",
-            transform: "translateZ(-30px)"
+            transform: "translateZ(-30px)",
           }}
         />
 
         <div className="absolute inset-0 z-10 bg-linear-to-t from-black/95 via-black/40 to-transparent transition-opacity duration-500 group-hover:from-black" />
 
-        <div 
+        <div
           className="absolute bottom-0 left-0 right-0 z-20 p-8 md:p-10 flex flex-col items-start transition-all duration-500 group-hover:-translate-y-4"
           style={{ transform: "translateZ(40px)" }}
         >
@@ -207,18 +265,23 @@ function ParallaxCard({ title, description, image, heightClass, delay = 0, slug,
             <span className="px-3 py-1.5 rounded-sm bg-white/5 border border-white/10 text-[10px] uppercase tracking-wider text-white/50 font-mono backdrop-blur-md">
               {teamSize}
             </span>
-            <span className={`px-3 py-1.5 rounded-sm border text-[10px] uppercase tracking-wider font-mono backdrop-blur-md ${
-              status === 'OPEN' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
-              status === 'CLOSED' ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' :
-              status === 'POSTPONED' ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' :
-              'bg-white/5 border-white/10 text-white/30'
-            }`}>
+            <span
+              className={`px-3 py-1.5 rounded-sm border text-[10px] uppercase tracking-wider font-mono backdrop-blur-md ${
+                status === "OPEN"
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                  : status === "CLOSED"
+                    ? "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                    : status === "POSTPONED"
+                      ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                      : "bg-white/5 border-white/10 text-white/30"
+              }`}
+            >
               {status}
             </span>
           </div>
         </div>
 
-        <div 
+        <div
           className="absolute top-8 right-8 z-30 p-4 border border-white/10 bg-black/40 backdrop-blur-md text-white rounded-full opacity-0 -translate-y-4 transition-all duration-500 group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-105"
           style={{ transform: "translateZ(50px)" }}
         >
@@ -240,13 +303,14 @@ function ParallaxCard({ title, description, image, heightClass, delay = 0, slug,
   );
 }
 
-import { COMPETITIONS_DATA } from "@/lib/competitions-data";
-
 export default function CompetitionsPage() {
-
-  const { data: competitions = [], isLoading } = useCompetitions();
-
-
+  const {
+    data: competitions = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useCompetitions();
 
   const { scrollYProgress } = useScroll();
   const bgY = useTransform(scrollYProgress, [0, 1], ["0%", "-10%"]);
@@ -256,81 +320,103 @@ export default function CompetitionsPage() {
   const [selectedStatus, setSelectedStatus] = useState("All Status");
   const [sortBy, setSortBy] = useState("Default");
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  
+
   const filterRef = useRef<HTMLDivElement>(null);
-
-
-
-
-
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+      if (
+        filterRef.current &&
+        !filterRef.current.contains(event.target as Node)
+      ) {
         setActiveDropdown(null);
       }
-
     }
     document.addEventListener("mousedown", handleClickOutside);
-  
+
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-
-
-
-
   const categories = useMemo(() => {
-    const cats = Array.from(new Set(competitions.map(c => c.category)));
+    const cats = Array.from(
+      new Set(
+        competitions
+          .map((c) => c?.category)
+          .filter((category): category is string => Boolean(category)),
+      ),
+    );
     return ["All Categories", ...cats];
-  }, []);
+  }, [competitions]);
 
-
-  
-
-  const statuses = ["All Status", "open", "closed", "postponed", "cancelled"];
-  const sortOptions = ["Default", "Title (A-Z)", "Title (Z-A)", "Date (Newest)", "Date (Oldest)"];
+  const statuses = ["All Status", "OPEN", "CLOSED", "POSTPONED", "CANCELLED"];
+  const sortOptions = [
+    "Default",
+    "Title (A-Z)",
+    "Title (Z-A)",
+    "Date (Newest)",
+    "Date (Oldest)",
+  ];
 
   const filteredCompetitions = useMemo(() => {
-    
     let result = [...competitions];
 
-    
-
     if (searchQuery) {
-      
       const query = searchQuery.toLowerCase();
-   
-      result = result.filter(c => 
-         
-        c.title.toLowerCase().includes(query) || 
-        c.category.toLowerCase().includes(query) ||
-        (c.shortDescription && c.shortDescription.toLowerCase().includes(query))
-      );
+
+      result = result.filter((c) => {
+        const title = String(c?.title || c?.name || "").toLowerCase();
+        const category = String(c?.category || "").toLowerCase();
+        const description = String(
+          c?.shortDescription || c?.description || "",
+        ).toLowerCase();
+
+        return (
+          title.includes(query) ||
+          category.includes(query) ||
+          description.includes(query)
+        );
+      });
     }
 
     if (selectedCategory !== "All Categories") {
-      result = result.filter(c => c.category === selectedCategory);
+      result = result.filter((c) => c?.category === selectedCategory);
     }
 
     if (selectedStatus !== "All Status") {
-      result = result.filter(c => c.status === selectedStatus);
+      result = result.filter(
+        (c) => String(c?.status || "").toUpperCase() === selectedStatus,
+      );
     }
 
     if (sortBy === "Title (A-Z)") {
-      result.sort((a, b) => a.title.localeCompare(b.title));
+      result.sort((a, b) =>
+        String(a?.title || a?.name || "").localeCompare(
+          String(b?.title || b?.name || ""),
+        ),
+      );
     } else if (sortBy === "Title (Z-A)") {
-      result.sort((a, b) => b.title.localeCompare(a.title));
+      result.sort((a, b) =>
+        String(b?.title || b?.name || "").localeCompare(
+          String(a?.title || a?.name || ""),
+        ),
+      );
     } else if (sortBy === "Date (Newest)") {
-      result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      result.sort(
+        (a, b) =>
+          new Date(b?.date || b?.startDate || b?.createdAt || 0).getTime() -
+          new Date(a?.date || a?.startDate || a?.createdAt || 0).getTime(),
+      );
     } else if (sortBy === "Date (Oldest)") {
-      result.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      result.sort(
+        (a, b) =>
+          new Date(a?.date || a?.startDate || a?.createdAt || 0).getTime() -
+          new Date(b?.date || b?.startDate || b?.createdAt || 0).getTime(),
+      );
     }
 
     return result;
-  }, [searchQuery, selectedCategory, selectedStatus, sortBy,competitions]);
+  }, [searchQuery, selectedCategory, selectedStatus, sortBy, competitions]);
 
-  
   const leftColumnComps = filteredCompetitions.filter((_, i) => i % 2 === 0);
 
   const rightColumnComps = filteredCompetitions.filter((_, i) => i % 2 !== 0);
@@ -339,19 +425,19 @@ export default function CompetitionsPage() {
     playSciFiClick();
     setActiveDropdown(activeDropdown === type ? null : type);
   };
-  
+
   const handleDropdownSelect = () => {
     playSciFiClick();
     setActiveDropdown(null);
-  }
+  };
 
   return (
     <div className="min-h-screen bg-[#030303] text-white selection:bg-white/20 relative overflow-hidden">
-      
-      <motion.div 
+      <motion.div
         className="pointer-events-none fixed inset-0 z-0"
         style={{
-          backgroundImage: "url('https://4kwallpapers.com/images/wallpapers/stars-galaxy-3840x2160-10307.jpg')",
+          backgroundImage:
+            "url('https://4kwallpapers.com/images/wallpapers/stars-galaxy-3840x2160-10307.jpg')",
           backgroundSize: "cover",
           backgroundPosition: "center",
           filter: "brightness(0.35) saturate(1.2)",
@@ -360,31 +446,45 @@ export default function CompetitionsPage() {
         }}
       />
       <div className="pointer-events-none fixed inset-0 z-0 bg-linear-to-b from-[#030303]/20 via-[#030303]/60 to-[#030303]" />
-      
+
       <ThreeStarsBackground />
 
       <div className="fixed top-6 left-6 z-50 pointer-events-auto flex flex-row items-center gap-4">
         <Link href="/" onClick={playSciFiClick}>
-          <img 
-            src="/neutron.png" 
-            alt="Logo" 
+          <img
+            src="/neutron.png"
+            alt="Logo"
             className="h-12 w-12 opacity-90 transition-transform duration-300 hover:scale-110 drop-shadow-[0_0_15px_rgba(255,200,80,0.4)]"
           />
         </Link>
-        <Link 
+        <Link
           href="/?phase=planets"
           onClick={playSciFiClick}
           className="group flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded-full backdrop-blur-md transition-all hover:bg-white/15 hover:border-white/30 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)]"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="group-hover:-translate-x-1 transition-transform duration-300">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="group-hover:-translate-x-1 transition-transform duration-300"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M10 19l-7-7m0 0l7-7m-7 7h18"
+            />
           </svg>
-          <span className="text-[10px] font-mono uppercase tracking-widest text-white/70 group-hover:text-white transition-colors">Planets</span>
+          <span className="text-[10px] font-mono uppercase tracking-widest text-white/70 group-hover:text-white transition-colors">
+            Planets
+          </span>
         </Link>
       </div>
 
       <main className="max-w-[1400px] mx-auto px-6 md:px-12 lg:px-20 pt-36 pb-40">
-        <motion.div 
+        <motion.div
           className="mb-16 md:mb-28 mt-4 md:mt-10 max-w-4xl relative z-10"
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
@@ -396,21 +496,33 @@ export default function CompetitionsPage() {
           />
         </motion.div>
 
-        <div className="relative z-20 mb-20 flex flex-col gap-6" ref={filterRef}>
+        <div
+          className="relative z-20 mb-20 flex flex-col gap-6"
+          ref={filterRef}
+        >
           <div className="flex flex-col md:flex-row gap-4 items-center">
-            <motion.div 
+            <motion.div
               className="relative w-full md:w-[400px]"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8, delay: 0.2 }}
             >
               <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/30">
-                  <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="text-white/30"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.3-4.3" />
                 </svg>
               </div>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 placeholder="Search cosmic signals..."
                 value={searchQuery}
                 onChange={(e) => {
@@ -422,7 +534,7 @@ export default function CompetitionsPage() {
               />
             </motion.div>
 
-            <motion.div 
+            <motion.div
               className="flex flex-row flex-wrap gap-3 w-full md:w-auto overflow-visible py-2"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -430,24 +542,39 @@ export default function CompetitionsPage() {
             >
               <div className="relative">
                 <button
-                  onClick={() => handleDropdownClick('category')}
+                  onClick={() => handleDropdownClick("category")}
                   className={`h-14 px-6 flex items-center gap-3 rounded-sm border transition-all cursor-pointer font-mono text-[10px] uppercase tracking-widest ${
-                    activeDropdown === 'category' || selectedCategory !== "All Categories"
-                      ? "bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.2)]" 
+                    activeDropdown === "category" ||
+                    selectedCategory !== "All Categories"
+                      ? "bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.2)]"
                       : "bg-black/40 backdrop-blur-md border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
                   }`}
                 >
-                  <Filter size={18} strokeWidth={activeDropdown === 'category' ? 2.5 : 1.5} />
-                  <span>{selectedCategory === "All Categories" ? "Category" : selectedCategory}</span>
-                  <ChevronDown size={14} className={`transition-transform duration-300 ${activeDropdown === 'category' ? 'rotate-180' : ''}`} />
+                  <Filter
+                    size={18}
+                    strokeWidth={activeDropdown === "category" ? 2.5 : 1.5}
+                  />
+                  <span>
+                    {selectedCategory === "All Categories"
+                      ? "Category"
+                      : selectedCategory}
+                  </span>
+                  <ChevronDown
+                    size={14}
+                    className={`transition-transform duration-300 ${activeDropdown === "category" ? "rotate-180" : ""}`}
+                  />
                 </button>
                 <AnimatePresence>
-                  {activeDropdown === 'category' && (
-                    <motion.div 
+                  {activeDropdown === "category" && (
+                    <motion.div
                       initial={{ opacity: 0, y: 15, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 400,
+                        damping: 30,
+                      }}
                       className="absolute top-full left-0 mt-3 w-64 bg-black/80 backdrop-blur-2xl border border-white/20 rounded-md shadow-[0_10px_40px_rgba(0,0,0,0.8)] z-50 p-2 overflow-hidden"
                     >
                       {categories.map((cat) => (
@@ -458,10 +585,14 @@ export default function CompetitionsPage() {
                             handleDropdownSelect();
                           }}
                           className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm transition-all text-left group ${
-                            selectedCategory === cat ? "bg-white/15 text-white" : "text-white/40 hover:bg-white/10 hover:text-white"
+                            selectedCategory === cat
+                              ? "bg-white/15 text-white"
+                              : "text-white/40 hover:bg-white/10 hover:text-white"
                           }`}
                         >
-                          <span className="font-mono text-[10px] uppercase tracking-widest">{cat === "All Categories" ? "All Missions" : cat}</span>
+                          <span className="font-mono text-[10px] uppercase tracking-widest">
+                            {cat === "All Categories" ? "All Missions" : cat}
+                          </span>
                         </button>
                       ))}
                     </motion.div>
@@ -471,24 +602,39 @@ export default function CompetitionsPage() {
 
               <div className="relative">
                 <button
-                  onClick={() => handleDropdownClick('status')}
+                  onClick={() => handleDropdownClick("status")}
                   className={`h-14 px-6 flex items-center gap-3 rounded-sm border transition-all cursor-pointer font-mono text-[10px] uppercase tracking-widest ${
-                    activeDropdown === 'status' || selectedStatus !== "All Status"
-                      ? "bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.2)]" 
+                    activeDropdown === "status" ||
+                    selectedStatus !== "All Status"
+                      ? "bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.2)]"
                       : "bg-black/40 backdrop-blur-md border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
                   }`}
                 >
-                  <CircleDot size={18} strokeWidth={activeDropdown === 'status' ? 2.5 : 1.5} />
-                  <span>{selectedStatus === "All Status" ? "Status" : selectedStatus}</span>
-                  <ChevronDown size={14} className={`transition-transform duration-300 ${activeDropdown === 'status' ? 'rotate-180' : ''}`} />
+                  <CircleDot
+                    size={18}
+                    strokeWidth={activeDropdown === "status" ? 2.5 : 1.5}
+                  />
+                  <span>
+                    {selectedStatus === "All Status"
+                      ? "Status"
+                      : selectedStatus}
+                  </span>
+                  <ChevronDown
+                    size={14}
+                    className={`transition-transform duration-300 ${activeDropdown === "status" ? "rotate-180" : ""}`}
+                  />
                 </button>
                 <AnimatePresence>
-                  {activeDropdown === 'status' && (
-                    <motion.div 
+                  {activeDropdown === "status" && (
+                    <motion.div
                       initial={{ opacity: 0, y: 15, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 400,
+                        damping: 30,
+                      }}
                       className="absolute top-full left-0 mt-3 w-48 bg-black/80 backdrop-blur-2xl border border-white/20 rounded-md shadow-[0_10px_40px_rgba(0,0,0,0.8)] z-50 p-2 overflow-hidden"
                     >
                       {statuses.map((status) => (
@@ -499,15 +645,25 @@ export default function CompetitionsPage() {
                             handleDropdownSelect();
                           }}
                           className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm transition-all text-left ${
-                            selectedStatus === status ? "bg-white/15 text-white" : "text-white/40 hover:bg-white/10 hover:text-white"
+                            selectedStatus === status
+                              ? "bg-white/15 text-white"
+                              : "text-white/40 hover:bg-white/10 hover:text-white"
                           }`}
                         >
-                          <div className={`w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] ${
-                             status === 'OPEN' ? 'bg-emerald-500 text-emerald-500' : 
-                             status === 'CLOSED' ? 'bg-rose-500 text-rose-500' : 
-                             status === 'POSTPONED' ? 'bg-amber-500 text-amber-500' : 'bg-white/20 text-white/20'
-                          }`} />
-                          <span className="font-mono text-[10px] uppercase tracking-widest">{status === "All Status" ? "All Status" : status}</span>
+                          <div
+                            className={`w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] ${
+                              status === "OPEN"
+                                ? "bg-emerald-500 text-emerald-500"
+                                : status === "CLOSED"
+                                  ? "bg-rose-500 text-rose-500"
+                                  : status === "POSTPONED"
+                                    ? "bg-amber-500 text-amber-500"
+                                    : "bg-white/20 text-white/20"
+                            }`}
+                          />
+                          <span className="font-mono text-[10px] uppercase tracking-widest">
+                            {status === "All Status" ? "All Status" : status}
+                          </span>
                         </button>
                       ))}
                     </motion.div>
@@ -517,24 +673,34 @@ export default function CompetitionsPage() {
 
               <div className="relative">
                 <button
-                  onClick={() => handleDropdownClick('sort')}
+                  onClick={() => handleDropdownClick("sort")}
                   className={`h-14 px-6 flex items-center gap-3 rounded-sm border transition-all cursor-pointer font-mono text-[10px] uppercase tracking-widest ${
-                    activeDropdown === 'sort' || sortBy !== "Default"
-                      ? "bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.2)]" 
+                    activeDropdown === "sort" || sortBy !== "Default"
+                      ? "bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.2)]"
                       : "bg-black/40 backdrop-blur-md border-white/10 text-white/50 hover:bg-white/10 hover:text-white"
                   }`}
                 >
-                  <ArrowDownUp size={18} strokeWidth={activeDropdown === 'sort' ? 2.5 : 1.5} />
+                  <ArrowDownUp
+                    size={18}
+                    strokeWidth={activeDropdown === "sort" ? 2.5 : 1.5}
+                  />
                   <span>{sortBy === "Default" ? "Sort By" : sortBy}</span>
-                  <ChevronDown size={14} className={`transition-transform duration-300 ${activeDropdown === 'sort' ? 'rotate-180' : ''}`} />
+                  <ChevronDown
+                    size={14}
+                    className={`transition-transform duration-300 ${activeDropdown === "sort" ? "rotate-180" : ""}`}
+                  />
                 </button>
                 <AnimatePresence>
-                  {activeDropdown === 'sort' && (
-                    <motion.div 
+                  {activeDropdown === "sort" && (
+                    <motion.div
                       initial={{ opacity: 0, y: 15, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 400,
+                        damping: 30,
+                      }}
                       className="absolute top-full right-0 mt-3 w-52 bg-black/80 backdrop-blur-2xl border border-white/20 rounded-md shadow-[0_10px_40px_rgba(0,0,0,0.8)] z-50 p-2 overflow-hidden"
                     >
                       {sortOptions.map((opt) => (
@@ -545,7 +711,9 @@ export default function CompetitionsPage() {
                             handleDropdownSelect();
                           }}
                           className={`w-full px-4 py-3 rounded-sm transition-all text-left font-mono text-[10px] uppercase tracking-widest ${
-                            sortBy === opt ? "bg-white/15 text-white" : "text-white/40 hover:bg-white/10 hover:text-white"
+                            sortBy === opt
+                              ? "bg-white/15 text-white"
+                              : "text-white/40 hover:bg-white/10 hover:text-white"
                           }`}
                         >
                           {opt}
@@ -557,17 +725,25 @@ export default function CompetitionsPage() {
               </div>
             </motion.div>
           </div>
-          
-          {filteredCompetitions.length === 0 && (
-            <motion.div 
+
+          {!isLoading && !isError && filteredCompetitions.length === 0 && (
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="mt-20 text-center py-20 border border-dashed border-white/20 rounded-lg bg-black/20 backdrop-blur-md"
             >
-              <p className="text-white/40 font-mono uppercase tracking-[0.2em] text-sm">No cosmic signals detected matching your criteria.</p>
-              <button 
+              <p className="text-white/40 font-mono uppercase tracking-[0.2em] text-sm">
+                {competitions.length === 0
+                  ? "No competitions available right now."
+                  : "No cosmic signals detected matching your criteria."}
+              </p>
+              <button
                 onClick={() => {
                   playSciFiClick();
+                  if (competitions.length === 0) {
+                    refetch();
+                    return;
+                  }
                   setSearchQuery("");
                   setSelectedCategory("All Categories");
                   setSelectedStatus("All Status");
@@ -575,50 +751,110 @@ export default function CompetitionsPage() {
                 }}
                 className="mt-8 px-6 py-3 hover:scale-105 bg-white text-black hover:bg-gray-200 border border-transparent rounded-full transition-all text-[11px] font-mono font-bold uppercase tracking-widest"
               >
-                Recalibrate Sensors
+                {competitions.length === 0
+                  ? "Refresh Feed"
+                  : "Recalibrate Sensors"}
+              </button>
+            </motion.div>
+          )}
+
+          {isError && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mt-20 text-center py-20 border border-dashed border-rose-400/30 rounded-lg bg-rose-500/10 backdrop-blur-md"
+            >
+              <p className="text-rose-200 font-mono uppercase tracking-[0.2em] text-sm">
+                Failed to fetch competitions.
+              </p>
+              <p className="mt-3 text-rose-200/80 text-xs">
+                {(error as any)?.message || "Please try again."}
+              </p>
+              <button
+                onClick={() => {
+                  playSciFiClick();
+                  refetch();
+                }}
+                className="mt-8 px-6 py-3 hover:scale-105 bg-white text-black hover:bg-gray-200 border border-transparent rounded-full transition-all text-[11px] font-mono font-bold uppercase tracking-widest"
+              >
+                Retry
               </button>
             </motion.div>
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 lg:gap-16 relative z-10 items-start mt-8 md:mt-0">
-          <div className="flex flex-col gap-8 lg:gap-12 w-full">
-            {leftColumnComps.map((comp, index) => (
-              <>
-              <ParallaxCard
-                key={comp.id}
-                slug={comp.id}
-                title={comp.title}
-                description={comp.shortDescription}
-                image={comp.posterPath}
-                heightClass={"h-[750px] md:h-[900px]"}
-                delay={index}
-                category={comp.category}
-                teamSize={comp.maxTeamSize}
-                status={comp.status}
-              />
-            </>
-
-            ))}
-          </div>
-
-          <div className="flex flex-col gap-8 lg:gap-12 w-full pt-0 md:pt-40 lg:pt-56">
-            {rightColumnComps.map((comp, index) => (
-              <ParallaxCard
-                key={comp.id}
-                slug={comp.id}
-                title={comp.title}
-                description={comp.shortDescription}
-                image={comp.posterPath}
-                heightClass={"h-[750px] md:h-[900px]"}
-                delay={index}
-                category={comp.category}
-                teamSize={`${comp.minTeamSize} - ${comp.maxTeamSize} Members`}
-                status={comp.status}
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 lg:gap-16 relative z-10 items-start mt-8 md:mt-0">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <div
+                key={idx}
+                className="h-[750px] md:h-[900px] rounded-xl border border-white/10 bg-white/5 animate-pulse"
               />
             ))}
           </div>
-        </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 lg:gap-16 relative z-10 items-start mt-8 md:mt-0">
+            <div className="flex flex-col gap-8 lg:gap-12 w-full">
+              {leftColumnComps.map((comp, index) => (
+                <ParallaxCard
+                  key={String(comp.id || comp._id || `competition-${index}`)}
+                  slug={String(comp.id || comp._id || "")}
+                  title={comp.title || comp.name || "Untitled Competition"}
+                  description={comp.shortDescription || comp.description || ""}
+                  image={comp.posterPath || comp.bannerMediaPath || ""}
+                  heightClass={"h-[750px] md:h-[900px]"}
+                  delay={index}
+                  category={comp.category || "Uncategorized"}
+                  teamSize={
+                    comp.minTeamSize && comp.maxTeamSize
+                      ? `${comp.minTeamSize} - ${comp.maxTeamSize} Members`
+                      : comp.maxTeamSize
+                        ? `${comp.maxTeamSize} Members`
+                        : "Team size not specified"
+                  }
+                  status={
+                    (["OPEN", "CLOSED", "POSTPONED", "CANCELLED"].includes(
+                      String(comp.status || "").toUpperCase(),
+                    )
+                      ? String(comp.status).toUpperCase()
+                      : "CLOSED") as CardProps["status"]
+                  }
+                />
+              ))}
+            </div>
+
+            <div className="flex flex-col gap-8 lg:gap-12 w-full pt-0 md:pt-40 lg:pt-56">
+              {rightColumnComps.map((comp, index) => (
+                <ParallaxCard
+                  key={String(
+                    comp.id || comp._id || `competition-right-${index}`,
+                  )}
+                  slug={String(comp.id || comp._id || "")}
+                  title={comp.title || comp.name || "Untitled Competition"}
+                  description={comp.shortDescription || comp.description || ""}
+                  image={comp.posterPath || comp.bannerMediaPath || ""}
+                  heightClass={"h-[750px] md:h-[900px]"}
+                  delay={index}
+                  category={comp.category || "Uncategorized"}
+                  teamSize={
+                    comp.minTeamSize && comp.maxTeamSize
+                      ? `${comp.minTeamSize} - ${comp.maxTeamSize} Members`
+                      : comp.maxTeamSize
+                        ? `${comp.maxTeamSize} Members`
+                        : "Team size not specified"
+                  }
+                  status={
+                    (["OPEN", "CLOSED", "POSTPONED", "CANCELLED"].includes(
+                      String(comp.status || "").toUpperCase(),
+                    )
+                      ? String(comp.status).toUpperCase()
+                      : "CLOSED") as CardProps["status"]
+                  }
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

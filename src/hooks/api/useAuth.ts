@@ -27,6 +27,12 @@ export interface LoginCredentials {
   password: string;
 }
 
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  password: string;
+}
+
 /**
  * Get current authenticated user
  */
@@ -50,10 +56,7 @@ export function useLogin() {
 
   return useMutation<User, Error, LoginCredentials>({
     mutationFn: async (credentials) => {
-      const { data } = await apiClient.post<User>(
-        "/auth/login",
-        credentials
-      );
+      const { data } = await apiClient.post<User>("/auth/login", credentials);
       return data;
     },
     onSuccess: (data) => {
@@ -98,6 +101,40 @@ export function useGoogleLogin() {
 }
 
 /**
+ * Email registration
+ */
+export function useRegister() {
+  return useMutation<
+    { success: boolean; message?: string; data?: { userId?: string } },
+    Error,
+    RegisterPayload
+  >({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post("/auth/register", payload);
+      return data;
+    },
+  });
+}
+
+/**
+ * Request password reset link
+ */
+export function useRequestPasswordReset() {
+  return useMutation<
+    { success: boolean; message?: string },
+    Error,
+    { email: string }
+  >({
+    mutationFn: async ({ email }) => {
+      const { data } = await apiClient.post("/auth/password-reset/request", {
+        email,
+      });
+      return data;
+    },
+  });
+}
+
+/**
  * Get all active sessions
  */
 export function useSessions() {
@@ -118,9 +155,7 @@ export function useRevokeSession() {
 
   return useMutation<any, Error, string>({
     mutationFn: async (sessionId) => {
-      const { data } = await apiClient.delete(
-        `/auth/sessions/${sessionId}`
-      );
+      const { data } = await apiClient.delete(`/auth/sessions/${sessionId}`);
       return data;
     },
     onSuccess: () => {
@@ -157,13 +192,49 @@ export function useChangePassword() {
     { currentPassword: string; newPassword: string }
   >({
     mutationFn: async ({ currentPassword, newPassword }) => {
+      const { data } = await apiClient.post("/auth/change-password", {
+        currentPassword,
+        newPassword,
+      });
+      return data;
+    },
+  });
+}
+
+/**
+ * Resend verification email
+ */
+export function useResendVerificationEmail() {
+  return useMutation<
+    { success: boolean; message?: string },
+    Error,
+    { email: string }
+  >({
+    mutationFn: async ({ email }) => {
       const { data } = await apiClient.post(
-        "/auth/change-password",
+        "/auth/resend-verification-public",
         {
-          currentPassword,
-          newPassword,
-        }
+          email,
+        },
       );
+      return data;
+    },
+  });
+}
+
+/**
+ * Verify email with token
+ */
+export function useVerifyEmail() {
+  return useMutation<
+    { success: boolean; message?: string },
+    Error,
+    { token: string }
+  >({
+    mutationFn: async ({ token }) => {
+      const { data } = await apiClient.get("/auth/verify-email", {
+        params: { token },
+      });
       return data;
     },
   });

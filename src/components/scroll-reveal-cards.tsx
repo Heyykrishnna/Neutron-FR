@@ -1,7 +1,13 @@
 "use client";
 
 import { useRef } from "react";
-import { useScroll, useTransform, motion, useMotionTemplate, MotionValue } from "framer-motion";
+import {
+  useScroll,
+  useTransform,
+  motion,
+  useMotionTemplate,
+  MotionValue,
+} from "framer-motion";
 
 export interface ScrollRevealCardsProps {
   prizePool?: string;
@@ -9,7 +15,11 @@ export interface ScrollRevealCardsProps {
   teamSize?: string;
 }
 
-export function ScrollRevealCards({ prizePool, location, teamSize }: ScrollRevealCardsProps) {
+export function ScrollRevealCards({
+  prizePool,
+  location,
+  teamSize,
+}: ScrollRevealCardsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { scrollYProgress } = useScroll({
@@ -18,12 +28,16 @@ export function ScrollRevealCards({ prizePool, location, teamSize }: ScrollRevea
   });
 
   const scale = useTransform(scrollYProgress, [0, 0.25], [1, 0.8]);
-  
+
   const titleOpacity = useTransform(scrollYProgress, [0.15, 0.25], [0, 1]);
   const titleY = useTransform(scrollYProgress, [0.15, 0.25], [20, 0]);
   const gap = 0;
-  
-  const outerBorderRadiusRound = useTransform(scrollYProgress, [0, 0.25], [0, 24]);
+
+  const outerBorderRadiusRound = useTransform(
+    scrollYProgress,
+    [0, 0.25],
+    [0, 24],
+  );
   const innerBorderRadiusRound = 0;
 
   const leftRadius = useMotionTemplate`${outerBorderRadiusRound}px ${innerBorderRadiusRound}px ${innerBorderRadiusRound}px ${outerBorderRadiusRound}px`;
@@ -43,20 +57,21 @@ export function ScrollRevealCards({ prizePool, location, teamSize }: ScrollRevea
   const yCenter = useTransform(scrollYProgress, [0.7, 0.9], [0, -10]);
   const yRight = useTransform(scrollYProgress, [0.7, 0.9], [0, 20]);
 
-  const ASTR_IMG = "https://res.cloudinary.com/dpod2sj9t/image/upload/v1774362735/astronaut_21_9_ibyn0c.png";
+  const ASTR_IMG =
+    "https://res.cloudinary.com/dpod2sj9t/image/upload/v1774362735/astronaut_21_9_ibyn0c.png";
 
   return (
     <div ref={containerRef} className="relative h-[400vh]">
       <div className="sticky top-0 h-screen flex flex-col items-center justify-center overflow-hidden">
-        
-        <motion.h2 
+        <motion.h2
           style={{ opacity: titleOpacity, y: titleY }}
           className="text-white text-3xl md:text-5xl font-serif mb-12 tracking-wide z-10"
         >
-          What stage <span className="italic text-gray-400">is</span> your mission in?
+          What stage <span className="italic text-gray-400">is</span> your
+          mission in?
         </motion.h2>
 
-        <motion.div 
+        <motion.div
           style={{ scale, gap }}
           className="flex w-full max-w-[1200px] h-[60vh] px-4 md:px-0 z-20 perspective-[1000px]"
         >
@@ -70,7 +85,7 @@ export function ScrollRevealCards({ prizePool, location, teamSize }: ScrollRevea
             backColor="#939393"
             textColor="#000000"
             title="Location"
-            value={location || "Rishihood University, India"}
+            value={location || ""}
           />
 
           <FlipCard
@@ -83,7 +98,7 @@ export function ScrollRevealCards({ prizePool, location, teamSize }: ScrollRevea
             backColor="#740f0d"
             textColor="#ffffff"
             title="Prize Pool"
-            value={prizePool || "₹10,000"}
+            value={prizePool || ""}
           />
 
           <FlipCard
@@ -96,9 +111,8 @@ export function ScrollRevealCards({ prizePool, location, teamSize }: ScrollRevea
             backColor="#151515"
             textColor="#ffffff"
             title="Team Size"
-            value={teamSize || "Up to 4 Members"}
+            value={teamSize || ""}
           />
-
         </motion.div>
       </div>
     </div>
@@ -118,29 +132,40 @@ interface FlipCardProps {
   value: string;
 }
 
-function FlipCard({ rotateY, rotateZ, y, borderRadius, bgPosition, bgImage, backColor, textColor, title, value }: FlipCardProps) {
+function FlipCard({
+  rotateY,
+  rotateZ,
+  y,
+  borderRadius,
+  bgPosition,
+  bgImage,
+  backColor,
+  textColor,
+  title,
+  value,
+}: FlipCardProps) {
   return (
-    <motion.div 
-      style={{ 
-        rotateY, 
-        rotate: rotateZ, 
+    <motion.div
+      style={{
+        rotateY,
+        rotate: rotateZ,
         y,
         rotateX: 0,
-        transformStyle: "preserve-3d"
+        transformStyle: "preserve-3d",
       }}
       className="relative flex-1 h-full cursor-pointer -mr-px last:mr-0"
     >
       <motion.div
-        style={{ 
-          borderRadius, 
-          backfaceVisibility: "hidden", 
+        style={{
+          borderRadius,
+          backfaceVisibility: "hidden",
           WebkitBackfaceVisibility: "hidden",
           transformStyle: "preserve-3d",
-          transform: "translateZ(1px)"
+          transform: "translateZ(1px)",
         }}
         className="absolute inset-0 w-full h-full bg-cover bg-no-repeat z-20"
       >
-        <div 
+        <div
           className="w-full h-full"
           style={{
             backgroundImage: `url('${bgImage}')`,
@@ -152,22 +177,24 @@ function FlipCard({ rotateY, rotateZ, y, borderRadius, bgPosition, bgImage, back
       </motion.div>
 
       <motion.div
-        style={{ 
+        style={{
           borderRadius: "24px",
           backgroundColor: backColor,
           color: textColor,
-          backfaceVisibility: "hidden", 
+          backfaceVisibility: "hidden",
           WebkitBackfaceVisibility: "hidden",
           transform: "rotateY(180deg) translateZ(1px)",
-          transformStyle: "preserve-3d"
+          transformStyle: "preserve-3d",
         }}
         className="absolute inset-0 w-full h-full overflow-hidden shadow-2xl flex flex-col justify-between p-10 z-10"
       >
         <div className="absolute bg-[url('https://res.cloudinary.com/dpod2sj9t/image/upload/v1774362639/nnnoise_zgex87.svg')] opacity-[1] mix-blend-overlay pointer-events-none z-0"></div>
-        
+
         <div className="flex flex-col h-full relative z-10">
           <div className="mt-auto">
-            <h3 className="text-sm font-mono uppercase tracking-[0.2em] mb-3 opacity-60">{title}</h3>
+            <h3 className="text-sm font-mono uppercase tracking-[0.2em] mb-3 opacity-60">
+              {title}
+            </h3>
             <p className="text-4xl lg:text-4xl font-semibold  tracking-tight leading-none wrap-break-word">
               {value}
             </p>

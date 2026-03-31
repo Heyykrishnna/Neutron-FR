@@ -2,39 +2,45 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { 
-  Plus, 
-  Trash2, 
-  X, 
-  ChevronRight, 
-  Bell, 
-  Layout, 
-  User, 
-  Target, 
-  Mail, 
-  Download, 
-  CheckCircle2, 
+import {
+  Plus,
+  Trash2,
+  X,
+  ChevronRight,
+  Bell,
+  Layout,
+  User,
+  Target,
+  Mail,
+  Download,
+  CheckCircle2,
   AlertCircle,
   MoreVertical,
   Upload,
   Calendar,
   Zap,
   Award,
-  ChevronLeft
+  ChevronLeft,
 } from "lucide-react";
 import Link from "next/link";
-import { COMPETITIONS_DATA } from "@/lib/competitions-data";
-import { EVENTS_DATA } from "@/lib/events-data";
 import ProfileCard from "./ProfileCard";
+import { useAuthMe } from "@/src/hooks/api/useAuth";
+import {
+  useAcceptTeamInvite,
+  useDeclineTeamInvite,
+  useMyRegistrations,
+  usePendingTeamInvites,
+} from "@/src/hooks/api/usePublicRegistration";
+import { useUpdateUserProfile } from "@/src/hooks/api/useUserProfile";
 
 type NavItem = "profile" | "competitions" | "events" | "calendar" | "inbox";
 
 const DashboardContext = React.createContext<{
   showToast: (msg: string, type?: "success" | "error" | "info") => void;
   setExpandedID: (val: boolean) => void;
-}>({ 
-  showToast: () => {}, 
-  setExpandedID: () => {} 
+}>({
+  showToast: () => {},
+  setExpandedID: () => {},
 });
 
 function useDashboard() {
@@ -51,6 +57,8 @@ interface TeamMember {
 }
 
 interface EnrolledItem {
+  kind: "competition" | "event";
+  id: string;
   slug: string;
   title: string;
   image: string;
@@ -61,57 +69,81 @@ interface EnrolledItem {
   team?: TeamMember[];
 }
 
-const MOCK_COMPETITIONS: EnrolledItem[] = COMPETITIONS_DATA.slice(0, 3).map((c, i) => ({
-  slug: c.slug,
-  title: c.title,
-  image: c.image,
-  category: c.category,
-  date: c.date,
-  status: c.status,
-  teamSize: c.teamSize,
-  team:
-    i === 0
-      ? [
-          { id: "u1", name: "Yatharth Khandelwal", email: "yatharth@neutron.in", role: "leader", status: "confirmed", avatar: "https://ik.imagekit.io/YatharthKhandelwal/AVAT.jpeg" },
-          { id: "u2", name: "Arjun Mehta", email: "arjun@neutron.in", role: "member", status: "confirmed", avatar: "https://i.pravatar.cc/150?img=11" },
-          { id: "u3", name: "Priya Sen", email: "priya@neutron.in", role: "member", status: "pending", avatar: "https://i.pravatar.cc/150?img=47" },
-        ]
-      : i === 1
-      ? [
-          { id: "u1", name: "Yatharth Khandelwal", email: "yatharth@neutron.in", role: "leader", status: "confirmed", avatar: "https://ik.imagekit.io/YatharthKhandelwal/AVAT.jpeg" },
-        ]
-      : [
-          { id: "u1", name: "Yatharth Khandelwal", email: "yatharth@neutron.in", role: "leader", status: "confirmed", avatar: "https://ik.imagekit.io/YatharthKhandelwal/AVAT.jpeg" },
-          { id: "u4", name: "Karan Tiwari", email: "karan@neutron.in", role: "member", status: "confirmed", avatar: "https://i.pravatar.cc/150?img=33" },
-        ],
-}));
+interface ProfileState {
+  name: string;
+  email: string;
+  bio: string;
+  college: string;
+  year: string;
+  gender: string;
+  city: string;
+  state: string;
+  whatsapp: string;
+  image: string;
+  collegeIdPic: string;
+  govtIdPic: string;
+}
 
-const MOCK_EVENTS: EnrolledItem[] = EVENTS_DATA.slice(0, 2).map((e, i) => ({
-  slug: e.slug,
-  title: e.title,
-  image: e.image,
-  category: e.category,
-  date: e.date,
-  status: e.status,
-  teamSize: e.teamSize,
-  team:
-    i === 0
-      ? [
-          { id: "u1", name: "Yatharth Khandelwal", email: "yatharth@neutron.in", role: "leader", status: "confirmed", avatar: "https://ik.imagekit.io/YatharthKhandelwal/AVAT.jpeg" },
-          { id: "u5", name: "Meera Joshi", email: "meera@neutron.in", role: "member", status: "pending", avatar: "https://i.pravatar.cc/150?img=21" },
-        ]
-      : [
-          { id: "u1", name: "Yatharth Khandelwal", email: "yatharth@neutron.in", role: "leader", status: "confirmed", avatar: "https://ik.imagekit.io/YatharthKhandelwal/AVAT.jpeg" },
-        ],
-}));
+const EMPTY_PROFILE: ProfileState = {
+  name: "",
+  email: "",
+  bio: "",
+  college: "",
+  year: "",
+  gender: "",
+  city: "",
+  state: "",
+  whatsapp: "",
+  image: "",
+  collegeIdPic: "",
+  govtIdPic: "",
+};
 
-const MOCK_GLOBAL_USERS = [
-  { id: "u-99", name: "Riya Sharma", email: "riya@neutron.in", avatar: "https://i.pravatar.cc/150?img=5" },
-  { id: "u-98", name: "Kabir Singh", email: "kabir@neutron.in", avatar: "https://i.pravatar.cc/150?img=12" },
-  { id: "u-97", name: "Ananya Patel", email: "ananya@neutron.in", avatar: "https://i.pravatar.cc/150?img=20" },
-  { id: "u-96", name: "Vikram Reddy", email: "vikram@neutron.in", avatar: "https://i.pravatar.cc/150?img=33" },
-  { id: "u-95", name: "Neha Gupta", email: "neha@neutron.in", avatar: "https://i.pravatar.cc/150?img=41" },
-];
+const STATUS_MAP: Record<string, EnrolledItem["status"]> = {
+  OPEN: "open",
+  ACTIVE: "open",
+  REGISTRATION_OPEN: "open",
+  CLOSED: "closed",
+  REGISTRATION_CLOSED: "closed",
+  POSTPONED: "postponed",
+  CANCELLED: "cancelled",
+};
+
+function toDashboardStatus(status?: string): EnrolledItem["status"] {
+  if (!status) return "closed";
+  return STATUS_MAP[status.toUpperCase()] || "closed";
+}
+
+function formatTeamSize(min?: number, max?: number): string {
+  if (typeof max !== "number" || max < 2) return "1 Member";
+  const safeMin = typeof min === "number" && min > 0 ? min : 1;
+  if (safeMin === max) return `${max} Members`;
+  return `${safeMin}-${max} Members`;
+}
+
+function formatDisplayDate(value?: string | Date): string {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function timeAgo(value?: string | Date): string {
+  if (!value) return "";
+  const then = new Date(value).getTime();
+  if (Number.isNaN(then)) return "";
+  const diffSec = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  return `${Math.floor(diffHr / 24)}d ago`;
+}
 
 function isTeamEvent(teamSize: string): boolean {
   const match = teamSize.match(/\d+/g);
@@ -120,7 +152,15 @@ function isTeamEvent(teamSize: string): boolean {
   return max > 1;
 }
 
-function Toast({ message, type, onClose }: { message: string; type: "success" | "error" | "info"; onClose: () => void }) {
+function Toast({
+  message,
+  type,
+  onClose,
+}: {
+  message: string;
+  type: "success" | "error" | "info";
+  onClose: () => void;
+}) {
   useEffect(() => {
     const timer = setTimeout(onClose, 3000);
     return () => clearTimeout(timer);
@@ -133,17 +173,26 @@ function Toast({ message, type, onClose }: { message: string; type: "success" | 
       exit={{ opacity: 0, y: 20, scale: 0.95 }}
       className="fixed bottom-8 left-1/2 -translate-x-1/2 z-1000 px-4 py-2.5 rounded-xl border border-white/10 bg-[#080808]/90 backdrop-blur-xl shadow-2xl flex items-center gap-2.5 min-w-[200px] max-w-[320px]"
     >
-      <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-        type === "success" ? "bg-emerald-500/10 text-emerald-400" : 
-        type === "error" ? "bg-rose-500/10 text-rose-400" : 
-        "bg-blue-500/10 text-blue-400"
-      }`}>
+      <div
+        className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+          type === "success"
+            ? "bg-emerald-500/10 text-emerald-400"
+            : type === "error"
+              ? "bg-rose-500/10 text-rose-400"
+              : "bg-blue-500/10 text-blue-400"
+        }`}
+      >
         {type === "success" && <CheckCircle2 size={14} />}
         {type === "error" && <AlertCircle size={14} />}
         {type === "info" && <Bell size={14} />}
       </div>
-      <p className="text-[10px] font-bold text-white tracking-wide truncate flex-1">{message}</p>
-      <button onClick={onClose} className="text-white/20 hover:text-white transition-colors p-1">
+      <p className="text-[10px] font-bold text-white tracking-wide truncate flex-1">
+        {message}
+      </p>
+      <button
+        onClick={onClose}
+        className="text-white/20 hover:text-white transition-colors p-1"
+      >
         <X size={12} />
       </button>
     </motion.div>
@@ -178,7 +227,7 @@ function EditableRow({
       <span className="text-[10px] uppercase tracking-widest text-white/30 font-mono w-1/3 shrink-0">
         {label}
       </span>
-      
+
       <div className="flex-1 flex items-center justify-end gap-3 text-right">
         {editing ? (
           <div className="flex items-center gap-2 w-full max-w-[240px]">
@@ -186,30 +235,83 @@ function EditableRow({
               type={type}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") save();
+                if (e.key === "Escape") setEditing(false);
+              }}
               autoFocus
               className="w-full bg-white/5 border border-white/20 rounded-md px-3 py-1.5 text-xs text-white outline-none focus:border-white/40 transition-all font-mono"
             />
-            <button onClick={save} className="text-emerald-400 hover:text-emerald-300 transition-colors">
-              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <button
+              onClick={save}
+              className="text-emerald-400 hover:text-emerald-300 transition-colors"
+            >
+              <svg
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M20 6L9 17l-5-5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </button>
-            <button onClick={() => setEditing(false)} className="text-white/30 hover:text-white/60 transition-colors">
-              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <button
+              onClick={() => setEditing(false)}
+              className="text-white/30 hover:text-white/60 transition-colors"
+            >
+              <svg
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M18 6L6 18M6 6l12 12"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </button>
           </div>
         ) : (
           <div className="flex items-center gap-3">
-             <span className={`text-[12px] font-medium leading-none ${locked ? "text-white/40" : "text-white/80"}`}>
+            <span
+              className={`text-[12px] font-medium leading-none ${locked ? "text-white/40" : "text-white/80"}`}
+            >
               {value || placeholder || "—"}
             </span>
             {!locked && (
               <button
-                onClick={() => { setDraft(value); setEditing(true); }}
+                onClick={() => {
+                  setDraft(value);
+                  setEditing(true);
+                }}
                 className="opacity-0 group-hover:opacity-100 transition-opacity text-white/20 hover:text-white/50"
               >
-                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" />
-                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" />
+                <svg
+                  width="12"
+                  height="12"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
+                    strokeLinecap="round"
+                  />
                 </svg>
               </button>
             )}
@@ -235,15 +337,30 @@ function SelectField({
   return (
     <div className="group">
       <div className="flex items-center justify-between mb-1">
-        <label className="text-[10px] uppercase tracking-wider text-white/25 font-mono">{label}</label>
+        <label className="text-[10px] uppercase tracking-wider text-white/25 font-mono">
+          {label}
+        </label>
         {!editing && (
           <button
             onClick={() => setEditing(true)}
             className="text-[10px] text-white/20 hover:text-white/50 transition-colors opacity-0 group-hover:opacity-100 flex items-center gap-1"
           >
-            <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" />
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" />
+            <svg
+              width="10"
+              height="10"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+                strokeLinecap="round"
+              />
+              <path
+                d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
+                strokeLinecap="round"
+              />
             </svg>
             Edit
           </button>
@@ -253,31 +370,47 @@ function SelectField({
         <div className="flex gap-2">
           <select
             value={value}
-            onChange={(e) => { onChange(e.target.value); setEditing(false); }}
+            onChange={(e) => {
+              onChange(e.target.value);
+              setEditing(false);
+            }}
             autoFocus
             className="flex-1 bg-[#111] border border-white/15 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-white/30 transition-all"
           >
-            {options.map((o) => <option key={o} value={o}>{o}</option>)}
+            {options.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
           </select>
-          <button onClick={() => setEditing(false)} className="px-3 py-2 bg-white/5 border border-white/10 text-white/50 text-xs rounded-lg hover:bg-white/10 transition-colors shrink-0">✕</button>
+          <button
+            onClick={() => setEditing(false)}
+            className="px-3 py-2 bg-white/5 border border-white/10 text-white/50 text-xs rounded-lg hover:bg-white/10 transition-colors shrink-0"
+          >
+            ✕
+          </button>
         </div>
       ) : (
-        <p className={`text-sm mt-0.5 ${value ? "text-white/80" : "text-white/25 italic"}`}>{value || "—"}</p>
+        <p
+          className={`text-sm mt-0.5 ${value ? "text-white/80" : "text-white/25 italic"}`}
+        >
+          {value || "—"}
+        </p>
       )}
     </div>
   );
 }
 
-function DocumentCard({ 
-  label, 
-  type, 
-  date, 
-  onUpload 
-}: { 
-  label: string; 
-  type: string; 
-  date: string; 
-  onUpload: (name: string) => void 
+function DocumentCard({
+  label,
+  type,
+  date,
+  onUpload,
+}: {
+  label: string;
+  type: string;
+  date: string;
+  onUpload: (name: string) => void;
 }) {
   const { showToast } = useDashboard();
   const [file, setFile] = useState<File | null>(null);
@@ -288,7 +421,7 @@ function DocumentCard({
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    
+
     setUploading(true);
     setTimeout(() => {
       setFile(f);
@@ -298,94 +431,148 @@ function DocumentCard({
   };
 
   return (
-    <div className={`bg-white/2 border border-white/8 rounded-2xl p-4 flex flex-col gap-3 group/doc hover:border-white/20 hover:bg-white/5 transition-all duration-300 relative ${file ? "border-emerald-500/20" : ""}`}>
-      <input ref={inputRef} type="file" className="hidden" onChange={handleFile} />
-      <div className="w-full aspect-video rounded-xl bg-[#111] border border-white/5 overflow-hidden relative cursor-pointer" onClick={() => !uploading && inputRef.current?.click()}>
+    <div
+      className={`bg-white/2 border border-white/8 rounded-2xl p-4 flex flex-col gap-3 group/doc hover:border-white/20 hover:bg-white/5 transition-all duration-300 relative ${file ? "border-emerald-500/20" : ""}`}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        className="hidden"
+        onChange={handleFile}
+      />
+      <div
+        className="w-full aspect-video rounded-xl bg-[#111] border border-white/5 overflow-hidden relative cursor-pointer"
+        onClick={() => !uploading && inputRef.current?.click()}
+      >
         <div className="absolute inset-0 flex items-center justify-center">
-            {uploading ? (
-               <div className="flex flex-col items-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                  <p className="text-[8px] text-white/40 uppercase tracking-widest font-mono">Uploading...</p>
-               </div>
-            ) : file ? (
-               <div className="w-full h-full bg-linear-to-br from-emerald-500/10 to-teal-500/10 flex flex-col items-center justify-center p-4 text-center">
-                  <CheckCircle2 size={24} className="text-emerald-400 mb-2" />
-                  <p className="text-[8px] text-white/50 truncate w-full font-mono">{file.name}</p>
-               </div>
-            ) : (
-               <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover/doc:bg-white/10 transition-all">
-                  <Upload size={18} className="text-white/20 group-hover/doc:text-white" />
-               </div>
-            )}
+          {uploading ? (
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+              <p className="text-[8px] text-white/40 uppercase tracking-widest font-mono">
+                Uploading...
+              </p>
+            </div>
+          ) : file ? (
+            <div className="w-full h-full bg-linear-to-br from-emerald-500/10 to-teal-500/10 flex flex-col items-center justify-center p-4 text-center">
+              <CheckCircle2 size={24} className="text-emerald-400 mb-2" />
+              <p className="text-[8px] text-white/50 truncate w-full font-mono">
+                {file.name}
+              </p>
+            </div>
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover/doc:bg-white/10 transition-all">
+              <Upload
+                size={18}
+                className="text-white/20 group-hover/doc:text-white"
+              />
+            </div>
+          )}
         </div>
       </div>
       <div>
         <div className="flex items-center justify-between">
-           <h4 className="text-[11px] font-bold text-white uppercase tracking-wider">{label}</h4>
-           <div className="relative">
-              <button 
-                onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
-                className="w-7 h-7 rounded-lg hover:bg-white/5 flex items-center justify-center text-white/20 hover:text-white transition-all cursor-pointer"
-              >
-                <MoreVertical size={14} />
-              </button>
-              
-              <AnimatePresence>
-                {menuOpen && (
-                  <>
-                    <div className="fixed inset-0 z-100" onClick={() => setMenuOpen(false)} />
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95, y: 5 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95, y: 5 }}
-                      className="absolute bottom-full right-0 mb-2 w-32 bg-[#0c0c0c] border border-white/10 rounded-xl shadow-2xl z-101 overflow-hidden"
-                    >
-                      {[
-                        { label: "View", icon: Layout, action: () => showToast("Viewer restricted in beta.", "info") },
-                        { label: "Download", icon: Download, action: () => showToast("Download started...", "success") },
-                        { label: "Delete", icon: Trash2, action: () => { setFile(null); showToast("File deleted."); }, destructive: true }
-                      ].map((item) => (
-                        <button
-                          key={item.label}
-                          onClick={(e) => { e.stopPropagation(); item.action(); setMenuOpen(false); }}
-                          className={`w-full flex items-center gap-2.5 px-3 py-2 text-[10px] font-bold uppercase tracking-widest transition-colors text-left ${item.destructive ? "text-rose-400 hover:bg-rose-500/10" : "text-white/40 hover:text-white hover:bg-white/5"}`}
-                        >
-                          <item.icon size={12} />
-                          {item.label}
-                        </button>
-                      ))}
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
-           </div>
+          <h4 className="text-[11px] font-bold text-white uppercase tracking-wider">
+            {label}
+          </h4>
+          <div className="relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen(!menuOpen);
+              }}
+              className="w-7 h-7 rounded-lg hover:bg-white/5 flex items-center justify-center text-white/20 hover:text-white transition-all cursor-pointer"
+            >
+              <MoreVertical size={14} />
+            </button>
+
+            <AnimatePresence>
+              {menuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-100"
+                    onClick={() => setMenuOpen(false)}
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 5 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 5 }}
+                    className="absolute bottom-full right-0 mb-2 w-32 bg-[#0c0c0c] border border-white/10 rounded-xl shadow-2xl z-101 overflow-hidden"
+                  >
+                    {[
+                      {
+                        label: "View",
+                        icon: Layout,
+                        action: () =>
+                          showToast("Viewer restricted in beta.", "info"),
+                      },
+                      {
+                        label: "Download",
+                        icon: Download,
+                        action: () =>
+                          showToast("Download started...", "success"),
+                      },
+                      {
+                        label: "Delete",
+                        icon: Trash2,
+                        action: () => {
+                          setFile(null);
+                          showToast("File deleted.");
+                        },
+                        destructive: true,
+                      },
+                    ].map((item) => (
+                      <button
+                        key={item.label}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          item.action();
+                          setMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 text-[10px] font-bold uppercase tracking-widest transition-colors text-left ${item.destructive ? "text-rose-400 hover:bg-rose-500/10" : "text-white/40 hover:text-white hover:bg-white/5"}`}
+                      >
+                        <item.icon size={12} />
+                        {item.label}
+                      </button>
+                    ))}
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
         <div className="flex items-center justify-between mt-1">
           <p className="text-[9px] text-white/30 font-mono uppercase tracking-widest leading-none">
-            {file ? (file.size / 1024 / 1024).toFixed(1) + " MB" : type} &bull; {file ? "Just now" : date}
+            {file ? (file.size / 1024 / 1024).toFixed(1) + " MB" : type} &bull;{" "}
+            {file ? "Just now" : date}
           </p>
-          {file && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>}
+          {file && (
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function DashboardWidget({ 
-  title, 
-  children, 
-  className = "", 
-  onManage 
-}: { 
-  title: string; 
-  children: React.ReactNode; 
+function DashboardWidget({
+  title,
+  children,
+  className = "",
+  onManage,
+}: {
+  title: string;
+  children: React.ReactNode;
   className?: string;
   onManage: () => void;
 }) {
   return (
-    <div className={`bg-white/3 border border-white/8 rounded-3xl p-6 backdrop-blur-2xl transition-all duration-300 hover:border-white/15 h-full ${className}`}>
+    <div
+      className={`bg-white/3 border border-white/8 rounded-3xl p-6 backdrop-blur-2xl transition-all duration-300 hover:border-white/15 h-full ${className}`}
+    >
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-white/40 font-mono">{title}</h3>
+        <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-white/40 font-mono">
+          {title}
+        </h3>
       </div>
       {children}
     </div>
@@ -411,43 +598,23 @@ function TeamModal({
   const [isFocused, setIsFocused] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<TeamMember | null>(null);
 
-  const suggestions = MOCK_GLOBAL_USERS.filter(u => 
-    inviteEmail.trim() && 
-    (u.name.toLowerCase().includes(inviteEmail.toLowerCase()) || 
-     u.email.toLowerCase().includes(inviteEmail.toLowerCase()))
-  );
-
-  const handleInvite = (selectedUser?: typeof MOCK_GLOBAL_USERS[0]) => {
+  const handleInvite = () => {
     setInviteError("");
-
-    if (selectedUser && 'id' in selectedUser) {
-      if (members.some((m) => m.email.toLowerCase() === selectedUser.email.toLowerCase())) {
-        setInviteError("User is already in your team.");
-        return;
-      }
-      const newMember: TeamMember = {
-        id: selectedUser.id,
-        name: selectedUser.name,
-        email: selectedUser.email,
-        role: "member",
-        status: "pending",
-        avatar: selectedUser.avatar,
-      };
-      setMembers((prev) => [...prev, newMember]);
-      setInviteEmail("");
-      setIsFocused(false);
-      showToast(`Invited ${selectedUser.name} to the team.`, "success");
-      return;
-    }
 
     const val = inviteEmail.trim();
     if (!val || !canAdd) return;
-    
-    if (members.some((m) => m.email.toLowerCase() === val.toLowerCase() || m.name.toLowerCase() === val.toLowerCase())) {
+
+    if (
+      members.some(
+        (m) =>
+          m.email.toLowerCase() === val.toLowerCase() ||
+          m.name.toLowerCase() === val.toLowerCase(),
+      )
+    ) {
       setInviteError("User is already in your team.");
       return;
     }
-    
+
     showToast(`Invite sent to ${val}.`, "success");
     setInviteEmail("");
   };
@@ -469,10 +636,17 @@ function TeamModal({
       >
         <div className="p-8 pb-4 flex items-center justify-between border-b border-white/5">
           <div>
-            <h2 className="text-2xl font-bold text-white tracking-tight">{item.title}</h2>
-            <p className="text-xs text-white/30 mt-1 font-mono uppercase tracking-widest">Team Management &bull; {members.length}/{maxMembers} Slots</p>
+            <h2 className="text-2xl font-bold text-white tracking-tight">
+              {item.title}
+            </h2>
+            <p className="text-xs text-white/30 mt-1 font-mono uppercase tracking-widest">
+              Team Management &bull; {members.length}/{maxMembers} Slots
+            </p>
           </div>
-          <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all">
+          <button
+            onClick={onClose}
+            className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all"
+          >
             <X size={20} />
           </button>
         </div>
@@ -480,19 +654,32 @@ function TeamModal({
         <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto overflow-x-visible custom-scrollbar">
           {/* Members List */}
           <div className="space-y-4">
-            <h3 className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/20 font-mono">Active Members</h3>
+            <h3 className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/20 font-mono">
+              Active Members
+            </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {members.map((member) => (
-                <div key={member.id} className="flex items-center gap-3 p-3 rounded-2xl bg-white/3 border border-white/5 group hover:border-white/10 transition-all">
+                <div
+                  key={member.id}
+                  className="flex items-center gap-3 p-3 rounded-2xl bg-white/3 border border-white/5 group hover:border-white/10 transition-all"
+                >
                   <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 shrink-0">
-                    <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" />
+                    <img
+                      src={member.avatar}
+                      alt={member.name}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-white truncate">{member.name}</p>
-                    <p className="text-[10px] text-white/30 uppercase tracking-widest font-mono mt-0.5">{member.role}</p>
+                    <p className="text-sm font-bold text-white truncate">
+                      {member.name}
+                    </p>
+                    <p className="text-[10px] text-white/30 uppercase tracking-widest font-mono mt-0.5">
+                      {member.role}
+                    </p>
                   </div>
                   {member.role !== "leader" && (
-                    <button 
+                    <button
                       onClick={() => setMemberToRemove(member)}
                       className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center hover:bg-rose-500/20"
                     >
@@ -516,18 +703,24 @@ function TeamModal({
                   <div className="w-16 h-16 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center justify-center mx-auto mb-6">
                     <Trash2 size={24} />
                   </div>
-                  <h4 className="text-lg font-bold text-white">Remove {memberToRemove.name}?</h4>
-                  <p className="text-xs text-white/40 mt-2 leading-relaxed">This will revoke their access to this project immediately.</p>
+                  <h4 className="text-lg font-bold text-white">
+                    Remove {memberToRemove.name}?
+                  </h4>
+                  <p className="text-xs text-white/40 mt-2 leading-relaxed">
+                    This will revoke their access to this project immediately.
+                  </p>
                   <div className="flex gap-3 mt-8">
-                    <button 
+                    <button
                       onClick={() => setMemberToRemove(null)}
                       className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:bg-white/10 transition-all"
                     >
                       Cancel
                     </button>
-                    <button 
+                    <button
                       onClick={() => {
-                        setMembers(prev => prev.filter(m => m.id !== memberToRemove.id));
+                        setMembers((prev) =>
+                          prev.filter((m) => m.id !== memberToRemove.id),
+                        );
                         showToast(`${memberToRemove.name} removed.`, "info");
                         setMemberToRemove(null);
                       }}
@@ -543,83 +736,68 @@ function TeamModal({
 
           {/* Invitation Section */}
           <div className="space-y-4 pt-4 border-t border-white/5">
-             <div className="flex items-center justify-between">
-                <h3 className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/20 font-mono">Invite Peers</h3>
-                <span className={`text-[9px] uppercase tracking-widest font-mono ${canAdd ? "text-emerald-400" : "text-rose-400"}`}>
-                  {canAdd ? "Available Slots Open" : "Limit Reached"}
-                </span>
-             </div>
+            <div className="flex items-center justify-between">
+              <h3 className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/20 font-mono">
+                Invite Peers
+              </h3>
+              <span
+                className={`text-[9px] uppercase tracking-widest font-mono ${canAdd ? "text-emerald-400" : "text-rose-400"}`}
+              >
+                {canAdd ? "Available Slots Open" : "Limit Reached"}
+              </span>
+            </div>
 
-             <div className="relative">
-                <div className={`p-1.5 rounded-2.5xl border transition-all flex items-center gap-2 ${isFocused ? "bg-white/5 border-white/20" : "bg-white/3 border-white/5"}`}>
-                   <div className="pl-3 text-white/20"><Mail size={18} /></div>
-                   <input 
-                      type="text"
-                      placeholder="Enter name or email..."
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      onFocus={() => setIsFocused(true)}
-                      onBlur={() => setTimeout(() => setIsFocused(false), 200)}
-                      disabled={!canAdd}
-                      className="bg-transparent border-none outline-none flex-1 py-3 text-sm text-white placeholder:text-white/10 font-medium"
-                   />
-                   <button 
-                      onClick={() => handleInvite()}
-                      disabled={!canAdd || !inviteEmail.trim()}
-                      className="h-10 px-6 rounded-2xl bg-white text-black text-[10px] font-extrabold uppercase tracking-widest hover:bg-white/90 transition-all disabled:opacity-20 disabled:grayscale"
-                   >
-                      Send
-                   </button>
+            <div className="relative">
+              <div
+                className={`p-1.5 rounded-2.5xl border transition-all flex items-center gap-2 ${isFocused ? "bg-white/5 border-white/20" : "bg-white/3 border-white/5"}`}
+              >
+                <div className="pl-3 text-white/20">
+                  <Mail size={18} />
                 </div>
-
-                <AnimatePresence>
-                  {isFocused && suggestions.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="absolute bottom-full left-0 right-0 mb-3 z-50 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-[0_-20px_50px_rgba(0,0,0,0.5)] overflow-hidden divide-y divide-white/5"
-                    >
-                       {suggestions.map((user) => (
-                         <button 
-                           key={user.id}
-                           onClick={() => handleInvite(user)}
-                           className="w-full flex items-center gap-4 p-4 hover:bg-white/5 transition-colors group text-left"
-                         >
-                            <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-xl border border-white/10" />
-                            <div className="flex-1 min-w-0">
-                               <p className="text-sm font-bold text-white group-hover:text-emerald-400 transition-colors truncate">{user.name}</p>
-                               <p className="text-[10px] text-white/30 truncate mt-0.5">{user.email}</p>
-                            </div>
-                            <div className="text-white/20 group-hover:text-emerald-400 transition-colors">
-                               <Plus size={16} />
-                            </div>
-                         </button>
-                       ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-             </div>
-             {inviteError && <p className="text-[10px] text-rose-400 font-mono ml-2">{inviteError}</p>}
+                <input
+                  type="text"
+                  placeholder="Enter name or email..."
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => setTimeout(() => setIsFocused(false), 200)}
+                  disabled={!canAdd}
+                  className="bg-transparent border-none outline-none flex-1 py-3 text-sm text-white placeholder:text-white/10 font-medium"
+                />
+                <button
+                  onClick={() => handleInvite()}
+                  disabled={!canAdd || !inviteEmail.trim()}
+                  className="h-10 px-6 rounded-2xl bg-white text-black text-[10px] font-extrabold uppercase tracking-widest hover:bg-white/90 transition-all disabled:opacity-20 disabled:grayscale"
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+            {inviteError && (
+              <p className="text-[10px] text-rose-400 font-mono ml-2">
+                {inviteError}
+              </p>
+            )}
           </div>
         </div>
 
         <div className="px-8 py-6 bg-white/2 border-t border-white/5 flex items-center justify-between">
-           <p className="text-[9px] text-white/10 font-mono uppercase tracking-[0.3em]">Integrity verified &bull; 2m ago</p>
-           <button onClick={onClose} className="px-6 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/10 transition-all">Done</button>
+          <p className="text-[9px] text-white/10 font-mono uppercase tracking-[0.3em]">
+            Integrity verified &bull; 2m ago
+          </p>
+          <button
+            onClick={onClose}
+            className="px-6 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/10 transition-all"
+          >
+            Done
+          </button>
         </div>
       </motion.div>
     </div>
   );
 }
 
-function EnrolledCard({
-  item,
-  href,
-}: {
-  item: EnrolledItem;
-  href: string;
-}) {
+function EnrolledCard({ item, href }: { item: EnrolledItem; href: string }) {
   const [showTeam, setShowTeam] = useState(false);
   const hasTeam = isTeamEvent(item.teamSize);
 
@@ -649,7 +827,9 @@ function EnrolledCard({
               {item.category} · {item.date}
             </p>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <span className={`px-2 py-0.5 rounded-md border text-[10px] uppercase tracking-wider font-mono ${statusColor[item.status]}`}>
+              <span
+                className={`px-2 py-0.5 rounded-md border text-[10px] uppercase tracking-wider font-mono ${statusColor[item.status]}`}
+              >
                 {item.status}
               </span>
               <span className="text-[10px] text-white/25 font-mono">
@@ -667,28 +847,34 @@ function EnrolledCard({
                 <div className="flex -space-x-2">
                   {(item.team || []).slice(0, 4).map((m) => (
                     <div
-                      key={m.id}
-                      className="w-6 h-6 rounded-full overflow-hidden border-2 border-[#0c0c0c]"
+                      key={m.id || m.name}
+                      className="w-6 h-6 rounded-full ring-1 ring-black/50 overflow-hidden bg-white/10"
                       title={m.name}
                     >
-                      <img src={m.avatar} alt={m.name} className="w-full h-full object-cover" />
+                      <img
+                        src={m.avatar}
+                        alt={m.name}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                   ))}
+                  {(item.team || []).length > 4 && (
+                    <span className="w-6 h-6 rounded-full bg-white/10 border border-white/20 text-[10px] text-white/70 grid place-items-center font-mono">
+                      +{(item.team || []).length - 4}
+                    </span>
+                  )}
                 </div>
-                <span className="text-[11px] text-white/35">
-                  {(item.team || []).length} member{(item.team || []).length !== 1 ? "s" : ""}
+                <span className="text-[11px] text-white/45 font-mono">
+                  {(item.team || []).length} member
+                  {(item.team || []).length === 1 ? "" : "s"}
                 </span>
               </div>
               <button
+                type="button"
                 onClick={() => setShowTeam(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-white/60 hover:bg-white/10 hover:text-white hover:border-white/20 transition-all duration-200 font-medium"
+                className="px-3 py-1.5 rounded-lg border border-white/15 text-[10px] uppercase tracking-wider font-mono text-white/70 hover:text-white hover:bg-white/10 transition-colors"
               >
-                <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" strokeLinecap="round" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" strokeLinecap="round" />
-                </svg>
-                Manage Team
+                View Team
               </button>
             </div>
           </div>
@@ -725,34 +911,52 @@ function MemberProfileModal({
         <div className="p-8 flex flex-col items-center text-center">
           <div className="relative group">
             <div className="w-24 h-24 rounded-3xl overflow-hidden border-2 border-white/10 mb-6 shadow-2xl transition-transform group-hover:scale-105 duration-500">
-               <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" />
+              <img
+                src={member.avatar}
+                alt={member.name}
+                className="w-full h-full object-cover"
+              />
             </div>
             <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-4 border-[#080808]"></div>
           </div>
-          
-          <h2 className="text-2xl font-bold text-white tracking-tight">{member.name}</h2>
-          <p className="text-[10px] text-white/30 uppercase tracking-[0.3em] font-mono mt-2">{member.role || "Member"}</p>
-          
+
+          <h2 className="text-2xl font-bold text-white tracking-tight">
+            {member.name}
+          </h2>
+          <p className="text-[10px] text-white/30 uppercase tracking-[0.3em] font-mono mt-2">
+            {member.role || "Member"}
+          </p>
+
           <div className="w-full h-px bg-white/5 my-8"></div>
-          
+
           <div className="w-full space-y-5 text-left">
-             <div>
-                <p className="text-[10px] uppercase font-bold text-white/20 tracking-widest font-mono mb-2">About & Bio</p>
-                <p className="text-xs text-white/50 leading-relaxed font-medium">Expert in {member.role || "this field"} with a focus on collaborative problem solving and innovative design thinking.</p>
-             </div>
-             <div>
-                <p className="text-[10px] uppercase font-bold text-white/20 tracking-widest font-mono mb-3">Presence</p>
-                <div className="flex gap-3">
-                   {["Github", "X", "LinkedIn"].map(sn => (
-                     <div key={sn} className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/5 text-[9px] text-white/40 font-mono uppercase tracking-widest hover:text-white hover:bg-white/10 transition-all cursor-pointer">
-                        {sn}
-                     </div>
-                   ))}
-                </div>
-             </div>
+            <div>
+              <p className="text-[10px] uppercase font-bold text-white/20 tracking-widest font-mono mb-2">
+                About & Bio
+              </p>
+              <p className="text-xs text-white/50 leading-relaxed font-medium">
+                Expert in {member.role || "this field"} with a focus on
+                collaborative problem solving and innovative design thinking.
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase font-bold text-white/20 tracking-widest font-mono mb-3">
+                Presence
+              </p>
+              <div className="flex gap-3">
+                {["Github", "X", "LinkedIn"].map((sn) => (
+                  <div
+                    key={sn}
+                    className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/5 text-[9px] text-white/40 font-mono uppercase tracking-widest hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                  >
+                    {sn}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-          
-          <button 
+
+          <button
             onClick={onClose}
             className="mt-10 w-full py-4 rounded-2xl bg-white text-black text-[10px] font-extrabold uppercase tracking-widest shadow-[0_10px_30px_rgba(255,255,255,0.1)] hover:shadow-[0_15px_40px_rgba(255,255,255,0.2)] hover:-translate-y-0.5 transition-all"
           >
@@ -763,258 +967,438 @@ function MemberProfileModal({
     </div>
   );
 }
-function ProfilePanel({ 
-  profile, 
+function ProfilePanel({
+  profile,
   set,
-  onViewMember 
-}: { 
-  profile: any, 
-  set: (key: any) => (val: string) => void,
-  onViewMember: (m: any) => void
+  onViewMember,
+  teamMembers,
+}: {
+  profile: ProfileState;
+  set: (key: keyof ProfileState) => (val: string) => void;
+  onViewMember: (m: any) => void;
+  teamMembers: Array<{
+    id: string;
+    name: string;
+    role: string;
+    avatar: string;
+    isMe?: boolean;
+  }>;
 }) {
   const { showToast, setExpandedID } = useDashboard();
 
-  const GENDERS = ["Male", "Female", "Non-binary", "Prefer not to say"];
-
-  const INDIAN_STATES = [
-    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
-    "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
-    "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
-    "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu",
-    "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
-    "Delhi", "Ladakh", "Jammu & Kashmir",
-  ];
+  const completedCount = [
+    Boolean(profile.name && profile.gender && profile.city && profile.state),
+    Boolean(profile.college && profile.year),
+    Boolean(profile.email),
+    Boolean(profile.whatsapp),
+    Boolean(profile.govtIdPic),
+    Boolean(profile.collegeIdPic),
+  ].filter(Boolean).length;
+  const totalChecks = 6;
+  const score = Math.round((completedCount / totalChecks) * 100);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
       {/* Top Row */}
       <div className="lg:col-span-8">
-        <DashboardWidget 
-          title="Personal information" 
-          onManage={() => showToast("Profile archival and history logs are currently restricted.", "info")}
+        <DashboardWidget
+          title="Personal information"
+          onManage={() =>
+            showToast(
+              "Profile archival and history logs are currently restricted.",
+              "info",
+            )
+          }
         >
-           <div className="flex flex-col">
-              <EditableRow label="Full Name" value={profile.name} onChange={set("name")} locked />
-              <EditableRow label="Date of birth" value="March 15th, 2004" onChange={() => showToast("DOB updated successfully.")} />
-              <EditableRow label="Gender" value={profile.gender} onChange={set("gender")} />
-              <EditableRow label="Phone" value={profile.whatsapp} onChange={set("whatsapp")} placeholder="+91 XXXXX XXXXX" />
-              <EditableRow label="Email" value={profile.email} onChange={set("email")} locked />
-              <EditableRow label="Address" value={profile.city + ", " + profile.state} onChange={() => {}} />
-           </div>
+          <div className="flex flex-col">
+            <EditableRow
+              label="Full Name"
+              value={profile.name}
+              onChange={set("name")}
+              locked
+            />
+            <EditableRow
+              label="Date of birth"
+              value="March 15th, 2004"
+              onChange={() => showToast("DOB updated successfully.")}
+            />
+            <EditableRow
+              label="Gender"
+              value={profile.gender}
+              onChange={set("gender")}
+            />
+            <EditableRow
+              label="Phone"
+              value={profile.whatsapp}
+              onChange={set("whatsapp")}
+              placeholder="+91 XXXXX XXXXX"
+            />
+            <EditableRow
+              label="Email"
+              value={profile.email}
+              onChange={set("email")}
+              locked
+            />
+            <EditableRow
+              label="Address"
+              value={`${profile.city}${profile.city && profile.state ? ", " : ""}${profile.state}`}
+              onChange={() => {}}
+            />
+          </div>
         </DashboardWidget>
       </div>
 
       <div className="lg:col-span-4">
-        <DashboardWidget 
-          title="Documents" 
-          onManage={() => showToast("Document verification engine is running in the background.", "info")}
+        <DashboardWidget
+          title="Documents"
+          onManage={() =>
+            showToast(
+              "Document verification engine is running in the background.",
+              "info",
+            )
+          }
         >
-           <div className="grid grid-cols-2 gap-4">
-              <DocumentCard label="College ID" type="Card" date="Mar 2026" onUpload={(name) => showToast(`College ID "${name}" uploaded.`)} />
-              <DocumentCard label="Aadhaar" type="Card" date="Mar 2026" onUpload={(name) => showToast(`Aadhaar "${name}" uploaded.`)} />
-              <DocumentCard label="Certificate" type="PDF" date="Feb 2026" onUpload={(name) => showToast(`Certificate "${name}" uploaded.`)} />
-              <div 
-                onClick={() => showToast("Additional slots will be available after verification.", "info")}
-                className="border-2 border-dashed border-white/5 rounded-2xl flex items-center justify-center aspect-video group cursor-pointer hover:border-white/10 transition-all"
-              >
-                  <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/20 group-hover:text-white/40 transition-all">
-                     <Plus size={14} />
-                  </div>
+          <div className="grid grid-cols-2 gap-4">
+            <DocumentCard
+              label="College ID"
+              type="Card"
+              date="Mar 2026"
+              onUpload={(name) => showToast(`College ID "${name}" uploaded.`)}
+            />
+            <DocumentCard
+              label="Aadhaar"
+              type="Card"
+              date="Mar 2026"
+              onUpload={(name) => showToast(`Aadhaar "${name}" uploaded.`)}
+            />
+            <DocumentCard
+              label="Certificate"
+              type="PDF"
+              date="Feb 2026"
+              onUpload={(name) => showToast(`Certificate "${name}" uploaded.`)}
+            />
+            <div
+              onClick={() =>
+                showToast(
+                  "Additional slots will be available after verification.",
+                  "info",
+                )
+              }
+              className="border-2 border-dashed border-white/5 rounded-2xl flex items-center justify-center aspect-video group cursor-pointer hover:border-white/10 transition-all"
+            >
+              <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/20 group-hover:text-white/40 transition-all">
+                <Plus size={14} />
               </div>
-           </div>
+            </div>
+          </div>
         </DashboardWidget>
       </div>
 
       <div className="lg:col-span-4">
-         <DashboardWidget 
-          title="Identity Card" 
+        <DashboardWidget
+          title="Identity Card"
           className="flex flex-col justify-center items-center py-10"
-          onManage={() => showToast("ID Customization coming soon in v4.0.", "info")}
-         >
-            <div className="w-full max-w-[280px] cursor-pointer active:scale-[0.98] transition-all hover:brightness-110" onClick={() => setExpandedID(true)}>
-              <ProfileCard
-                name={profile.name}
-                title={profile.college}
-                handle="yatharth.k"
-                status={profile.year}
-                contactText="VIEW FULL ID"
-                avatarUrl="https://ik.imagekit.io/YatharthKhandelwal/AVAT.jpeg"
-                showUserInfo={false}
-                enableTilt={true}
-                enableMobileTilt={false}
-                behindGlowColor="rgba(125, 190, 255, 0.4)"
-                iconUrl="https://static.vecteezy.com/system/resources/thumbnails/010/332/153/small_2x/code-flat-color-outline-icon-free-png.png"
-                behindGlowEnabled
-                innerGradient="linear-gradient(145deg,#2e106510 0%,#1e3a8a20 100%)"
-              />
-            </div>
-         </DashboardWidget>
+          onManage={() =>
+            showToast("ID Customization coming soon in v4.0.", "info")
+          }
+        >
+          <div
+            className="w-full max-w-[280px] cursor-pointer active:scale-[0.98] transition-all hover:brightness-110"
+            onClick={() => setExpandedID(true)}
+          >
+            <ProfileCard
+              name={profile.name}
+              title={profile.college}
+              handle={(profile.email || "").split("@")[0] || ""}
+              status={profile.year}
+              contactText="VIEW FULL ID"
+              avatarUrl={profile.image || ""}
+              showUserInfo={false}
+              enableTilt={true}
+              enableMobileTilt={false}
+              behindGlowColor="rgba(125, 190, 255, 0.4)"
+              iconUrl="https://static.vecteezy.com/system/resources/thumbnails/010/332/153/small_2x/code-flat-color-outline-icon-free-png.png"
+              behindGlowEnabled
+              innerGradient="linear-gradient(145deg,#2e106510 0%,#1e3a8a20 100%)"
+            />
+          </div>
+        </DashboardWidget>
       </div>
 
       <div className="lg:col-span-4">
-         <DashboardWidget 
-          title="Team structure" 
-          onManage={() => showToast("Synchronizing team roles with global registry.", "info")}
-         >
-            <div className="space-y-4">
-               {[
-                 { id: 't1', name: "Arjun Mehta", role: "Frontend Lead", avatar: "https://i.pravatar.cc/150?img=11" },
-                 { id: 't2', name: "Priya Sen", role: "AI Research", avatar: "https://i.pravatar.cc/150?img=47" },
-                 { id: 't3', name: "Yatharth K.", role: "Full Stack", avatar: "https://ik.imagekit.io/YatharthKhandelwal/AVAT.jpeg", isMe: true },
-                 { id: 't4', name: "Karan Tiwari", role: "UI Designer", avatar: "https://i.pravatar.cc/150?img=33" },
-               ].map((member, i) => (
-                 <div key={member.name} className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer ${member.isMe ? "bg-white/10 border-white/20" : "bg-white/5 border-white/5 hover:bg-white/8 hover:scale-[1.02]"}`} onClick={() => onViewMember(member)}>
-                    <img src={member.avatar} alt={member.name} className="w-10 h-10 rounded-xl object-cover border border-white/10" />
-                    <div>
-                       <p className="text-[12px] font-bold text-white leading-tight">{member.name}</p>
-                       <p className="text-[10px] text-white/30 font-mono mt-0.5">{member.role}</p>
-                    </div>
-                    {member.isMe && (
-                      <div className="ml-auto w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
-                    )}
-                 </div>
-               ))}
-            </div>
-         </DashboardWidget>
-      </div>
-
-      <div className="lg:col-span-4">
-         <DashboardWidget 
-          title="Data completion 2/5" 
-          onManage={() => showToast("Analysis complete. You are in the top 5% of verified users.", "info")}
-         >
-            <div className="space-y-4">
-               {[
-                 { label: "Personal data & resume", done: true },
-                 { label: "Education", done: true },
-                 { label: "Email address", done: true },
-                 { label: "Work experience", done: true },
-                 { label: "Personal statement and consent", done: false },
-                 { label: "Certification", done: false },
-               ].map((item) => (
-                 <div key={item.label} className="flex items-center gap-3 group cursor-pointer" onClick={() => showToast(`Requirement: ${item.label} (${item.done ? "Fulfilled" : "Pending"})`, "info")}>
-                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${item.done ? "bg-emerald-500/20 border-emerald-500 text-emerald-500" : "bg-white/5 border-white/10 text-white/5 group-hover:border-white/20"}`}>
-                       {item.done && <CheckCircle2 size={12} strokeWidth={3} />}
-                    </div>
-                    <span className={`text-[11px] font-medium transition-colors ${item.done ? "text-white/60" : "text-white/30 group-hover:text-white/50"}`}>{item.label}</span>
-                 </div>
-               ))}
-            </div>
-            <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between">
+        <DashboardWidget
+          title="Team structure"
+          onManage={() =>
+            showToast("Synchronizing team roles with global registry.", "info")
+          }
+        >
+          <div className="space-y-4">
+            {teamMembers.map((member) => (
+              <div
+                key={member.name}
+                className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer ${member.isMe ? "bg-white/10 border-white/20" : "bg-white/5 border-white/5 hover:bg-white/8 hover:scale-[1.02]"}`}
+                onClick={() => onViewMember(member)}
+              >
+                <img
+                  src={member.avatar}
+                  alt={member.name}
+                  className="w-10 h-10 rounded-xl object-cover border border-white/10"
+                />
                 <div>
-                   <p className="text-[10px] uppercase font-bold text-white/20 tracking-widest font-mono">Profile Score</p>
-                   <p className="text-xl font-bold text-white mt-1">85%</p>
+                  <p className="text-[12px] font-bold text-white leading-tight">
+                    {member.name}
+                  </p>
+                  <p className="text-[10px] text-white/30 font-mono mt-0.5">
+                    {member.role}
+                  </p>
                 </div>
-                <div className="w-12 h-12 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 flex items-center justify-center text-[10px] text-white font-bold">85%</div>
+                {member.isMe && (
+                  <div className="ml-auto w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                )}
+              </div>
+            ))}
+          </div>
+        </DashboardWidget>
+      </div>
+
+      <div className="lg:col-span-4">
+        <DashboardWidget
+          title={`Data completion ${completedCount}/${totalChecks}`}
+          onManage={() =>
+            showToast(
+              "Analysis complete. You are in the top 5% of verified users.",
+              "info",
+            )
+          }
+        >
+          <div className="space-y-4">
+            {[
+              {
+                label: "Personal data",
+                done: Boolean(
+                  profile.name &&
+                  profile.gender &&
+                  profile.city &&
+                  profile.state,
+                ),
+              },
+              {
+                label: "Education",
+                done: Boolean(profile.college && profile.year),
+              },
+              { label: "Email address", done: Boolean(profile.email) },
+              { label: "Phone number", done: Boolean(profile.whatsapp) },
+              { label: "Government ID", done: Boolean(profile.govtIdPic) },
+              { label: "College ID", done: Boolean(profile.collegeIdPic) },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="flex items-center gap-3 group cursor-pointer"
+                onClick={() =>
+                  showToast(
+                    `Requirement: ${item.label} (${item.done ? "Fulfilled" : "Pending"})`,
+                    "info",
+                  )
+                }
+              >
+                <div
+                  className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${item.done ? "bg-emerald-500/20 border-emerald-500 text-emerald-500" : "bg-white/5 border-white/10 text-white/5 group-hover:border-white/20"}`}
+                >
+                  {item.done && <CheckCircle2 size={12} strokeWidth={3} />}
+                </div>
+                <span
+                  className={`text-[11px] font-medium transition-colors ${item.done ? "text-white/60" : "text-white/30 group-hover:text-white/50"}`}
+                >
+                  {item.label}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] uppercase font-bold text-white/20 tracking-widest font-mono">
+                Profile Score
+              </p>
+              <p className="text-xl font-bold text-white mt-1">{score}%</p>
             </div>
-         </DashboardWidget>
-      </div>
-    </div>
-  );
-}
-
-function CompetitionsPanel() {
-  const { showToast } = useDashboard();
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
-      <div className="lg:col-span-8">
-        <DashboardWidget 
-          title="My Competitions" 
-          onManage={() => showToast("Competition migration logs in progress.", "info")}
-        >
-           <div className="space-y-4">
-              {MOCK_COMPETITIONS.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-white/5 py-12 text-center">
-                  <p className="text-sm text-white/20 italic font-mono uppercase tracking-widest leading-relaxed">No registrations found.</p>
-                  <Link href="/competitions" className="mt-4 inline-block text-[10px] font-bold text-white/50 hover:text-white uppercase tracking-[0.2em] transition-all">Explore all &rarr;</Link>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {MOCK_COMPETITIONS.map((c) => (
-                    <EnrolledCard key={c.slug} item={c} href={`/competitions/${c.slug}`} />
-                  ))}
-                </div>
-              )}
-           </div>
-        </DashboardWidget>
-      </div>
-      
-      <div className="lg:col-span-4">
-        <DashboardWidget 
-          title="Stats & Filters" 
-          onManage={() => showToast("Custom analytics views are being built.", "info")}
-        >
-           <div className="space-y-4">
-              {[
-                { label: "Active", value: "3", color: "emerald-400" },
-                { label: "Completed", value: "2", color: "blue-400" },
-                { label: "Rank", value: "Top 1%", color: "amber-400" },
-              ].map((stat) => (
-                <div key={stat.label} className="bg-white/3 border border-white/5 rounded-2xl p-4 flex items-center justify-between group cursor-pointer active:bg-white/5 transition-colors" onClick={() => showToast(`Detailed stats for ${stat.label} coming soon.`, "info")}>
-                   <div>
-                      <p className="text-[10px] uppercase font-bold text-white/20 tracking-widest font-mono">{stat.label}</p>
-                      <p className="text-xl font-bold text-white mt-1">{stat.value}</p>
-                   </div>
-                   <div className={`w-1.5 h-6 rounded-full bg-${stat.color} opacity-40 shadow-[0_0_12px_rgba(255,255,255,0.1)] group-hover:opacity-100 transition-opacity`}></div>
-                </div>
-              ))}
-           </div>
+            <div className="w-12 h-12 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 flex items-center justify-center text-[10px] text-white font-bold">
+              {score}%
+            </div>
+          </div>
         </DashboardWidget>
       </div>
     </div>
   );
 }
 
-function EventsPanel({ setActive }: { setActive?: (v: any) => void }) {
+function CompetitionsPanel({ competitions }: { competitions: EnrolledItem[] }) {
   const { showToast } = useDashboard();
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
       <div className="lg:col-span-8">
-        <DashboardWidget 
-          title="Enrolled Events" 
-          onManage={() => showToast("Reviewing event enrollment history.", "info")}
+        <DashboardWidget
+          title="My Competitions"
+          onManage={() =>
+            showToast("Competition migration logs in progress.", "info")
+          }
         >
-           <div className="space-y-4">
-              {MOCK_EVENTS.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-white/5 py-12 text-center">
-                  <p className="text-sm text-white/20 italic font-mono uppercase tracking-widest leading-relaxed">No events found.</p>
-                  <Link href="/events" className="mt-4 inline-block text-[10px] font-bold text-white/50 hover:text-white uppercase tracking-[0.2em] transition-all">Browse Events &rarr;</Link>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {MOCK_EVENTS.map((e) => (
-                    <EnrolledCard key={e.slug} item={e} href={`/events/${e.slug}`} />
-                  ))}
-                </div>
-              )}
-           </div>
+          <div className="space-y-4">
+            {competitions.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-white/5 py-12 text-center">
+                <p className="text-sm text-white/20 italic font-mono uppercase tracking-widest leading-relaxed">
+                  No registrations found.
+                </p>
+                <Link
+                  href="/competitions"
+                  className="mt-4 inline-block text-[10px] font-bold text-white/50 hover:text-white uppercase tracking-[0.2em] transition-all"
+                >
+                  Explore all &rarr;
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {competitions.map((c) => (
+                  <EnrolledCard
+                    key={c.slug}
+                    item={c}
+                    href={`/competitions/${c.slug}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </DashboardWidget>
       </div>
-      
+
       <div className="lg:col-span-4">
-        <DashboardWidget 
-          title="Calendar View" 
+        <DashboardWidget
+          title="Stats & Filters"
+          onManage={() =>
+            showToast("Custom analytics views are being built.", "info")
+          }
+        >
+          <div className="space-y-4">
+            {[
+              { label: "Active", value: "3", color: "emerald-400" },
+              { label: "Completed", value: "2", color: "blue-400" },
+              { label: "Rank", value: "Top 1%", color: "amber-400" },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className="bg-white/3 border border-white/5 rounded-2xl p-4 flex items-center justify-between group cursor-pointer active:bg-white/5 transition-colors"
+                onClick={() =>
+                  showToast(
+                    `Detailed stats for ${stat.label} coming soon.`,
+                    "info",
+                  )
+                }
+              >
+                <div>
+                  <p className="text-[10px] uppercase font-bold text-white/20 tracking-widest font-mono">
+                    {stat.label}
+                  </p>
+                  <p className="text-xl font-bold text-white mt-1">
+                    {stat.value}
+                  </p>
+                </div>
+                <div
+                  className={`w-1.5 h-6 rounded-full bg-${stat.color} opacity-40 shadow-[0_0_12px_rgba(255,255,255,0.1)] group-hover:opacity-100 transition-opacity`}
+                ></div>
+              </div>
+            ))}
+          </div>
+        </DashboardWidget>
+      </div>
+    </div>
+  );
+}
+
+function EventsPanel({
+  setActive,
+  events,
+}: {
+  setActive?: (v: any) => void;
+  events: EnrolledItem[];
+}) {
+  const { showToast } = useDashboard();
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+      <div className="lg:col-span-8">
+        <DashboardWidget
+          title="Enrolled Events"
+          onManage={() =>
+            showToast("Reviewing event enrollment history.", "info")
+          }
+        >
+          <div className="space-y-4">
+            {events.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-white/5 py-12 text-center">
+                <p className="text-sm text-white/20 italic font-mono uppercase tracking-widest leading-relaxed">
+                  No events found.
+                </p>
+                <Link
+                  href="/events"
+                  className="mt-4 inline-block text-[10px] font-bold text-white/50 hover:text-white uppercase tracking-[0.2em] transition-all"
+                >
+                  Browse Events &rarr;
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {events.map((e) => (
+                  <EnrolledCard
+                    key={e.slug}
+                    item={e}
+                    href={`/events/${e.slug}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </DashboardWidget>
+      </div>
+
+      <div className="lg:col-span-4">
+        <DashboardWidget
+          title="Calendar View"
           onManage={() => showToast("Syncing with Google Calendar...", "info")}
         >
-           <div className="aspect-square bg-white/3 border border-white/5 rounded-3xl p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-white/5 transition-colors" onClick={() => setActive?.("calendar")}>
-              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex flex-col items-center justify-center mb-4">
-                 <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest font-mono">MAR</p>
-                 <p className="text-2xl font-bold text-white uppercase tracking-tighter">30</p>
-              </div>
-              <p className="text-xs font-bold text-white uppercase tracking-widest">No Events Today</p>
-              <p className="text-[10px] text-white/20 mt-2 font-mono uppercase tracking-[0.2em]">Next: Web3 Summit (Apr 4)</p>
-           </div>
+          <div
+            className="aspect-square bg-white/3 border border-white/5 rounded-3xl p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-white/5 transition-colors"
+            onClick={() => setActive?.("calendar")}
+          >
+            <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex flex-col items-center justify-center mb-4">
+              <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest font-mono">
+                MAR
+              </p>
+              <p className="text-2xl font-bold text-white uppercase tracking-tighter">
+                30
+              </p>
+            </div>
+            <p className="text-xs font-bold text-white uppercase tracking-widest">
+              No Events Today
+            </p>
+            <p className="text-[10px] text-white/20 mt-2 font-mono uppercase tracking-[0.2em]">
+              Next: Web3 Summit (Apr 4)
+            </p>
+          </div>
         </DashboardWidget>
       </div>
     </div>
   );
 }
 
-function CalendarPanel() {
+function CalendarPanel({
+  competitions,
+  events,
+}: {
+  competitions: EnrolledItem[];
+  events: EnrolledItem[];
+}) {
   const { showToast } = useDashboard();
-  const [viewMode, setViewMode] = useState<'schedule' | 'month'>('schedule');
+  const [viewMode, setViewMode] = useState<"schedule" | "month">("schedule");
   const [currentDate, setCurrentDate] = useState(new Date(2026, 2, 1)); // March 2026
-  
+
   const generateGoogleCalLink = (title: string, dateStr: string) => {
     const baseUrl = "https://www.google.com/calendar/render?action=TEMPLATE";
     const text = encodeURIComponent(title);
@@ -1022,276 +1406,436 @@ function CalendarPanel() {
     const day = dayMatch ? dayMatch[0] : "01";
     const isApril = dateStr.toLowerCase().includes("apr");
     const month = isApril ? "04" : "03";
-    const dateParam = `2026${month}${day.padStart(2, '0')}T100000Z/2026${month}${day.padStart(2, '0')}T120000Z`;
+    const dateParam = `2026${month}${day.padStart(2, "0")}T100000Z/2026${month}${day.padStart(2, "0")}T120000Z`;
     return `${baseUrl}&text=${text}&dates=${dateParam}&details=Neutron+Event+Registry`;
   };
 
   const schedule = [
-    ...MOCK_COMPETITIONS.map(c => ({ ...c, type: 'Competition' })),
-    ...MOCK_EVENTS.map(e => ({ ...e, type: 'Event' }))
+    ...competitions.map((c) => ({ ...c, type: "Competition" })),
+    ...events.map((e) => ({ ...e, type: "Event" })),
   ].sort((a, b) => {
     const dateA = new Date(a.date);
     const dateB = new Date(b.date);
     return dateA.getTime() - dateB.getTime();
   });
 
-  const groupedSchedule = schedule.reduce((acc, item) => {
-    if (!acc[item.date]) acc[item.date] = [];
-    acc[item.date].push(item);
-    return acc;
-  }, {} as Record<string, typeof schedule>);
+  const groupedSchedule = schedule.reduce(
+    (acc, item) => {
+      if (!acc[item.date]) acc[item.date] = [];
+      acc[item.date].push(item);
+      return acc;
+    },
+    {} as Record<string, typeof schedule>,
+  );
 
   const sortedDates = Object.keys(groupedSchedule)
-    .filter(dateStr => {
-        const d = new Date(dateStr);
-        return d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear();
+    .filter((dateStr) => {
+      const d = new Date(dateStr);
+      return (
+        d.getMonth() === currentDate.getMonth() &&
+        d.getFullYear() === currentDate.getFullYear()
+      );
     })
     .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
 
   const getDaysInMonthGrid = (date: Date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
-    const firstDay = new Date(year, month, 1).getDay(); 
+    const firstDay = new Date(year, month, 1).getDay();
     const totalDays = new Date(year, month + 1, 0).getDate();
-    
+
     const days = [];
     for (let i = 0; i < firstDay; i++) {
-        days.push({ day: null, full: null });
+      days.push({ day: null, full: null });
     }
     for (let i = 1; i <= totalDays; i++) {
-        const fullDate = new Date(year, month, i).toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-        days.push({ day: i, full: fullDate });
+      const fullDate = new Date(year, month, i).toLocaleString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+      days.push({ day: i, full: fullDate });
     }
     while (days.length < 42) {
-        days.push({ day: null, full: null });
+      days.push({ day: null, full: null });
     }
     return days;
   };
 
   const handlePrevMonth = () => {
-    setCurrentDate(prev => {
-        const next = new Date(prev);
-        next.setMonth(next.getMonth() - 1);
-        if (next.getFullYear() < 2026) return prev;
-        return next;
+    setCurrentDate((prev) => {
+      const next = new Date(prev);
+      next.setMonth(next.getMonth() - 1);
+      if (next.getFullYear() < 2026) return prev;
+      return next;
     });
   };
 
   const handleNextMonth = () => {
-    setCurrentDate(prev => {
-        const next = new Date(prev);
-        next.setMonth(next.getMonth() + 1);
-        if (next.getFullYear() > 2026) return prev;
-        return next;
+    setCurrentDate((prev) => {
+      const next = new Date(prev);
+      next.setMonth(next.getMonth() + 1);
+      if (next.getFullYear() > 2026) return prev;
+      return next;
     });
   };
 
-  const currentMonthName = currentDate.toLocaleString('en-US', { month: 'long' });
+  const currentMonthName = currentDate.toLocaleString("en-US", {
+    month: "long",
+  });
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
       <div className="lg:col-span-12">
-        <DashboardWidget title="Schedule Dashboard" onManage={() => showToast("Syncing with Google Calendar API...", "info")}>
-           <div className="max-w-5xl mx-auto py-4">
-              <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 px-4 gap-6">
-                <div className="flex items-center gap-6">
-                  <h2 className="text-2xl font-bold text-white tracking-tight">
-                    {viewMode === 'schedule' ? 'Timeline' : currentMonthName} <span className="text-white/20 ml-2 font-light">2026</span>
-                  </h2>
-                  <div className="flex items-center gap-2">
-                    <button onClick={handlePrevMonth} className="p-2 rounded-full hover:bg-white/5 text-white/40 hover:text-white transition-all"><ChevronLeft size={20} /></button>
-                    <button onClick={handleNextMonth} className="p-2 rounded-full hover:bg-white/5 text-white/40 hover:text-white transition-all"><ChevronRight size={20} /></button>
-                  </div>
-                </div>
-                <div className="hidden md:flex items-center bg-white/5 p-1.5 rounded-2xl border border-white/10 gap-1">
-                   <button 
-                    onClick={() => setViewMode('schedule')}
-                    className={`px-5 py-2 rounded-xl text-[10px] uppercase tracking-widest font-extrabold transition-all ${viewMode === 'schedule' ? 'bg-white text-black shadow-xl' : 'text-white/40 hover:text-white'}`}
-                   >
-                     Schedule
-                   </button>
-                   <button 
-                    onClick={() => setViewMode('month')}
-                    className={`px-5 py-2 rounded-xl text-[10px] uppercase tracking-widest font-extrabold transition-all ${viewMode === 'month' ? 'bg-white text-black shadow-xl' : 'text-white/40 hover:text-white'}`}
-                   >
-                     Month
-                   </button>
+        <DashboardWidget
+          title="Schedule Dashboard"
+          onManage={() =>
+            showToast("Syncing with Google Calendar API...", "info")
+          }
+        >
+          <div className="max-w-5xl mx-auto py-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 px-4 gap-6">
+              <div className="flex items-center gap-6">
+                <h2 className="text-2xl font-bold text-white tracking-tight">
+                  {viewMode === "schedule" ? "Timeline" : currentMonthName}{" "}
+                  <span className="text-white/20 ml-2 font-light">2026</span>
+                </h2>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handlePrevMonth}
+                    className="p-2 rounded-full hover:bg-white/5 text-white/40 hover:text-white transition-all"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <button
+                    onClick={handleNextMonth}
+                    className="p-2 rounded-full hover:bg-white/5 text-white/40 hover:text-white transition-all"
+                  >
+                    <ChevronRight size={20} />
+                  </button>
                 </div>
               </div>
+              <div className="hidden md:flex items-center bg-white/5 p-1.5 rounded-2xl border border-white/10 gap-1">
+                <button
+                  onClick={() => setViewMode("schedule")}
+                  className={`px-5 py-2 rounded-xl text-[10px] uppercase tracking-widest font-extrabold transition-all ${viewMode === "schedule" ? "bg-white text-black shadow-xl" : "text-white/40 hover:text-white"}`}
+                >
+                  Schedule
+                </button>
+                <button
+                  onClick={() => setViewMode("month")}
+                  className={`px-5 py-2 rounded-xl text-[10px] uppercase tracking-widest font-extrabold transition-all ${viewMode === "month" ? "bg-white text-black shadow-xl" : "text-white/40 hover:text-white"}`}
+                >
+                  Month
+                </button>
+              </div>
+            </div>
 
-              <AnimatePresence mode="wait">
-                {viewMode === 'schedule' ? (
-                  <motion.div 
-                    key="schedule"
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 10 }}
-                    className="space-y-16 px-4"
-                  >
-                    <div className="flex items-center gap-4 mb-4 opacity-50">
-                      <div className="h-px flex-1 bg-linear-to-r from-white/10 to-transparent"></div>
-                      <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-[0.4em] font-mono">{currentMonthName} 2026</h3>
-                      <div className="h-px flex-1 bg-linear-to-l from-white/10 to-transparent"></div>
-                    </div>
+            <AnimatePresence mode="wait">
+              {viewMode === "schedule" ? (
+                <motion.div
+                  key="schedule"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  className="space-y-16 px-4"
+                >
+                  <div className="flex items-center gap-4 mb-4 opacity-50">
+                    <div className="h-px flex-1 bg-linear-to-r from-white/10 to-transparent"></div>
+                    <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-[0.4em] font-mono">
+                      {currentMonthName} 2026
+                    </h3>
+                    <div className="h-px flex-1 bg-linear-to-l from-white/10 to-transparent"></div>
+                  </div>
 
-                    {sortedDates.length === 0 ? (
-                      <div className="py-24 flex flex-col items-center justify-center text-center">
-                         <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-6">
-                            <Calendar size={24} className="text-white/10" />
-                         </div>
-                         <p className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] font-mono">No events aligned for this month</p>
-                         <button onClick={handleNextMonth} className="mt-6 text-[9px] font-bold text-white/40 hover:text-white uppercase tracking-widest transition-all">Next Month &rarr;</button>
+                  {sortedDates.length === 0 ? (
+                    <div className="py-24 flex flex-col items-center justify-center text-center">
+                      <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-6">
+                        <Calendar size={24} className="text-white/10" />
                       </div>
-                    ) : (
-                      sortedDates.map((dateStr) => {
-                        const dayEvents = groupedSchedule[dateStr];
-                        const dateObj = new Date(dateStr);
-                        const month = dateObj.toLocaleString('en-US', { month: 'short' }).toUpperCase();
-                        const day = dateObj.getDate();
-                        const isToday = false;
-
-                        return (
-                          <div key={dateStr} className="flex flex-col md:flex-row gap-6 md:gap-12 relative group">
-                             <div className="md:w-28 shrink-0 md:text-right md:sticky md:top-24 h-fit">
-                                <div className="flex md:flex-col items-baseline md:items-end gap-2 md:gap-0">
-                                   <p className="text-[11px] font-bold text-emerald-500 uppercase tracking-[0.3em] font-mono mb-1">{month}</p>
-                                   <p className="text-4xl md:text-5xl font-light text-white tracking-tighter leading-none">
-                                      {day}<span className="text-sm md:text-base ml-1 opacity-20 font-mono">th</span>
-                                   </p>
-                                </div>
-                             </div>
-
-                             <div className="flex-1 space-y-6 pb-4 border-l-2 md:border-l-2 border-white/5 pl-8 md:pl-12 relative">
-                                <div className="absolute -left-px top-4 bottom-0 w-0.5 bg-linear-to-b from-white/10 via-white/5 to-transparent"></div>
-                                
-                                {dayEvents.map((item) => (
-                                   <div key={item.slug} className="relative group/item">
-                                      <div className="absolute -left-[37px] md:-left-[53px] top-5 w-4 h-4 rounded-full border-4 border-[#000000] bg-white/10 group-hover/item:bg-emerald-500 group-hover/item:scale-125 transition-all duration-300 z-10 shadow-[0_0_15px_rgba(16,185,129,0)] group-hover/item:shadow-[0_0_15px_rgba(16,185,129,0.5)]"></div>
-                                      
-                                      <div className="bg-white/2 border border-white/8 rounded-3xl p-6 md:p-8 hover:border-white/20 hover:bg-white/4 transition-all duration-500 flex flex-col lg:flex-row lg:items-center justify-between gap-8 group/card overflow-hidden relative">
-                                         <div className="absolute inset-0 bg-linear-to-br from-white/2 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity"></div>
-                                         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 relative z-10">
-                                            <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl overflow-hidden border border-white/10 shrink-0 group-hover/card:scale-105 transition-transform duration-500">
-                                              <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
-                                            </div>
-                                            <div>
-                                               <div className="flex flex-wrap items-center gap-3 mb-3">
-                                                  <span className={`text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full border ${item.type === 'Competition' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'}`}>{item.type}</span>
-                                                  <div className="flex items-center gap-2 text-white/30 text-[10px] font-mono"><Target size={12} className="text-white/20" /><span>10:00 — 18:00 IST</span></div>
-                                               </div>
-                                               <h4 className="text-xl md:text-2xl font-bold text-white tracking-tight group-hover/card:text-emerald-400 transition-colors duration-300">{item.title}</h4>
-                                               <div className="flex items-center gap-4 mt-3">
-                                                  <p className="text-[10px] text-white/40 uppercase tracking-[0.3em] font-mono">{item.category}</p>
-                                                  <span className="w-1 h-1 rounded-full bg-white/10"></span>
-                                                  <p className="text-[10px] text-white/40 uppercase tracking-[0.3em] font-mono">Global Entry</p>
-                                               </div>
-                                            </div>
-                                         </div>
-                                         <div className="flex items-center gap-3 relative z-10">
-                                            <button onClick={() => { const link = generateGoogleCalLink(item.title, item.date); window.open(link, '_blank'); showToast("Syncing with Google Calendar...", "success"); }} className="h-12 px-6 rounded-2xl bg-white/5 border border-white/10 text-white/60 hover:bg-white hover:text-black hover:border-white transition-all duration-300 text-[11px] font-bold uppercase tracking-widest flex items-center gap-3 group/btn"><Calendar size={16} className="group-hover/btn:scale-110 transition-transform" /><span className="hidden sm:inline">Add to Calendar</span><span className="sm:hidden">Sync</span></button>
-                                            <Link href={`/${item.type === 'Competition' ? 'competitions' : 'events'}/${item.slug}`} className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-all"><ChevronRight size={20} /></Link>
-                                         </div>
-                                      </div>
-                                   </div>
-                                ))}
-                             </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </motion.div>
-                ) : (
-                  <motion.div 
-                    key="month"
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -10 }}
-                    className="px-4"
-                  >
-                    <div className="grid grid-cols-7 gap-px bg-white/10 border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
-                       {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                         <div key={d} className="bg-[#050505] p-4 text-center border-b border-white/10">
-                            <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest font-mono">{d}</span>
-                         </div>
-                       ))}
-                       {getDaysInMonthGrid(currentDate).map((d, i) => {
-                          const hasEvents = d.full ? groupedSchedule[d.full] : null;
-                          return (
-                            <div key={`${d.full}-${i}`} className={`bg-[#030303] min-h-[120px] p-4 border-r border-b border-white/5 group hover:bg-white/2 transition-all relative ${d.day ? 'cursor-pointer' : 'opacity-10 pointer-events-none'}`} onClick={() => hasEvents && setViewMode('schedule')}>
-                               <span className="text-sm font-light text-white/20 group-hover:text-white transition-colors">{d.day}</span>
-                               <div className="mt-4 space-y-1.5">
-                                  {hasEvents?.slice(0, 2).map(ev => (
-                                    <div key={ev.slug} className={`h-1.5 w-full rounded-full ${ev.type === 'Competition' ? 'bg-amber-500' : 'bg-emerald-500'} opacity-40 group-hover:opacity-100 transition-opacity`}></div>
-                                  ))}
-                                  {(hasEvents?.length || 0) > 2 && (
-                                    <div className="h-1 text-[8px] font-bold text-white/10 group-hover:text-white/40 font-mono text-center">+{hasEvents!.length - 2} MORE</div>
-                                  )}
-                               </div>
-                            </div>
-                          );
-                       })}
+                      <p className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] font-mono">
+                        No events aligned for this month
+                      </p>
+                      <button
+                        onClick={handleNextMonth}
+                        className="mt-6 text-[9px] font-bold text-white/40 hover:text-white uppercase tracking-widest transition-all"
+                      >
+                        Next Month &rarr;
+                      </button>
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-           </div>
+                  ) : (
+                    sortedDates.map((dateStr) => {
+                      const dayEvents = groupedSchedule[dateStr];
+                      const dateObj = new Date(dateStr);
+                      const month = dateObj
+                        .toLocaleString("en-US", { month: "short" })
+                        .toUpperCase();
+                      const day = dateObj.getDate();
+                      const isToday = false;
+
+                      return (
+                        <div
+                          key={dateStr}
+                          className="flex flex-col md:flex-row gap-6 md:gap-12 relative group"
+                        >
+                          <div className="md:w-28 shrink-0 md:text-right md:sticky md:top-24 h-fit">
+                            <div className="flex md:flex-col items-baseline md:items-end gap-2 md:gap-0">
+                              <p className="text-[11px] font-bold text-emerald-500 uppercase tracking-[0.3em] font-mono mb-1">
+                                {month}
+                              </p>
+                              <p className="text-4xl md:text-5xl font-light text-white tracking-tighter leading-none">
+                                {day}
+                                <span className="text-sm md:text-base ml-1 opacity-20 font-mono">
+                                  th
+                                </span>
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex-1 space-y-6 pb-4 border-l-2 md:border-l-2 border-white/5 pl-8 md:pl-12 relative">
+                            <div className="absolute -left-px top-4 bottom-0 w-0.5 bg-linear-to-b from-white/10 via-white/5 to-transparent"></div>
+
+                            {dayEvents.map((item) => (
+                              <div
+                                key={item.slug}
+                                className="relative group/item"
+                              >
+                                <div className="absolute -left-[37px] md:-left-[53px] top-5 w-4 h-4 rounded-full border-4 border-[#000000] bg-white/10 group-hover/item:bg-emerald-500 group-hover/item:scale-125 transition-all duration-300 z-10 shadow-[0_0_15px_rgba(16,185,129,0)] group-hover/item:shadow-[0_0_15px_rgba(16,185,129,0.5)]"></div>
+
+                                <div className="bg-white/2 border border-white/8 rounded-3xl p-6 md:p-8 hover:border-white/20 hover:bg-white/4 transition-all duration-500 flex flex-col lg:flex-row lg:items-center justify-between gap-8 group/card overflow-hidden relative">
+                                  <div className="absolute inset-0 bg-linear-to-br from-white/2 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity"></div>
+                                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 relative z-10">
+                                    <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl overflow-hidden border border-white/10 shrink-0 group-hover/card:scale-105 transition-transform duration-500">
+                                      <img
+                                        src={item.image}
+                                        alt={item.title}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    </div>
+                                    <div>
+                                      <div className="flex flex-wrap items-center gap-3 mb-3">
+                                        <span
+                                          className={`text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full border ${item.type === "Competition" ? "bg-amber-500/10 text-amber-500 border-amber-500/20" : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"}`}
+                                        >
+                                          {item.type}
+                                        </span>
+                                        <div className="flex items-center gap-2 text-white/30 text-[10px] font-mono">
+                                          <Target
+                                            size={12}
+                                            className="text-white/20"
+                                          />
+                                          <span>10:00 — 18:00 IST</span>
+                                        </div>
+                                      </div>
+                                      <h4 className="text-xl md:text-2xl font-bold text-white tracking-tight group-hover/card:text-emerald-400 transition-colors duration-300">
+                                        {item.title}
+                                      </h4>
+                                      <div className="flex items-center gap-4 mt-3">
+                                        <p className="text-[10px] text-white/40 uppercase tracking-[0.3em] font-mono">
+                                          {item.category}
+                                        </p>
+                                        <span className="w-1 h-1 rounded-full bg-white/10"></span>
+                                        <p className="text-[10px] text-white/40 uppercase tracking-[0.3em] font-mono">
+                                          Global Entry
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-3 relative z-10">
+                                    <button
+                                      onClick={() => {
+                                        const link = generateGoogleCalLink(
+                                          item.title,
+                                          item.date,
+                                        );
+                                        window.open(link, "_blank");
+                                        showToast(
+                                          "Syncing with Google Calendar...",
+                                          "success",
+                                        );
+                                      }}
+                                      className="h-12 px-6 rounded-2xl bg-white/5 border border-white/10 text-white/60 hover:bg-white hover:text-black hover:border-white transition-all duration-300 text-[11px] font-bold uppercase tracking-widest flex items-center gap-3 group/btn"
+                                    >
+                                      <Calendar
+                                        size={16}
+                                        className="group-hover/btn:scale-110 transition-transform"
+                                      />
+                                      <span className="hidden sm:inline">
+                                        Add to Calendar
+                                      </span>
+                                      <span className="sm:hidden">Sync</span>
+                                    </button>
+                                    <Link
+                                      href={`/${item.type === "Competition" ? "competitions" : "events"}/${item.slug}`}
+                                      className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-all"
+                                    >
+                                      <ChevronRight size={20} />
+                                    </Link>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="month"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  className="px-4"
+                >
+                  <div className="grid grid-cols-7 gap-px bg-white/10 border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
+                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
+                      (d) => (
+                        <div
+                          key={d}
+                          className="bg-[#050505] p-4 text-center border-b border-white/10"
+                        >
+                          <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest font-mono">
+                            {d}
+                          </span>
+                        </div>
+                      ),
+                    )}
+                    {getDaysInMonthGrid(currentDate).map((d, i) => {
+                      const hasEvents = d.full ? groupedSchedule[d.full] : null;
+                      return (
+                        <div
+                          key={`${d.full}-${i}`}
+                          className={`bg-[#030303] min-h-[120px] p-4 border-r border-b border-white/5 group hover:bg-white/2 transition-all relative ${d.day ? "cursor-pointer" : "opacity-10 pointer-events-none"}`}
+                          onClick={() => hasEvents && setViewMode("schedule")}
+                        >
+                          <span className="text-sm font-light text-white/20 group-hover:text-white transition-colors">
+                            {d.day}
+                          </span>
+                          <div className="mt-4 space-y-1.5">
+                            {hasEvents?.slice(0, 2).map((ev) => (
+                              <div
+                                key={ev.slug}
+                                className={`h-1.5 w-full rounded-full ${ev.type === "Competition" ? "bg-amber-500" : "bg-emerald-500"} opacity-40 group-hover:opacity-100 transition-opacity`}
+                              ></div>
+                            ))}
+                            {(hasEvents?.length || 0) > 2 && (
+                              <div className="h-1 text-[8px] font-bold text-white/10 group-hover:text-white/40 font-mono text-center">
+                                +{hasEvents!.length - 2} MORE
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </DashboardWidget>
       </div>
     </div>
   );
 }
 
-function InboxPanel() {
+function InboxPanel({
+  invites,
+  onAccept,
+  onDecline,
+  isMutating,
+}: {
+  invites: any[];
+  onAccept: (inviteToken: string) => void;
+  onDecline: (inviteToken: string) => void;
+  isMutating: boolean;
+}) {
   const { showToast } = useDashboard();
-  const invites = [
-    { id: 1, type: "received", title: "Global Hackathon 2026", user: "Arjun Mehta", time: "2h ago", role: "Frontend Dev" },
-    { id: 2, type: "received", title: "AI Ideathon", user: "Priya Sen", time: "1d ago", role: "AI Engineer" },
-  ];
-  
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
       <div className="lg:col-span-12">
-        <DashboardWidget 
-          title="Team Invites" 
-          onManage={() => showToast("Scanning global network for pending invites...", "info")}
+        <DashboardWidget
+          title="Team Invites"
+          onManage={() =>
+            showToast("Scanning global network for pending invites...", "info")
+          }
         >
-           <div className="space-y-3 max-w-4xl mx-auto py-4">
-              {invites.map((inv) => (
-                <div key={inv.id} className="bg-white/3 border border-white/8 rounded-2xl p-5 flex flex-col sm:flex-row gap-5 sm:items-center justify-between hover:border-white/20 hover:bg-white/5 transition-all duration-300">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl overflow-hidden shrink-0 border border-white/10">
-                      <img src={`https://i.pravatar.cc/150?u=${inv.user}`} alt={inv.user} className="w-full h-full object-cover" />
-                    </div>
-                    <div>
-                      <p className="text-[13px] font-bold text-white">{inv.user} <span className="text-white/30 font-normal ml-1">invited you to join</span></p>
-                      <p className="text-[11px] text-amber-400 font-bold mt-1 uppercase tracking-wider">{inv.title}</p>
-                      <div className="flex items-center gap-2.5 mt-2">
-                        <span className="text-[9px] text-white/20 font-mono uppercase tracking-widest">{inv.time}</span>
-                        <span className="w-1 h-1 rounded-full bg-white/10"></span>
-                        <span className="text-[9px] text-white/50 border border-white/10 rounded-lg px-2 py-0.5 bg-white/5 font-bold uppercase tracking-widest">{inv.role}</span>
-                      </div>
-                    </div>
+          <div className="space-y-3 max-w-4xl mx-auto py-4">
+            {invites.length === 0 && (
+              <div className="rounded-3xl border border-dashed border-white/5 py-12 text-center">
+                <p className="text-sm text-white/20 italic font-mono uppercase tracking-widest leading-relaxed">
+                  No pending invites.
+                </p>
+              </div>
+            )}
+            {invites.map((inv) => (
+              <div
+                key={inv.id}
+                className="bg-white/3 border border-white/8 rounded-2xl p-5 flex flex-col sm:flex-row gap-5 sm:items-center justify-between hover:border-white/20 hover:bg-white/5 transition-all duration-300"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl overflow-hidden shrink-0 border border-white/10">
+                    <img
+                      src={inv.avatar || ""}
+                      alt={inv.user}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <button 
-                      onClick={() => showToast(`Successfully declined ${inv.user}'s invite.`, "error")}
-                      className="h-10 px-5 bg-white/5 border border-white/10 text-white hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/20 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all"
-                    >Decline</button>
-                    <button 
-                      onClick={() => showToast(`Welcome to the team! Accepted ${inv.user}'s invite.`, "success")}
-                      className="h-10 px-5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all"
-                    >Accept Invite</button>
+                  <div>
+                    <p className="text-[13px] font-bold text-white">
+                      {inv.user}{" "}
+                      <span className="text-white/30 font-normal ml-1">
+                        invited you to join
+                      </span>
+                    </p>
+                    <p className="text-[11px] text-amber-400 font-bold mt-1 uppercase tracking-wider">
+                      {inv.title}
+                    </p>
+                    <div className="flex items-center gap-2.5 mt-2">
+                      <span className="text-[9px] text-white/20 font-mono uppercase tracking-widest">
+                        {inv.time}
+                      </span>
+                      <span className="w-1 h-1 rounded-full bg-white/10"></span>
+                      <span className="text-[9px] text-white/50 border border-white/10 rounded-lg px-2 py-0.5 bg-white/5 font-bold uppercase tracking-widest">
+                        {inv.role}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              ))}
-           </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <button
+                    onClick={() => onDecline(inv.inviteToken)}
+                    disabled={isMutating}
+                    className="h-10 px-5 bg-white/5 border border-white/10 text-white hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/20 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all"
+                  >
+                    Decline
+                  </button>
+                  <button
+                    onClick={() => onAccept(inv.inviteToken)}
+                    disabled={isMutating}
+                    className="h-10 px-5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all"
+                  >
+                    Accept Invite
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </DashboardWidget>
       </div>
     </div>
   );
 }
 
-function SidebarNav({ active, setActive }: { active: any; setActive: (v: any) => void }) {
+function SidebarNav({
+  active,
+  setActive,
+}: {
+  active: any;
+  setActive: (v: any) => void;
+}) {
   const items = [
     { id: "profile", label: "Profile", icon: User },
     { id: "competitions", label: "Competitions", icon: Award },
@@ -1307,7 +1851,9 @@ function SidebarNav({ active, setActive }: { active: any; setActive: (v: any) =>
           key={item.id}
           onClick={() => setActive(item.id)}
           className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-300 relative group overflow-hidden ${
-            active === item.id ? "text-white" : "text-white/30 hover:text-white/60"
+            active === item.id
+              ? "text-white"
+              : "text-white/30 hover:text-white/60"
           }`}
         >
           {active === item.id && (
@@ -1319,7 +1865,11 @@ function SidebarNav({ active, setActive }: { active: any; setActive: (v: any) =>
           )}
           <div className="relative z-10 flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <p className={`text-[12px] font-extrabold uppercase tracking-widest ${active === item.id ? "text-white" : "text-white/40 group-hover:text-white/80"}`}>{item.label}</p>
+              <p
+                className={`text-[12px] font-extrabold uppercase tracking-widest ${active === item.id ? "text-white" : "text-white/40 group-hover:text-white/80"}`}
+              >
+                {item.label}
+              </p>
             </div>
             {active === item.id && (
               <div className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]"></div>
@@ -1332,63 +1882,182 @@ function SidebarNav({ active, setActive }: { active: any; setActive: (v: any) =>
 }
 
 export default function ProfilePage() {
+  const authMeQuery = useAuthMe();
+  const updateProfileMutation = useUpdateUserProfile();
+  const myRegistrationsQuery = useMyRegistrations(Boolean(authMeQuery.data));
+  const pendingInvitesQuery = usePendingTeamInvites(Boolean(authMeQuery.data));
+  const acceptInviteMutation = useAcceptTeamInvite();
+  const declineInviteMutation = useDeclineTeamInvite();
+
   const [active, setActive] = useState<NavItem>("profile");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  
+
   // Toast System
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
-  const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error" | "info";
+  } | null>(null);
+  const showToast = (
+    message: string,
+    type: "success" | "error" | "info" = "success",
+  ) => {
     setToast(null);
     setTimeout(() => setToast({ message, type }), 10);
   };
 
-  // Profile State (Lifted for global access)
-  const [profile, setProfile] = useState({
-    name: "Yatharth Khandelwal",
-    email: "yatharth@neutron.in",
-    bio: "Building at the intersection of space tech & software.",
-    college: "Rishihood University",
-    year: "1st Year · CS & AI",
-    gender: "Male",
-    city: "Sonipat",
-    state: "Haryana",
-    whatsapp: "",
-    github: "https://github.com",
-    linkedin: "https://linkedin.com",
-    twitter: "https://twitter.com",
-  });
+  const [profile, setProfile] = useState<ProfileState>(EMPTY_PROFILE);
 
-  const set = (key: keyof typeof profile) => (val: string) =>
+  const authUser = authMeQuery.data as Record<string, any> | undefined;
+  const userId = (authUser?.id || authUser?._id || "") as string;
+
+  useEffect(() => {
+    if (!authUser) return;
+
+    setProfile({
+      name: authUser.name || "",
+      email: authUser.email || "",
+      bio: authUser.bio || "",
+      college: authUser.collegeName || "",
+      year: authUser.yearOfStudy || "",
+      gender: authUser.gender || "",
+      city: authUser.city || "",
+      state: authUser.state || "",
+      whatsapp: authUser.whatsappNumber || "",
+      image: authUser.image || "",
+      collegeIdPic: authUser.collegeIdPic || "",
+      govtIdPic: authUser.govtIdPic || "",
+    });
+  }, [authUser]);
+
+  const set = (key: keyof ProfileState) => async (val: string) => {
     setProfile((p) => ({ ...p, [key]: val }));
 
-  // Header Button States
-  const [exporting, setExporting] = useState(false);
-  const [saving, setSaving] = useState(false);
+    if (!userId) return;
+
+    const payloadByField: Partial<
+      Record<keyof ProfileState, Record<string, string>>
+    > = {
+      city: { city: val },
+      state: { state: val },
+      college: { collegeName: val },
+      gender: { gender: val },
+      whatsapp: { whatsappNumber: val },
+      year: { yearOfStudy: val },
+    };
+
+    const payload = payloadByField[key];
+    if (!payload) return;
+
+    try {
+      await updateProfileMutation.mutateAsync({ userId, ...payload });
+      showToast("Profile updated successfully.", "success");
+    } catch {
+      showToast("Failed to update profile.", "error");
+    }
+  };
+
   const [expandedID, setExpandedID] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any | null>(null);
 
-  const handleExport = () => {
-    setExporting(true);
-    setTimeout(() => {
-      setExporting(false);
-      showToast("Profile exported as PDF successfully.");
-    }, 2500);
-  };
+  const registrations = Array.isArray(myRegistrationsQuery.data)
+    ? myRegistrationsQuery.data
+    : [];
+  const enrolledItems: EnrolledItem[] = registrations
+    .map((entry: any) => {
+      const competition = entry?.competition || {};
+      const competitionType = String(
+        competition?.eventType || competition?.type || "",
+      ).toUpperCase();
+      const kind: EnrolledItem["kind"] = competitionType.includes("EVENT")
+        ? "event"
+        : "competition";
 
-  const handleSave = () => {
-    setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
-      showToast("All changes have been saved.");
-    }, 1800);
-  };
+      const id = String(competition?.id || "");
+      if (!id) return null;
+
+      return {
+        kind,
+        id,
+        slug: id,
+        title: competition?.title || "",
+        image: competition?.posterPath || "",
+        category: competition?.category || competition?.type || "",
+        date: formatDisplayDate(
+          competition?.startTime || competition?.createdAt,
+        ),
+        status: toDashboardStatus(competition?.status),
+        teamSize: formatTeamSize(
+          competition?.minTeamSize,
+          competition?.maxTeamSize,
+        ),
+        team: [],
+      };
+    })
+    .filter(Boolean) as EnrolledItem[];
+
+  const competitionItems = enrolledItems.filter(
+    (item) => item.kind === "competition",
+  );
+  const eventItems = enrolledItems.filter((item) => item.kind === "event");
+
+  const teamMembers = [
+    {
+      id: userId || "me",
+      name: profile.name || "",
+      role: "You",
+      avatar: profile.image || "",
+      isMe: true,
+    },
+  ];
+
+  const pendingInvites = Array.isArray(pendingInvitesQuery.data)
+    ? pendingInvitesQuery.data
+    : [];
+  const inboxInvites = pendingInvites.map((item: any) => ({
+    id: item?.invite?.id || item?.invite?.inviteToken,
+    inviteToken: item?.invite?.inviteToken,
+    title: item?.competition?.title || "",
+    user: item?.inviter?.name || item?.inviter?.email || "",
+    avatar: item?.inviter?.image || "",
+    time: timeAgo(item?.invite?.createdAt),
+    role: item?.team?.name || "Team Invite",
+  }));
+
+  const isLoadingData =
+    authMeQuery.isLoading ||
+    myRegistrationsQuery.isLoading ||
+    pendingInvitesQuery.isLoading;
+
+  if (isLoadingData) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+          <p className="text-xs uppercase tracking-[0.2em] text-white/50 font-mono">
+            Loading profile data...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <DashboardContext.Provider value={{ showToast, setExpandedID }}>
       <div className="min-h-screen bg-black text-white selection:bg-white/20 relative">
         <AnimatePresence>
-          {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-          {selectedMember && <MemberProfileModal member={selectedMember} onClose={() => setSelectedMember(null)} />}
+          {toast && (
+            <Toast
+              message={toast.message}
+              type={toast.type}
+              onClose={() => setToast(null)}
+            />
+          )}
+          {selectedMember && (
+            <MemberProfileModal
+              member={selectedMember}
+              onClose={() => setSelectedMember(null)}
+            />
+          )}
           {expandedID && (
             <div className="fixed inset-0 z-200 flex items-center justify-center p-6">
               <motion.div
@@ -1408,10 +2077,10 @@ export default function ProfilePage() {
                 <ProfileCard
                   name={profile.name}
                   title={profile.college}
-                  handle="yatharth.k"
+                  handle={(profile.email || "").split("@")[0] || ""}
                   status={profile.year}
                   contactText="DOWNLOAD ID"
-                  avatarUrl="https://ik.imagekit.io/YatharthKhandelwal/AVAT.jpeg"
+                  avatarUrl={profile.image || ""}
                   showUserInfo={false}
                   enableTilt={true}
                   enableMobileTilt={true}
@@ -1420,11 +2089,14 @@ export default function ProfilePage() {
                   behindGlowEnabled
                   innerGradient="linear-gradient(145deg,#2e106520 0%,#1e3a8a40 100%)"
                 />
-                <button 
+                <button
                   onClick={() => setExpandedID(false)}
                   className="mt-12 mx-auto flex items-center gap-2 text-[10px] font-bold text-white/20 hover:text-rose-400 uppercase tracking-widest transition-all group"
                 >
-                  <X size={14} className="group-hover:rotate-90 transition-transform" />
+                  <X
+                    size={14}
+                    className="group-hover:rotate-90 transition-transform"
+                  />
                   Close Identity Viewer
                 </button>
               </motion.div>
@@ -1433,141 +2105,246 @@ export default function ProfilePage() {
         </AnimatePresence>
 
         <div className="pointer-events-none fixed inset-0 z-0 bg-[#000000]">
-        <div
-          className="absolute inset-0 opacity-20"
-          style={{
-            backgroundImage:
-              "radial-gradient(1px 1px at 20% 30%,white,transparent),radial-gradient(1px 1px at 80% 10%,white,transparent),radial-gradient(1px 1px at 50% 70%,white,transparent),radial-gradient(1px 1px at 10% 80%,white,transparent),radial-gradient(1px 1px at 90% 60%,white,transparent),radial-gradient(1px 1px at 65% 25%,white,transparent),radial-gradient(1px 1px at 75% 85%,white,transparent)",
-          }}
-        />
-      </div>
-
-      <header className="fixed top-0 left-0 right-0 z-50 h-14 border-b border-white/6 backdrop-blur-xl bg-[#030303]/70 flex items-center px-6 gap-4">
-        <Link href="/" className="shrink-0 flex items-center gap-2">
-          <img src="/neutron.png" alt="Neutron" className="h-8 w-8 opacity-90" />
-          <span className="font-bold text-white tracking-wide hidden sm:block">Neutron</span>
-        </Link>
-        <div className="flex-1" />
-        
-        <button 
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="md:hidden p-2 -mr-2 text-white/70 hover:text-white rounded-lg active:bg-white/10 transition-colors"
-        >
-          {mobileMenuOpen ? (
-            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
-            </svg>
-          ) : (
-            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
-            </svg>
-          )}
-        </button>
-
-        <div className="hidden md:flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg overflow-hidden border border-white/15">
-            <img
-              src="https://ik.imagekit.io/YatharthKhandelwal/AVAT.jpeg"
-              alt="Yatharth"
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <span className="text-sm text-white/60 hidden sm:block">Yatharth Khandelwal</span>
+          <div
+            className="absolute inset-0 opacity-20"
+            style={{
+              backgroundImage:
+                "radial-gradient(1px 1px at 20% 30%,white,transparent),radial-gradient(1px 1px at 80% 10%,white,transparent),radial-gradient(1px 1px at 50% 70%,white,transparent),radial-gradient(1px 1px at 10% 80%,white,transparent),radial-gradient(1px 1px at 90% 60%,white,transparent),radial-gradient(1px 1px at 65% 25%,white,transparent),radial-gradient(1px 1px at 75% 85%,white,transparent)",
+            }}
+          />
         </div>
-      </header>
 
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed inset-0 top-14 z-40 bg-[#0c0c0c] flex flex-col p-6 overflow-y-auto md:hidden"
+        <header className="fixed top-0 left-0 right-0 z-50 h-14 border-b border-white/6 backdrop-blur-xl bg-[#030303]/70 flex items-center px-6 gap-4">
+          <Link href="/" className="shrink-0 flex items-center gap-2">
+            <img
+              src="/neutron.png"
+              alt="Neutron"
+              className="h-8 w-8 opacity-90"
+            />
+            <span className="font-bold text-white tracking-wide hidden sm:block">
+              Neutron
+            </span>
+          </Link>
+          <div className="flex-1" />
+
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-2 -mr-2 text-white/70 hover:text-white rounded-lg active:bg-white/10 transition-colors"
           >
-            <SidebarNav active={active} setActive={(v: any) => { setActive(v); setMobileMenuOpen(false); }} />
-            
-            <div className="mt-8 pt-6 border-t border-white/10 flex flex-col gap-3">
-              <Link href="/competitions" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-                <span className="text-sm font-medium text-white/80">All Competitions</span>
-                <span className="text-white/40">→</span>
-              </Link>
-              <Link href="/events" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-                <span className="text-sm font-medium text-white/80">All Events</span>
-                <span className="text-white/40">→</span>
-              </Link>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            {mobileMenuOpen ? (
+              <svg
+                width="24"
+                height="24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg
+                width="24"
+                height="24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
+              </svg>
+            )}
+          </button>
 
-      <div className="flex pt-14 relative z-10 w-full min-h-[calc(100vh-3.5rem)]">
-        <aside className="w-64 shrink-0 h-[calc(100vh-3.5rem)] border-r border-white/6 bg-[#030303]/40 backdrop-blur-3xl hidden md:flex flex-col px-4 py-8 sticky top-14">
-          <div className="flex items-center gap-3 px-3 pb-8 mb-6 border-b border-white/6">
-            <div className="w-10 h-10 rounded-2xl overflow-hidden border border-white/10 shrink-0">
+          <div className="hidden md:flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg overflow-hidden border border-white/15">
               <img
-                src="https://ik.imagekit.io/YatharthKhandelwal/AVAT.jpeg"
-                alt="Yatharth"
+                src={profile.image || ""}
+                alt={profile.name}
                 className="w-full h-full object-cover"
               />
             </div>
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-white truncate">Yatharth K.</p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
-                <p className="text-[9px] uppercase tracking-widest text-white/30 font-mono">Verified</p>
+            <span className="text-sm text-white/60 hidden sm:block">
+              {profile.name}
+            </span>
+          </div>
+        </header>
+
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="fixed inset-0 top-14 z-40 bg-[#0c0c0c] flex flex-col p-6 overflow-y-auto md:hidden"
+            >
+              <SidebarNav
+                active={active}
+                setActive={(v: any) => {
+                  setActive(v);
+                  setMobileMenuOpen(false);
+                }}
+              />
+
+              <div className="mt-8 pt-6 border-t border-white/10 flex flex-col gap-3">
+                <Link
+                  href="/competitions"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                >
+                  <span className="text-sm font-medium text-white/80">
+                    All Competitions
+                  </span>
+                  <span className="text-white/40">→</span>
+                </Link>
+                <Link
+                  href="/events"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                >
+                  <span className="text-sm font-medium text-white/80">
+                    All Events
+                  </span>
+                  <span className="text-white/40">→</span>
+                </Link>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="flex pt-14 relative z-10 w-full min-h-[calc(100vh-3.5rem)]">
+          <aside className="w-64 shrink-0 h-[calc(100vh-3.5rem)] border-r border-white/6 bg-[#030303]/40 backdrop-blur-3xl hidden md:flex flex-col px-4 py-8 sticky top-14">
+            <div className="flex items-center gap-3 px-3 pb-8 mb-6 border-b border-white/6">
+              <div className="w-10 h-10 rounded-2xl overflow-hidden border border-white/10 shrink-0">
+                <img
+                  src={profile.image || ""}
+                  alt={profile.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-white truncate">
+                  {profile.name}
+                </p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                  <p className="text-[9px] uppercase tracking-widest text-white/30 font-mono">
+                    Verified
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <SidebarNav active={active} setActive={setActive} />
+            <SidebarNav active={active} setActive={setActive} />
 
-          <div className="mt-auto flex flex-col gap-1.5 pt-6 border-t border-white/6">
-            {[
-              { href: "/contact", label: "Contact Us" },
-            ].map(({ href, label }) => (
-              <Link
-                key={href}
-                href={href}
-                className="flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] uppercase tracking-widest font-mono text-white/20 hover:text-white/60 transition-all duration-300"
-              >
-                {label}
-                <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </Link>
-            ))}
-          </div>
-        </aside>
-
-        <main className="flex-1 w-full overflow-x-hidden min-h-screen bg-[#030303]/20">
-          <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-10 w-full">
-            <div className="flex items-center justify-between mb-10">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight text-white capitalize">{active}</h1>
-                <p className="text-xs text-white/30 mt-1.5 font-mono uppercase tracking-widest">Dashboard &bull; {active}</p>
-              </div>
+            <div className="mt-auto flex flex-col gap-1.5 pt-6 border-t border-white/6">
+              {[{ href: "/contact", label: "Contact Us" }].map(
+                ({ href, label }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    className="flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] uppercase tracking-widest font-mono text-white/20 hover:text-white/60 transition-all duration-300"
+                  >
+                    {label}
+                    <svg
+                      width="10"
+                      height="10"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        d="M5 12h14M12 5l7 7-7 7"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </Link>
+                ),
+              )}
             </div>
+          </aside>
 
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={active}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                className="w-full"
-              >
-                {active === "profile" && <ProfilePanel profile={profile} set={set} onViewMember={(m) => setSelectedMember(m)} />}
-                {active === "competitions" && <CompetitionsPanel />}
-                {active === "events" && <EventsPanel setActive={setActive} />}
-                {active === "calendar" && <CalendarPanel />}
-                {active === "inbox" && <InboxPanel />}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        </main>
+          <main className="flex-1 w-full overflow-x-hidden min-h-screen bg-[#030303]/20">
+            <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-10 w-full">
+              <div className="flex items-center justify-between mb-10">
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight text-white capitalize">
+                    {active}
+                  </h1>
+                  <p className="text-xs text-white/30 mt-1.5 font-mono uppercase tracking-widest">
+                    Dashboard &bull; {active}
+                  </p>
+                </div>
+              </div>
+
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={active}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                  className="w-full"
+                >
+                  {active === "profile" && (
+                    <ProfilePanel
+                      profile={profile}
+                      set={set}
+                      onViewMember={(m) => setSelectedMember(m)}
+                      teamMembers={teamMembers}
+                    />
+                  )}
+                  {active === "competitions" && (
+                    <CompetitionsPanel competitions={competitionItems} />
+                  )}
+                  {active === "events" && (
+                    <EventsPanel setActive={setActive} events={eventItems} />
+                  )}
+                  {active === "calendar" && (
+                    <CalendarPanel
+                      competitions={competitionItems}
+                      events={eventItems}
+                    />
+                  )}
+                  {active === "inbox" && (
+                    <InboxPanel
+                      invites={inboxInvites}
+                      onAccept={(inviteToken) => {
+                        acceptInviteMutation.mutate(
+                          { inviteToken },
+                          {
+                            onSuccess: () =>
+                              showToast("Invite accepted.", "success"),
+                            onError: () =>
+                              showToast("Failed to accept invite.", "error"),
+                          },
+                        );
+                      }}
+                      onDecline={(inviteToken) => {
+                        declineInviteMutation.mutate(
+                          { inviteToken },
+                          {
+                            onSuccess: () =>
+                              showToast("Invite declined.", "info"),
+                            onError: () =>
+                              showToast("Failed to decline invite.", "error"),
+                          },
+                        );
+                      }}
+                      isMutating={
+                        acceptInviteMutation.isPending ||
+                        declineInviteMutation.isPending
+                      }
+                    />
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
-  </DashboardContext.Provider>
-);
+    </DashboardContext.Provider>
+  );
 }

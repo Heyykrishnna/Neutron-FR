@@ -1,55 +1,173 @@
 "use client";
 
-import React, { useState, Suspense } from "react";
+import React, { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import AuthLayout from "@/components/auth-layout";
 import { AuthInput, AuthButton } from "@/components/auth-components";
-import { motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthModal } from "@/components/auth-modal";
+import {
+  useAuthMe,
+  useLogin,
+  useLogout,
+  useRequestPasswordReset,
+} from "@/src/hooks/api/useAuth";
+
+const normalizeAuthResponseUser = (payload: any) => {
+  if (payload?.data?.user) return payload.data.user;
+  if (payload?.user) return payload.user;
+  return payload;
+};
 
 function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
-  const [isLoading, setIsLoading] = useState(false);
+  const authStatus = searchParams.get("auth");
+  const authReason = searchParams.get("reason");
+  const forceLogin = searchParams.get("forceLogin") === "1";
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [resetMessage, setResetMessage] = useState("");
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
   const [isResetSent, setIsResetSent] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const authMeQuery = useAuthMe();
+  const loginMutation = useLogin();
+  const logoutMutation = useLogout();
+  const requestResetMutation = useRequestPasswordReset();
+  const isForceLogoutPending = logoutMutation.isPending;
+  const triggerForceLogout = logoutMutation.mutate;
+
+  useEffect(() => {
+    if (!forceLogin && authMeQuery.data) {
+      router.replace(callbackUrl);
+    }
+  }, [forceLogin, authMeQuery.data, callbackUrl, router]);
+
+  useEffect(() => {
+    if (!forceLogin) return;
+    if (!authMeQuery.data) return;
+    if (isForceLogoutPending) return;
+
+    triggerForceLogout();
+  }, [forceLogin, authMeQuery.data, isForceLogoutPending, triggerForceLogout]);
+
+  useEffect(() => {
+    if (authStatus === "failed") {
+      const reason = authReason
+        ? decodeURIComponent(authReason).replace(/_/g, " ")
+        : "Google sign-in failed";
+      setLoginError(reason);
+      return;
+    }
+
+    if (authStatus === "success") {
+      authMeQuery.refetch();
+    }
+  }, [authReason, authStatus, authMeQuery]);
+
+  const isSigningIn = loginMutation.isPending;
+  const isRequestingReset = requestResetMutation.isPending;
+  const submitDisabled = useMemo(
+    () => isSigningIn || !email.trim() || !password,
+    [isSigningIn, email, password],
+  );
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      router.push(callbackUrl);
-    }, 2000);
+    setLoginError("");
+
+    try {
+      const payload = await loginMutation.mutateAsync({
+        email: email.trim(),
+        password,
+      });
+      const user = normalizeAuthResponseUser(payload);
+
+      if (!user) {
+        throw new Error("Login failed. Please try again.");
+      }
+
+      router.replace(callbackUrl);
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Invalid email or password.";
+      setLoginError(message);
+    }
   };
 
-  const handleForgotSubmit = (e: React.FormEvent) => {
+  const handleForgotSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+
+    try {
+      const response = await requestResetMutation.mutateAsync({
+        email: forgotEmail.trim(),
+      });
+      setResetMessage(
+        response?.message ||
+          "If the email exists, a password reset link has been sent.",
+      );
       setIsResetSent(true);
-    }, 1500);
+    } catch (error: any) {
+      setResetMessage(
+        error?.response?.data?.message ||
+          "If the email exists, a password reset link has been sent.",
+      );
+      setIsResetSent(true);
+    }
+  };
+
+  const handleGoogleLogin = () => {
+    const backendUrl =
+      process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001";
+    const normalizedBackendUrl = backendUrl.replace(/\/+$/, "");
+    const oauthBaseUrl = normalizedBackendUrl.endsWith("/api/v1")
+      ? normalizedBackendUrl
+      : `${normalizedBackendUrl}/api/v1`;
+    const signinReturnUrl = `${window.location.origin}/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}${forceLogin ? "&forceLogin=1" : ""}`;
+    const redirectUrl = encodeURIComponent(signinReturnUrl);
+
+    window.location.href = `${oauthBaseUrl}/auth/google?redirect=${redirectUrl}`;
   };
 
   return (
-    <AuthLayout 
-      title="Welcome Back" 
+    <AuthLayout
+      title="Welcome Back"
       subtitle="The universe is waiting for you. Sign in to continue your journey through the stars."
     >
       <div className="space-y-8">
         <div>
           <h2 className="text-3xl font-bold mb-2">Sign In Account</h2>
-          <p className="text-white/50">Enter your credentials to access your workspace.</p>
+          <p className="text-white/50">
+            Enter your credentials to access your workspace.
+          </p>
         </div>
 
+        {forceLogin ? (
+          <p className="text-sm text-amber-300 border border-amber-300/20 bg-amber-500/10 rounded-xl px-3 py-2">
+            Switching account for this team invite. Please sign in with the
+            invited email.
+          </p>
+        ) : null}
+
+        {forceLogin && isForceLogoutPending ? (
+          <p className="text-xs text-white/55">
+            Signing out current session...
+          </p>
+        ) : null}
+
         <div className="space-y-4">
-          <AuthButton 
-            variant="outline" 
+          <AuthButton
+            variant="outline"
             className="w-full flex items-center justify-center space-x-3"
-            onClick={() => {}}
+            onClick={handleGoogleLogin}
+            type="button"
           >
             <svg width="20" height="20" viewBox="0 0 24 24">
               <path
@@ -73,33 +191,46 @@ function SignInContent() {
           </AuthButton>
         </div>
 
+        {loginError ? (
+          <p className="text-sm text-red-400 border border-red-400/20 bg-red-500/10 rounded-xl px-3 py-2">
+            {loginError}
+          </p>
+        ) : null}
+
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
             <span className="w-full border-t border-white/10"></span>
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-[#050505] px-4 text-white/40 tracking-widest">Or continue with</span>
+            <span className="bg-[#050505] px-4 text-white/40 tracking-widest">
+              Or continue with
+            </span>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <AuthInput 
-            label="Email Address" 
-            type="email" 
-            placeholder="eg. explorer@neutron.io" 
+          <AuthInput
+            label="Email Address"
+            type="email"
+            placeholder="eg. explorer@neutron.io"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             required
           />
-          <AuthInput 
-            label="Password" 
-            type="password" 
-            placeholder="Enter your password" 
+          <AuthInput
+            label="Password"
+            type="password"
+            placeholder="Enter your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             required
           />
-          
+
           <div className="flex items-center justify-end">
-            <button 
+            <button
               type="button"
               onClick={() => {
+                setResetMessage("");
                 setIsResetSent(false);
                 setIsForgotModalOpen(true);
               }}
@@ -109,14 +240,21 @@ function SignInContent() {
             </button>
           </div>
 
-          <AuthButton type="submit" isLoading={isLoading}>
+          <AuthButton
+            type="submit"
+            isLoading={isSigningIn}
+            disabled={submitDisabled}
+          >
             Sign In
           </AuthButton>
         </form>
 
         <p className="text-center text-white/40 text-sm">
           Don't have an account?{" "}
-          <Link href="/auth/signup" className="text-white font-semibold hover:underline decoration-purple-500 underline-offset-4">
+          <Link
+            href="/auth/signup"
+            className="text-white font-semibold hover:underline decoration-purple-500 underline-offset-4"
+          >
             Create account
           </Link>
         </p>
@@ -130,14 +268,30 @@ function SignInContent() {
         {isResetSent ? (
           <div className="text-center space-y-6 py-4">
             <div className="w-16 h-16 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M22 4L12 14.01l-3-3" strokeLinecap="round" strokeLinejoin="round" />
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path
+                  d="M22 11.08V12a10 10 0 1 1-5.93-9.14"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M22 4L12 14.01l-3-3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </div>
             <h4 className="text-xl font-bold">Transmission Sent</h4>
             <p className="text-white/60">
-              Check your inbox. We've sent instructions to reset your password to your registered email address.
+              {resetMessage ||
+                "If the email exists, a password reset link has been sent."}
             </p>
             <AuthButton onClick={() => setIsForgotModalOpen(false)}>
               Back to Sign In
@@ -146,15 +300,23 @@ function SignInContent() {
         ) : (
           <form onSubmit={handleForgotSubmit} className="space-y-6">
             <p className="text-white/60 text-sm leading-relaxed">
-              Enter your email address and we'll send you a cosmic link to reset your credentials.
+              Enter your email address and we'll send you a cosmic link to reset
+              your credentials.
             </p>
-            <AuthInput 
-              label="Email Address" 
-              type="email" 
-              placeholder="eg. explorer@neutron.io" 
+            <AuthInput
+              label="Email Address"
+              type="email"
+              placeholder="eg. explorer@neutron.io"
+              value={forgotEmail}
+              onChange={(e) => setForgotEmail(e.target.value)}
               required
             />
-            <AuthButton type="submit" isLoading={isLoading} variant="secondary">
+            <AuthButton
+              type="submit"
+              isLoading={isRequestingReset}
+              disabled={isRequestingReset || !forgotEmail.trim()}
+              variant="secondary"
+            >
               Send Reset Link
             </AuthButton>
           </form>
@@ -166,11 +328,13 @@ function SignInContent() {
 
 export default function SignInPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-[#050505]">
-        <div className="w-8 h-8 border-2 border-purple-500/20 border-t-purple-500 rounded-full animate-spin" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#050505]">
+          <div className="w-8 h-8 border-2 border-purple-500/20 border-t-purple-500 rounded-full animate-spin" />
+        </div>
+      }
+    >
       <SignInContent />
     </Suspense>
   );

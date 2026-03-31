@@ -6,70 +6,171 @@ import AuthLayout from "@/components/auth-layout";
 import { AuthInput, AuthButton } from "@/components/auth-components";
 import { motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  useRegister,
+  useResendVerificationEmail,
+} from "@/src/hooks/api/useAuth";
 
 function SignUpContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
-  const [isLoading, setIsLoading] = useState(false);
+
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [signupError, setSignupError] = useState("");
+  const [resendError, setResendError] = useState("");
+  const [resendSuccess, setResendSuccess] = useState("");
   const [isSignedUp, setIsSignedUp] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const registerMutation = useRegister();
+  const resendMutation = useResendVerificationEmail();
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      setIsSignedUp(true);
-    }, 2000);
+    setSignupError("");
+
+    try {
+      const response = await registerMutation.mutateAsync({
+        name: `${firstName} ${lastName}`.trim(),
+        email: email.trim(),
+        password,
+      });
+
+      if (response.success) {
+        setIsSignedUp(true);
+      } else {
+        setSignupError(response.message || "Signup failed. Please try again.");
+      }
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Signup failed. Please try again.";
+      setSignupError(message);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setResendError("");
+    setResendSuccess("");
+
+    try {
+      const response = await resendMutation.mutateAsync({
+        email: email.trim(),
+      });
+
+      if (response.success) {
+        setResendSuccess("Verification link has been resent to your email!");
+      } else {
+        setResendError(
+          response.message || "Failed to resend verification link.",
+        );
+      }
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to resend verification link.";
+      setResendError(message);
+    }
   };
 
   return (
-    <AuthLayout 
-      title="Get Started with Us" 
+    <AuthLayout
+      title="Get Started with Us"
       subtitle="Complete these easy steps to register your account and start exploring the Neutron universe."
     >
       <div className="space-y-8">
         {isSignedUp ? (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="text-center space-y-8 py-4"
           >
             <div className="w-20 h-20 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center mx-auto mb-6 relative">
               <div className="absolute inset-0 bg-purple-500/20 blur-xl rounded-full animate-pulse" />
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h9" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M22 7l-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M19 16v6m-3-3l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
+              <svg
+                width="40"
+                height="40"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              >
+                <path
+                  d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h9"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M22 7l-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M19 16v6m-3-3l3 3 3-3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </div>
-            
+
             <div>
               <h2 className="text-3xl font-bold mb-4">Verify Your Identity</h2>
               <p className="text-white/60 leading-relaxed font-light">
-                A link verification transmission has been sent to your email. Please follow the coordinates in the message to initiate your launch sequence.
+                A link verification transmission has been sent to your email.
+                Please follow the coordinates in the message to initiate your
+                launch sequence.
               </p>
             </div>
 
             <div className="pt-4 space-y-4">
-              <AuthButton onClick={() => window.location.reload()} variant="primary">
-                I've Verified My Mail
+              <AuthButton
+                onClick={() =>
+                  router.push(
+                    "/auth/signin?callbackUrl=" +
+                      encodeURIComponent(callbackUrl),
+                  )
+                }
+                variant="primary"
+              >
+                Go to Sign In
               </AuthButton>
-              <button className="text-white/40 hover:text-white text-sm transition-colors cursor-pointer">
-                Didn't receive the transmission? <span className="text-purple-400 font-medium">Resend link</span>
-              </button>
+              <div className="space-y-2">
+                <button
+                  onClick={handleResendVerification}
+                  className="text-white/40 hover:text-white text-sm transition-colors cursor-pointer w-full"
+                  disabled={resendMutation.isPending}
+                >
+                  Didn't receive the transmission?{" "}
+                  <span className="text-purple-400 font-medium">
+                    Resend link
+                  </span>
+                </button>
+                {resendSuccess && (
+                  <p className="text-sm text-green-400">{resendSuccess}</p>
+                )}
+                {resendError && (
+                  <p className="text-sm text-red-400">{resendError}</p>
+                )}
+              </div>
             </div>
           </motion.div>
         ) : (
           <>
             <div>
               <h2 className="text-3xl font-bold mb-2">Sign Up Account</h2>
-              <p className="text-white/50">Enter your personal data to create your account.</p>
+              <p className="text-white/50">
+                Enter your personal data to create your account.
+              </p>
             </div>
 
             <div className="space-y-4">
-              <AuthButton 
-                variant="outline" 
+              <AuthButton
+                variant="outline"
                 className="w-full flex items-center justify-center space-x-3"
                 onClick={() => {}}
               >
@@ -100,50 +201,76 @@ function SignUpContent() {
                 <span className="w-full border-t border-white/10"></span>
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-[#050505] px-4 text-white/40 tracking-widest">Or continue with</span>
+                <span className="bg-[#050505] px-4 text-white/40 tracking-widest">
+                  Or continue with
+                </span>
               </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
-                <AuthInput 
-                  label="First Name" 
-                  type="text" 
-                  placeholder="eg. John" 
+                <AuthInput
+                  label="First Name"
+                  type="text"
+                  placeholder="eg. John"
                   required
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
                 />
-                <AuthInput 
-                  label="Last Name" 
-                  type="text" 
-                  placeholder="eg. Francisco" 
+                <AuthInput
+                  label="Last Name"
+                  type="text"
+                  placeholder="eg. Francisco"
                   required
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
                 />
               </div>
-              
-              <AuthInput 
-                label="Email Address" 
-                type="email" 
-                placeholder="eg. johnfrans@gmail.com" 
-                required
-              />
-              
-              <AuthInput 
-                label="Password" 
-                type="password" 
-                placeholder="Enter your password" 
-                required
-              />
-              
-              <p className="text-xs text-white/30 ml-1">Must be at least 8 characters.</p>
 
-              <AuthButton type="submit" isLoading={isLoading} variant="primary">
+              <AuthInput
+                label="Email Address"
+                type="email"
+                placeholder="eg. johnfrans@gmail.com"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+
+              <AuthInput
+                label="Password"
+                type="password"
+                placeholder="Enter your password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+
+              <p className="text-xs text-white/30 ml-1">
+                Must be at least 8 characters.
+              </p>
+
+              {signupError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded text-red-400 text-sm">
+                  {signupError}
+                </div>
+              )}
+
+              <AuthButton
+                type="submit"
+                isLoading={registerMutation.isPending}
+                variant="primary"
+                disabled={registerMutation.isPending}
+              >
                 Sign Up
               </AuthButton>
             </form>
 
             <p className="text-center text-white/40 text-sm">
               Already have an account?{" "}
-              <Link href="/auth/signin" className="text-white font-semibold hover:underline decoration-purple-500 underline-offset-4">
+              <Link
+                href="/auth/signin"
+                className="text-white font-semibold hover:underline decoration-purple-500 underline-offset-4"
+              >
                 Log in
               </Link>
             </p>
@@ -156,11 +283,13 @@ function SignUpContent() {
 
 export default function SignUpPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-[#050505]">
-        <div className="w-8 h-8 border-2 border-purple-500/20 border-t-purple-500 rounded-full animate-spin" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#050505]">
+          <div className="w-8 h-8 border-2 border-purple-500/20 border-t-purple-500 rounded-full animate-spin" />
+        </div>
+      }
+    >
       <SignUpContent />
     </Suspense>
   );

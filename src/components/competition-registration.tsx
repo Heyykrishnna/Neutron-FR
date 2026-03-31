@@ -1,118 +1,362 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useAuthMe } from "@/src/hooks/api/useAuth";
+import {
+  useMyRegistrations,
+  usePublicCompetitionFormFields,
+  useRegisterSoloCompetition,
+  useRegisterTeamCompetition,
+  useSendTeamInvite,
+  useSubmitTeamMemberForm,
+} from "@/src/hooks/api/usePublicRegistration";
 
 function parseTeamSize(sizeStr: string): number[] {
-  const match = sizeStr.match(/(\d+)(?:-(\d+))?/);
+  const match = sizeStr.match(/(\d+)(?:\s*-\s*(\d+))?/);
   if (!match) return [1];
-  const min = parseInt(match[1]);
-  const max = match[2] ? parseInt(match[2]) : min;
-  const options = [];
-  for(let i=min; i<=max; i++) {
-    options.push(i);
-  }
-  return options;
+
+  const min = parseInt(match[1], 10);
+  const max = match[2] ? parseInt(match[2], 10) : min;
+  const options: number[] = [];
+  for (let i = min; i <= max; i++) options.push(i);
+  return options.length ? options : [1];
 }
 
-type MemberData = {
-  name: string;
-  email: string;
-  phone: string;
+type FormField = {
+  id?: string;
+  _id?: string;
+  name?: string;
+  label?: string;
+  type?: string;
+  required?: boolean;
+  options?: Array<string | { label?: string; value?: string }>;
+};
+
+type TeamDetails = {
+  teamName: string;
+  selectedTeamSize: string;
+  inviteInput: string;
+  inviteEmails: string[];
+};
+
+const normalizeFieldValue = (field: FormField, value: any) => {
+  const fieldType = String(field?.type || "text").toLowerCase();
+  if (fieldType === "number") {
+    if (value === "") return "";
+    const num = Number(value);
+    return Number.isNaN(num) ? value : num;
+  }
+  if (fieldType === "checkbox") return Boolean(value);
+  return value;
 };
 
 export default function CompetitionRegistration({
+  competitionId,
   competitionTitle,
   teamSize,
 }: {
+  competitionId: string;
   competitionTitle: string;
   teamSize: string;
 }) {
   const pathname = usePathname();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const searchParams = useSearchParams();
+  const [step, setStep] = useState<"start" | "team" | "form" | "success">(
+    "start",
+  );
+  const [errorMessage, setErrorMessage] = useState("");
+  const [teamDetails, setTeamDetails] = useState<TeamDetails>({
+    teamName: "",
+    selectedTeamSize: "",
+    inviteInput: "",
+    inviteEmails: [],
+  });
+  const [dynamicFormValues, setDynamicFormValues] = useState<
+    Record<string, any>
+  >({});
 
   const teamOptions = useMemo(() => parseTeamSize(teamSize), [teamSize]);
+  const isSolo = teamOptions.length === 1 && teamOptions[0] === 1;
+  const selectedTeamSize = Number(
+    teamDetails.selectedTeamSize || teamOptions[0] || 1,
+  );
+  const inviteSlots = Math.max(selectedTeamSize - 1, 0);
 
-  const [formData, setFormData] = useState({
-    college: "",
-    teamSize: teamOptions[0].toString(),
-    members: [{ name: "", email: "", phone: "" }] as MemberData[],
-  });
+  const authMeQuery = useAuthMe();
+  const isAuthenticated = !!authMeQuery.data;
 
-  // Keep formData.teamSize in sync if teamOptions change
+  const myRegistrationsQuery = useMyRegistrations(isAuthenticated);
+  const formFieldsQuery = usePublicCompetitionFormFields(competitionId);
+  const registerSoloMutation = useRegisterSoloCompetition();
+  const registerTeamMutation = useRegisterTeamCompetition();
+  const sendTeamInviteMutation = useSendTeamInvite();
+  const submitMemberFormMutation = useSubmitTeamMemberForm();
+
+  const mode = searchParams.get("mode");
+  const teamIdFromQuery = searchParams.get("teamId") || "";
+  const isMemberMode = mode === "member" && Boolean(teamIdFromQuery);
+  const searchQuery = searchParams.toString();
+  const callbackUrl = searchQuery ? `${pathname}?${searchQuery}` : pathname;
+
+  const registrations = Array.isArray(myRegistrationsQuery.data)
+    ? myRegistrationsQuery.data
+    : [];
+
+  const alreadyRegistered = useMemo(() => {
+    return registrations.some((entry: any) => {
+      const directCompetitionId = entry?.competitionId;
+      const nestedCompetitionId =
+        entry?.competition?.id || entry?.competition?._id;
+      return (
+        String(directCompetitionId || nestedCompetitionId || "") ===
+        competitionId
+      );
+    });
+  }, [registrations, competitionId]);
+
   useEffect(() => {
-    setFormData((prev) => {
-      const defaultSize = teamOptions[0];
-      const newMembers = [...prev.members];
-      while (newMembers.length < defaultSize) {
-        newMembers.push({ name: "", email: "", phone: "" });
-      }
-      return { 
-        ...prev, 
-        teamSize: defaultSize.toString(),
-        members: newMembers.slice(0, defaultSize)
-      };
-    });
-  }, [teamOptions]);
+    if (isMemberMode && step === "start") {
+      setStep("form");
+    }
+  }, [isMemberMode, step]);
 
-  const handleGeneralChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleTeamSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newSize = parseInt(e.target.value);
-    setFormData((prev) => {
-      const newMembers = [...prev.members];
-      while (newMembers.length < newSize) {
-        newMembers.push({ name: "", email: "", phone: "" });
-      }
-      return {
-        ...prev,
-        teamSize: e.target.value,
-        members: newMembers.slice(0, newSize)
-      };
-    });
-  };
-
-  const handleMemberChange = (index: number, field: keyof MemberData, value: string) => {
-    setFormData((prev) => {
-      const newMembers = [...prev.members];
-      newMembers[index] = { ...newMembers[index], [field]: value };
-      return { ...prev, members: newMembers };
-    });
-  };
-
-  const handleRegister = (e: React.FormEvent) => {
+  const handleTeamDetailsContinue = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setIsSuccess(true);
-    }, 1500);
+    setErrorMessage("");
+
+    if (!isSolo && !teamDetails.teamName.trim()) {
+      setErrorMessage("Team name is required.");
+      return;
+    }
+
+    if (!isSolo && teamDetails.inviteInput.trim()) {
+      setErrorMessage("Press Enter to add the invite email before continuing.");
+      return;
+    }
+
+    setStep("form");
   };
+
+  const addInviteEmail = () => {
+    const value = teamDetails.inviteInput.trim().toLowerCase();
+    if (!value) return;
+    const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+    if (!isValidEmail) {
+      setErrorMessage("Please enter a valid email address.");
+      return;
+    }
+
+    if (teamDetails.inviteEmails.includes(value)) {
+      setErrorMessage("This email is already added.");
+      return;
+    }
+
+    if (inviteSlots > 0 && teamDetails.inviteEmails.length >= inviteSlots) {
+      setErrorMessage(
+        `You can add up to ${inviteSlots} teammate email${inviteSlots > 1 ? "s" : ""}.`,
+      );
+      return;
+    }
+
+    setErrorMessage("");
+    setTeamDetails((prev) => ({
+      ...prev,
+      inviteInput: "",
+      inviteEmails: [...prev.inviteEmails, value],
+    }));
+  };
+
+  const handleSubmitRegistration = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage("");
+
+    const fields = Array.isArray(formFieldsQuery.data?.fields)
+      ? formFieldsQuery.data.fields
+      : [];
+
+    const formData = fields.map((field: FormField) => {
+      const fieldId = String(field._id || field.id || "");
+      const fieldName = field.name || field.label || fieldId;
+      const rawValue = dynamicFormValues[fieldName];
+
+      return {
+        fieldId,
+        fieldName,
+        value: normalizeFieldValue(field, rawValue),
+      };
+    });
+
+    try {
+      if (isMemberMode) {
+        await submitMemberFormMutation.mutateAsync({
+          teamId: teamIdFromQuery,
+          formData,
+        });
+      } else if (isSolo) {
+        await registerSoloMutation.mutateAsync({ competitionId, formData });
+      } else {
+        const registrationResult = await registerTeamMutation.mutateAsync({
+          competitionId,
+          teamName: teamDetails.teamName.trim(),
+          formData,
+        });
+
+        const createdTeamId = registrationResult?.team?.id;
+
+        if (createdTeamId && teamDetails.inviteEmails.length > 0) {
+          await Promise.allSettled(
+            teamDetails.inviteEmails.map((email) =>
+              sendTeamInviteMutation.mutateAsync({
+                teamId: createdTeamId,
+                invitedEmail: email,
+              }),
+            ),
+          );
+        }
+      }
+
+      await myRegistrationsQuery.refetch();
+      setStep("success");
+    } catch (error: any) {
+      setErrorMessage(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Registration failed. Please try again.",
+      );
+    }
+  };
+
+  const renderDynamicField = (field: FormField, index: number) => {
+    const fieldName =
+      field.name ||
+      field.label ||
+      String(field._id || field.id || `field-${index}`);
+    const fieldType = String(field.type || "text").toLowerCase();
+    const required = Boolean(field.required);
+    const value =
+      dynamicFormValues[fieldName] ?? (fieldType === "checkbox" ? false : "");
+
+    if (fieldType === "textarea") {
+      return (
+        <textarea
+          required={required}
+          value={value}
+          onChange={(event) =>
+            setDynamicFormValues((prev) => ({
+              ...prev,
+              [fieldName]: event.target.value,
+            }))
+          }
+          placeholder={`Enter ${field.label || fieldName}`}
+          className="bg-black border border-white/10 rounded-lg px-4 py-3 min-h-28 text-white placeholder-white/20 focus:outline-hidden focus:border-white/40 focus:bg-white/10 transition-colors"
+        />
+      );
+    }
+
+    if (fieldType === "select") {
+      const options = Array.isArray(field.options) ? field.options : [];
+      return (
+        <select
+          required={required}
+          value={value}
+          onChange={(event) =>
+            setDynamicFormValues((prev) => ({
+              ...prev,
+              [fieldName]: event.target.value,
+            }))
+          }
+          className="bg-black border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-hidden focus:border-white/40"
+        >
+          <option value="">Select an option</option>
+          {options.map((option, optionIndex) => {
+            const optionValue =
+              typeof option === "string"
+                ? option
+                : option.value || option.label || "";
+            const optionLabel =
+              typeof option === "string"
+                ? option
+                : option.label || option.value || "Option";
+            return (
+              <option key={`${fieldName}-${optionIndex}`} value={optionValue}>
+                {optionLabel}
+              </option>
+            );
+          })}
+        </select>
+      );
+    }
+
+    if (fieldType === "checkbox") {
+      return (
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            checked={Boolean(value)}
+            onChange={(event) =>
+              setDynamicFormValues((prev) => ({
+                ...prev,
+                [fieldName]: event.target.checked,
+              }))
+            }
+            type="checkbox"
+            className="w-4 h-4"
+          />
+          <span className="text-white/80 text-sm">
+            {field.label || fieldName}
+          </span>
+        </label>
+      );
+    }
+
+    const inputType =
+      fieldType === "email" ||
+      fieldType === "tel" ||
+      fieldType === "number" ||
+      fieldType === "date"
+        ? fieldType
+        : "text";
+
+    return (
+      <input
+        required={required}
+        value={value}
+        onChange={(event) =>
+          setDynamicFormValues((prev) => ({
+            ...prev,
+            [fieldName]: event.target.value,
+          }))
+        }
+        type={inputType}
+        placeholder={`Enter ${field.label || fieldName}`}
+        className="bg-black border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/20 focus:outline-hidden focus:border-white/40 focus:bg-white/10 transition-colors"
+      />
+    );
+  };
+
+  if (authMeQuery.isLoading) {
+    return (
+      <div className="max-w-lg mx-auto text-center py-10">
+        <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin mx-auto" />
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
       <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-8 md:p-12 text-center max-w-lg mx-auto transform transition-all hover:border-white/20">
-        <svg
-          className="w-16 h-16 mx-auto mb-6 text-white/50"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-        </svg>
-        <h3 className="text-2xl font-semibold mb-4 text-white">Authentication Required</h3>
+        <h3 className="text-2xl font-semibold mb-4 text-white">
+          Authentication Required
+        </h3>
         <p className="text-white/60 mb-8 font-light">
-          You must be signed in to your Neutron account to register for {competitionTitle}.
+          You must be signed in to your Neutron account to register for{" "}
+          {competitionTitle}.
         </p>
         <Link
-          href={`/auth/signin?callbackUrl=${encodeURIComponent(pathname)}`}
+          href={`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`}
           className="inline-block bg-white text-black px-8 py-3 rounded-full font-medium hover:scale-105 transition-transform duration-300 w-full md:w-auto cursor-pointer"
         >
           Initiate Launch Sequence
@@ -121,41 +365,222 @@ export default function CompetitionRegistration({
     );
   }
 
-  if (isSuccess) {
+  if (myRegistrationsQuery.isLoading) {
+    return (
+      <div className="max-w-lg mx-auto text-center py-10">
+        <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin mx-auto" />
+      </div>
+    );
+  }
+
+  if (alreadyRegistered && !isMemberMode) {
+    return (
+      <div className="bg-emerald-500/10 border border-emerald-400/30 rounded-2xl p-8 md:p-12 text-center max-w-lg mx-auto">
+        <h3 className="text-2xl font-semibold mb-3 text-white">
+          Already Registered
+        </h3>
+        <p className="text-white/70">
+          Your registration for {competitionTitle} is already on record.
+        </p>
+      </div>
+    );
+  }
+
+  if (step === "start") {
+    return (
+      <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-8 md:p-10 max-w-2xl mx-auto shadow-2xl text-center">
+        <h3 className="text-2xl md:text-3xl font-bold text-white mb-3">
+          Ready To Register?
+        </h3>
+        <p className="text-white/60 mb-8">
+          We will collect team details first and then open the competition form.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            if (isSolo || isMemberMode) {
+              setStep("form");
+              return;
+            }
+            setTeamDetails((prev) => ({
+              ...prev,
+              selectedTeamSize:
+                prev.selectedTeamSize || String(teamOptions[0] || 1),
+            }));
+            setStep("team");
+          }}
+          className="bg-white text-black px-8 py-3 rounded-full font-semibold hover:bg-gray-200 transition-colors cursor-pointer"
+        >
+          Register Now
+        </button>
+      </div>
+    );
+  }
+
+  if (step === "team") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 md:p-10 max-w-2xl mx-auto shadow-2xl"
+      >
+        <div className="mb-8">
+          <h3 className="text-2xl md:text-3xl font-bold text-white mb-2">
+            Team Details
+          </h3>
+          <p className="text-white/50 text-sm">Step 1 of 2</p>
+        </div>
+
+        <form onSubmit={handleTeamDetailsContinue} className="space-y-6">
+          {!isSolo ? (
+            <div className="flex flex-col space-y-2">
+              <label className="text-xs uppercase tracking-wider text-white/50 font-medium ml-1">
+                Team Name
+              </label>
+              <input
+                required
+                value={teamDetails.teamName}
+                onChange={(event) =>
+                  setTeamDetails((prev) => ({
+                    ...prev,
+                    teamName: event.target.value,
+                  }))
+                }
+                type="text"
+                placeholder="Neutron Crew"
+                className="bg-black border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/20 focus:outline-hidden focus:border-white/40"
+              />
+            </div>
+          ) : null}
+
+          {teamOptions.length > 1 ? (
+            <div className="flex flex-col space-y-2">
+              <label className="text-xs uppercase tracking-wider text-white/50 font-medium ml-1">
+                Team Size
+              </label>
+              <select
+                value={teamDetails.selectedTeamSize || String(teamOptions[0])}
+                onChange={(event) =>
+                  setTeamDetails((prev) => ({
+                    ...prev,
+                    selectedTeamSize: event.target.value,
+                  }))
+                }
+                className="bg-black border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-hidden focus:border-white/40"
+              >
+                {teamOptions.map((size) => (
+                  <option key={size} value={size}>
+                    {size} Members
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+
+          {selectedTeamSize > 1 ? (
+            <div className="flex flex-col space-y-2">
+              <label className="text-xs uppercase tracking-wider text-white/50 font-medium ml-1">
+                Teammate Emails
+              </label>
+              <div className="flex gap-2">
+                <input
+                  value={teamDetails.inviteInput}
+                  onChange={(event) =>
+                    setTeamDetails((prev) => ({
+                      ...prev,
+                      inviteInput: event.target.value,
+                    }))
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      addInviteEmail();
+                    }
+                  }}
+                  type="email"
+                  placeholder="member@example.com"
+                  disabled={teamDetails.inviteEmails.length >= inviteSlots}
+                  className="bg-black border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/20 focus:outline-hidden focus:border-white/40 flex-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                />
+                <button
+                  type="button"
+                  onClick={addInviteEmail}
+                  disabled={teamDetails.inviteEmails.length >= inviteSlots}
+                  className="px-4 py-3 rounded-lg border border-white/20 text-white/80 hover:bg-white/10 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  Add
+                </button>
+              </div>
+              {teamDetails.inviteEmails.length > 0 ? (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {teamDetails.inviteEmails.map((email) => (
+                    <span
+                      key={email}
+                      className="inline-flex items-center gap-2 text-xs bg-white/10 border border-white/20 px-3 py-1.5 rounded-full"
+                    >
+                      {email}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setTeamDetails((prev) => ({
+                            ...prev,
+                            inviteEmails: prev.inviteEmails.filter(
+                              (item) => item !== email,
+                            ),
+                          }))
+                        }
+                        className="text-white/60 hover:text-white"
+                      >
+                        x
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              <p className="text-xs text-white/40">
+                Add up to {inviteSlots} teammate email
+                {inviteSlots > 1 ? "s" : ""}. Invites are sent after
+                registration is created.
+              </p>
+            </div>
+          ) : null}
+
+          {errorMessage ? (
+            <p className="text-sm text-rose-300">{errorMessage}</p>
+          ) : null}
+
+          <button
+            type="submit"
+            className="mt-2 w-full bg-white text-black font-semibold py-4 rounded-xl hover:bg-gray-200 transition-colors duration-300 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            Continue To Competition Form
+          </button>
+        </form>
+      </motion.div>
+    );
+  }
+
+  if (step === "success") {
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className="bg-[#0a0a0a] border border-green-500/30 rounded-2xl p-8 md:p-12 text-center max-w-lg mx-auto"
       >
-        <svg
-          className="w-20 h-20 mx-auto mb-6 text-green-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <h3 className="text-3xl font-bold mb-4 text-white">Registration Complete</h3>
+        <h3 className="text-3xl font-bold mb-4 text-white">
+          Registration Complete
+        </h3>
         <p className="text-white/60 mb-8 font-light">
-          Your team is successfully registered for {competitionTitle}. Briefing documents have been sent.
+          Your registration for {competitionTitle} has been submitted
+          successfully.
         </p>
-        <button
-          onClick={() => {
-            setIsSuccess(false);
-            setFormData({ 
-              college: "", 
-              teamSize: teamOptions[0].toString(), 
-              members: Array(teamOptions[0]).fill({ name: "", email: "", phone: "" }) 
-            });
-          }}
-          className="border border-white/20 text-white px-8 py-3 rounded-full hover:bg-white/5 transition-colors duration-300 cursor-pointer"
-        >
-          Register Another Team
-        </button>
       </motion.div>
     );
   }
+
+  const fields = Array.isArray(formFieldsQuery.data?.fields)
+    ? formFieldsQuery.data.fields
+    : [];
 
   return (
     <motion.div
@@ -164,132 +589,79 @@ export default function CompetitionRegistration({
       className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 md:p-10 max-w-2xl mx-auto shadow-2xl"
     >
       <div className="mb-8">
-        <h3 className="text-2xl md:text-3xl font-bold text-white mb-2">Secure Your Spot</h3>
-        <p className="text-white/50 text-sm">
-          Complete the form below to finalize your registration. All fields are required.
-        </p>
+        <h3 className="text-2xl md:text-3xl font-bold text-white mb-2">
+          Competition Form
+        </h3>
+        {!isMemberMode && <p className="text-white/50 text-sm">Step 2 of 2</p>}
       </div>
 
-      <form onSubmit={handleRegister} className="space-y-8 flex flex-col">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white/5 border border-white/10 rounded-xl p-6 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-1 h-full bg-blue-500/50"></div>
-          
-          <div className="flex flex-col space-y-2">
-            <label className="text-xs uppercase tracking-wider text-white/50 font-medium ml-1">Team Size</label>
-            {teamOptions.length === 1 ? (
-              <div className="bg-black border border-white/10 rounded-lg px-4 py-3 text-white/60">
-                {teamOptions[0] === 1 ? "1 (Solo)" : `${teamOptions[0]} Members`}
-              </div>
-            ) : (
-              <select
-                name="teamSize"
-                value={formData.teamSize}
-                onChange={handleTeamSizeChange}
-                className="bg-black border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-hidden focus:border-white/40 cursor-pointer appearance-none"
-              >
-                {teamOptions.map((opt) => (
-                  <option key={opt} value={opt} className="bg-black text-white">
-                    {opt === 1 ? "1 (Solo)" : `${opt} Members`}
-                  </option>
-                ))}
-              </select>
-            )}
+      <form onSubmit={handleSubmitRegistration} className="space-y-6">
+        {formFieldsQuery.isLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
           </div>
+        ) : fields.length === 0 ? (
+          <p className="text-white/60 text-sm border border-white/10 rounded-lg px-4 py-3">
+            No additional form fields are required for this competition.
+          </p>
+        ) : (
+          fields.map((field: FormField, index: number) => (
+            <div
+              key={String(field._id || field.id || `field-${index}`)}
+              className="flex flex-col space-y-2"
+            >
+              {String(field.type || "text").toLowerCase() !== "checkbox" ? (
+                <label className="text-xs uppercase tracking-wider text-white/50 font-medium ml-1">
+                  {field.label || field.name || `Field ${index + 1}`}
+                  {field.required ? " *" : ""}
+                </label>
+              ) : null}
+              {renderDynamicField(field, index)}
+            </div>
+          ))
+        )}
 
-          <div className="flex flex-col space-y-2">
-            <label className="text-xs uppercase tracking-wider text-white/50 font-medium ml-1">College/University</label>
-            <input
-              required
-              name="college"
-              value={formData.college}
-              onChange={handleGeneralChange}
-              type="text"
-              placeholder="SpaceX Academy"
-              className="bg-black border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/20 focus:outline-hidden focus:border-white/40 focus:bg-white/10 transition-colors"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <AnimatePresence>
-            {formData.members.map((member, index) => (
-              <motion.div 
-                key={index}
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.3, ease: 'easeInOut' }}
-                onAnimationComplete={() => window.dispatchEvent(new Event('resize'))}
-                className="bg-white/5 border border-white/10 rounded-xl p-6 relative overflow-hidden"
-              >
-                <div className="absolute top-0 left-0 w-1 h-full bg-green-500/50"></div>
-                <h4 className="text-sm font-bold text-white mb-4 flex items-center">
-                  <span className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[10px] mr-2 text-white/70">
-                    {index + 1}
-                  </span>
-                  {index === 0 ? "Team Leader Details" : `Member ${index + 1} Details`}
-                </h4>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="flex flex-col space-y-2">
-                    <label className="text-xs uppercase tracking-wider text-white/50 font-medium ml-1">Full Name</label>
-                    <input
-                      required
-                      value={member.name}
-                      onChange={(e) => handleMemberChange(index, "name", e.target.value)}
-                      type="text"
-                      placeholder="Commander Shepard"
-                      className="bg-black border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/20 focus:outline-hidden focus:border-white/40 focus:bg-white/10 transition-colors"
-                    />
-                  </div>
-
-                  <div className="flex flex-col space-y-2">
-                    <label className="text-xs uppercase tracking-wider text-white/50 font-medium ml-1">Email Address</label>
-                    <input
-                      required
-                      value={member.email}
-                      onChange={(e) => handleMemberChange(index, "email", e.target.value)}
-                      type="email"
-                      placeholder="shepard@normandy.com"
-                      className="bg-black border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/20 focus:outline-hidden focus:border-white/40 focus:bg-white/10 transition-colors"
-                    />
-                  </div>
-
-                  <div className="flex flex-col space-y-2 md:col-span-2">
-                    <label className="text-xs uppercase tracking-wider text-white/50 font-medium ml-1">Phone Number</label>
-                    <input
-                      required
-                      value={member.phone}
-                      onChange={(e) => handleMemberChange(index, "phone", e.target.value)}
-                      type="tel"
-                      placeholder="+91 98765 43210"
-                      className="bg-black border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/20 focus:outline-hidden focus:border-white/40 focus:bg-white/10 transition-colors"
-                    />
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
+        {errorMessage ? (
+          <p className="text-sm text-rose-300">{errorMessage}</p>
+        ) : null}
 
         <button
           type="submit"
-          disabled={isSubmitting}
-          className="mt-6 w-full bg-white text-black font-semibold py-4 rounded-xl hover:bg-gray-200 transition-colors duration-300 flex items-center justify-center space-x-2 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
+          disabled={
+            registerSoloMutation.isPending ||
+            registerTeamMutation.isPending ||
+            submitMemberFormMutation.isPending ||
+            sendTeamInviteMutation.isPending
+          }
+          className="mt-2 w-full bg-white text-black font-semibold py-4 rounded-xl hover:bg-gray-200 transition-colors duration-300 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          {isSubmitting ? (
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-              className="w-5 h-5 border-2 border-black border-t-transparent rounded-full"
-            />
-          ) : (
+          {registerSoloMutation.isPending ||
+          registerTeamMutation.isPending ||
+          submitMemberFormMutation.isPending ||
+          sendTeamInviteMutation.isPending ? (
             <>
-              <span>Confirm Registration</span>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+              <svg
+                className="animate-spin w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  opacity="0.25"
+                />
+                <path
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
               </svg>
+              Submitting...
             </>
+          ) : (
+            "Submit Registration"
           )}
         </button>
       </form>
