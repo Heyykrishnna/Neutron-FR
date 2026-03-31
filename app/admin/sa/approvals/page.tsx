@@ -1170,7 +1170,9 @@ export default function RequestsPage() {
                     </Typography>
                   ))}
                 </Box>
-                <Box sx={{ maxHeight: "min(60vh,600px)", overflowY: "auto" }}>
+                <Box 
+                data-lenis-prevent
+                sx={{ maxHeight: "min(60vh,600px)", overflowY: "auto" }}>
                   <RowDivider />
                   {filteredApprovals.length === 0 ? (
                     <EmptyRow message="No approvals found" />
@@ -1333,7 +1335,9 @@ export default function RequestsPage() {
                   ),
                 )}
               </Box>
-              <Box sx={{ maxHeight: "min(60vh,600px)", overflowY: "auto" }}>
+              <Box 
+              data-lenis-prevent
+              sx={{ maxHeight: "min(60vh,600px)", overflowY: "auto" }}>
                 <RowDivider />
                 {lockRequests.length === 0 ? (
                   <EmptyRow message="No pending score lock requests" />

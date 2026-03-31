@@ -296,6 +296,7 @@ export function Sidebar({ user, onLogout, mobileOpen, onMobileClose }: any) {
 
       {/* ── Nav ── */}
       <Box
+      data-lenis-prevent
         sx={{
           flex: 1,
           px: 2,

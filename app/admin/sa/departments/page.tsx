@@ -545,6 +545,7 @@ export default function DepartmentsPage() {
             overflowY: "auto",
             overflowX: "hidden",
           }}
+
         >
           <RowDivider />
 
@@ -839,6 +840,7 @@ export default function DepartmentsPage() {
         </Box>
         {/* DH checklist */}
         <Box
+        data-lenis-prevent
           sx={{
             maxHeight: 200,
             overflowY: "auto",
@@ -1077,6 +1079,7 @@ export default function DepartmentsPage() {
         </Box>
         {/* Checklist */}
         <Box
+        data-lenis-prevent
           sx={{
             maxHeight: 280,
             overflowY: "auto",
@@ -1084,6 +1087,7 @@ export default function DepartmentsPage() {
             borderRadius: "10px",
           }}
         >
+          
           {isVolunteersLoading || isDepartmentDetailsLoading ? (
             <Box sx={{ py: 4, textAlign: "center" }}>
               <Typography
@@ -1268,6 +1272,7 @@ export default function DepartmentsPage() {
           </Typography>
         ) : (
           <Box
+          data-lenis-prevent
             sx={{
               maxHeight: 360,
               overflowY: "auto",

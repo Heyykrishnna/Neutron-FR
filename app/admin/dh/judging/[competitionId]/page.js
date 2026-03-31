@@ -373,6 +373,7 @@ function CreateRoundDialog({
 
           {/* Teams list */}
           <Box
+          data-lenis-prevent
             sx={{
               maxHeight: 300,
               overflowY: "auto",

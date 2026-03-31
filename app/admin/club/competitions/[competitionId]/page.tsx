@@ -732,7 +732,9 @@ function ProposalModal({ open, onClose, competition }: ProposalModalProps) {
       </Box>
 
       {/* Scrollable form body */}
-      <Box sx={{ px: 3, py: 2.5, overflowY: "auto", flex: 1 }}>
+      <Box 
+      data-lenis-prevent
+      sx={{ px: 3, py: 2.5, overflowY: "auto", flex: 1 }}>
         <Box
           sx={{
             p: 1.5, mb: 3, borderRadius: "8px",

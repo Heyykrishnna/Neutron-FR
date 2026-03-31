@@ -911,6 +911,7 @@ export default function SettingsPage() {
           }}
         >
           <Box
+          data-lenis-prevent
             sx={{
               p: 2,
               borderRadius: "10px",

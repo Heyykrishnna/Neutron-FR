@@ -762,7 +762,9 @@ export default function CompetitionFormModal({
         onSubmit={(e) => e.preventDefault()}
         sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}
       >
-        <Box sx={{ px: 4, py: 3, flex: 1, minHeight: 0, overflowY: "auto" }}>
+        <Box 
+        data-lenis-prevent
+        sx={{ px: 4, py: 3, flex: 1, minHeight: 0, overflowY: "auto" }}>
           {/* Error banner */}
           <StepErrorBanner messages={currentStepErrors} />
 

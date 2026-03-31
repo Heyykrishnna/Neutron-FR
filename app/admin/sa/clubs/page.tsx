@@ -928,6 +928,7 @@ export default function ClubsPage() {
 
         {/* Checklist */}
         <Box
+        data-lenis-prevent
           sx={{
             maxHeight: 280,
             overflowY: "auto",
@@ -1141,6 +1142,7 @@ export default function ClubsPage() {
           </Typography>
         ) : (
           <Box
+          data-lenis-prevent
             sx={{
               maxHeight: 360,
               overflowY: "auto",

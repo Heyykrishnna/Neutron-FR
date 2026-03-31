@@ -700,6 +700,7 @@ function ManageDialog({ competition, open, onClose }: any) {
               <LoadingState message="Loading…" />
             ) : (
               <Box
+              data-lenis-prevent
                 sx={{
                   maxHeight: 320,
                   overflowY: "auto",
@@ -942,6 +943,7 @@ function ManageDialog({ competition, open, onClose }: any) {
               <LoadingState message="Loading…" />
             ) : (
               <Box
+              data-lenis-prevent
                 sx={{
                   maxHeight: 320,
                   overflowY: "auto",
@@ -1310,6 +1312,7 @@ function ManageDialog({ competition, open, onClose }: any) {
               <LoadingState message="Loading…" />
             ) : (
               <Box
+              data-lenis-prevent
                 sx={{
                   maxHeight: 320,
                   overflowY: "auto",
@@ -1516,6 +1519,7 @@ function ManageDialog({ competition, open, onClose }: any) {
               <LoadingState message="Loading…" />
             ) : (
               <Box
+              data-lenis-prevent
                 sx={{
                   maxHeight: 320,
                   overflowY: "auto",
@@ -2084,6 +2088,7 @@ export default function CompetitionsPage() {
             ))}
           </Box>
           <Box
+          data-lenis-prevent
             sx={{
               maxHeight: "min(62vh, 620px)",
               overflowY: "auto",

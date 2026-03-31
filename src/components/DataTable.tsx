@@ -91,7 +91,9 @@ export function DataTable({
 
   return (
     <Paper>
-      <TableContainer sx={{ maxHeight: maxTableHeight, overflowY: "auto" }}>
+      <TableContainer
+      data-lenis-prevent
+      sx={{ maxHeight: maxTableHeight, overflowY: "auto" }}>
         <Table stickyHeader>
           <TableHead>
             <TableRow>

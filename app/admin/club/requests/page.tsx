@@ -615,7 +615,9 @@ export default function MyRequestsPage() {
                 </Typography>
               ))}
             </Box>
-            <Box sx={{ maxHeight: "min(60vh,600px)", overflowY: "auto" }}>
+            <Box 
+            data-lenis-prevent
+            sx={{ maxHeight: "min(60vh,600px)", overflowY: "auto" }}>
               <RowDivider />
               {filteredRequests.length === 0 ? (
                 <EmptyRow message="No requests found" />

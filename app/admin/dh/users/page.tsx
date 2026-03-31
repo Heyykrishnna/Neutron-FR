@@ -429,6 +429,7 @@ export default function DHUsersPage() {
         </Box>
 
         <Box
+          data-lenis-prevent
           sx={{
             maxHeight: "min(62vh, 620px)",
             overflowY: "auto",

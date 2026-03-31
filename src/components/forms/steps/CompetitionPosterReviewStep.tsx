@@ -566,7 +566,9 @@ export default function CompetitionPosterReviewStep({
       </Box>
 
       {/* ── Review column ── */}
-      <Box sx={{ overflowY: "auto", maxHeight: 420, pr: 0.5 }}>
+      <Box 
+      data-lenis-prevent
+      sx={{ overflowY: "auto", maxHeight: 420, pr: 0.5 }}>
         <FieldLabel>Review Summary</FieldLabel>
 
         <ReviewSection title="Basic Info">

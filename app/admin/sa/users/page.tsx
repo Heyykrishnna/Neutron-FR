@@ -1261,6 +1261,7 @@ function UsersPageContent() {
             {/* Preview table */}
             {csvParsed.length > 0 && !csvResults && (
               <Box
+              data-lenis-prevent
                 sx={{
                   maxHeight: 180,
                   overflowY: "auto",
@@ -1322,6 +1323,7 @@ function UsersPageContent() {
             {/* Results after sending */}
             {csvResults && (
               <Box
+              data-lenis-prevent
                 sx={{
                   maxHeight: 200,
                   overflowY: "auto",
