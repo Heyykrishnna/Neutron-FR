@@ -29,8 +29,14 @@ export default function SectionWrapper({ competition }: { competition: any }) {
   const opacityVal = useTransform(scrollYProgress, [0.35, 0.45], [1, 0]);
   const dataOpacity = useTransform(scrollYProgress, [0.7, 0.8], [0, 0.5]);
   const dataY = useTransform(scrollYProgress, [0.7, 0.8], [50, 0]);
+  if(!competition){
+    return(
+      <h1>Hello</h1>
+    )
+  }
 
   return (
+    
     <div className="flex flex-col space-y-32">
       <SectionTransition className="relative group/header">
         <div className="absolute -inset-x-24 -top-48 -bottom-24 z-0 pointer-events-none overflow-hidden">

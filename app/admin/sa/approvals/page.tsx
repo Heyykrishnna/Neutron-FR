@@ -1137,8 +1137,10 @@ export default function RequestsPage() {
                   overflow: "hidden",
                   background: "#0c0c0c",
                 }}
+                data-lenis-prevent
               >
                 <Box
+                  data-lenis-prevent
                   sx={{
                     display: "grid",
                     gridTemplateColumns:
@@ -2057,6 +2059,7 @@ export default function RequestsPage() {
                 <Label>Request Data</Label>
                 {competitionRequestPreview ? (
                   <Box
+                  data-lenis-prevent
                     sx={{
                       p: 1.5,
                       borderRadius: "8px",
@@ -2125,6 +2128,7 @@ export default function RequestsPage() {
                       <>
                         <Label>Changed Fields</Label>
                         <Box
+                        data-lenis-prevent
                           sx={{
                             maxHeight: 220,
                             overflow: "auto",
@@ -2266,6 +2270,7 @@ export default function RequestsPage() {
                         {Array.isArray(formRequestPreview.proposed?.fields) &&
                           formRequestPreview.proposed.fields.length > 0 ? (
                           <Box
+                          data-lenis-prevent
                             sx={{
                               maxHeight: 240,
                               overflow: "auto",
@@ -2344,6 +2349,7 @@ export default function RequestsPage() {
                   </Box>
                 ) : (
                   <Box
+                  data-lenis-prevent
                     sx={{
                       p: 1.5,
                       borderRadius: "8px",
