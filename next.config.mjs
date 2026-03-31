@@ -47,6 +47,11 @@ const nextConfig = {
         hostname: 'res.cloudinary.com',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'image.benq.com',
+        pathname: '/**'
+      }
 
     ],
   },

@@ -673,20 +673,96 @@ export default function SpaceLanding() {
         <AnimatePresence>
           {scenePhase === "planets" && runtimeState !== "ready" && (
             <motion.div
-              key={runtimeState}
-              className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              key="space-loader"
+              className="pointer-events-none fixed inset-0 z-30 flex flex-col items-center justify-center overflow-hidden bg-[#030303]"
+              initial={{ opacity: 1 }}
+              exit={{ 
+                opacity: 0,
+                scale: 1.2,
+                filter: "blur(10px)",
+                transition: { duration: 1.2, ease: [0.76, 0, 0.24, 1] } 
+              }}
             >
-              <motion.div
-                className="relative grid place-items-center h-18 w-18"
-                animate={{ scale: runtimeState === "loading" ? [0.94, 1, 0.94] : 1 }}
-                transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <span className="absolute inset-0 rounded-full" style={{ border: "1px solid rgba(180,100,20,0.22)", borderTopColor: runtimeState === "error" ? "rgba(255,100,60,0.95)" : "rgba(255,180,60,0.9)", borderRightColor: runtimeState === "error" ? "rgba(255,140,60,0.9)" : "rgba(200,120,30,0.8)", boxShadow: "0 0 35px rgba(220,140,40,0.22)", animation: "spin-loader 1.1s linear infinite" }} />
-                <span className="absolute h-[0.95rem] w-[0.95rem] rounded-full" style={{ background: "radial-gradient(circle,#fffbe8 0%,#f0c060 55%,#c06010 100%)", boxShadow: "0 0 28px rgba(220,160,40,0.7)" }} />
-              </motion.div>
+              <div className="relative flex flex-col items-center justify-center w-full h-full">
+                <div className="md:hidden flex flex-col items-center justify-center font-black uppercase text-[#EFEFEF] leading-[0.85] -tracking-[0.06em]" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                  {["NEUT", "RON"].map((word, wordIdx) => (
+                    <motion.div 
+                      key={wordIdx}
+                      className="flex overflow-hidden"
+                      initial="hidden"
+                      animate="visible"
+                      variants={{
+                        hidden: {},
+                        visible: { transition: { staggerChildren: 0.1, delayChildren: wordIdx * 0.3 } }
+                      }}
+                    >
+                      {word.split("").map((char, i) => (
+                        <motion.span
+                          key={i}
+                          variants={{
+                            hidden: { y: "150%", rotateX: -60, opacity: 0, filter: "blur(10px)" },
+                            visible: { y: "0%", rotateX: 0, opacity: 1, filter: "blur(0px)", transition: { duration: 1.2, ease: [0.76, 0, 0.24, 1] } }
+                          }}
+                          className="text-[29vw] inline-block"
+                        >
+                          {char}
+                        </motion.span>
+                      ))}
+                    </motion.div>
+                  ))}
+                </div>
+
+                <motion.div 
+                  initial={{ opacity: 0, y: -20, scale: 0.8 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 1, delay: 0.8 }}
+                  className="mb-8 md:mb-12 relative w-16 h-16 md:w-24 md:h-24"
+                >
+                  <Image
+                    src="/neutron.png"
+                    alt="Neutron Logo"
+                    fill
+                    className="object-contain drop-shadow-[0_0_15px_rgba(255,160,40,0.6)]"
+                  />
+                </motion.div>
+
+                <div className="hidden md:flex flex-col items-center justify-center font-black uppercase text-[#EFEFEF] leading-none -tracking-[0.08em]" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                  <motion.div 
+                    className="flex overflow-hidden"
+                    initial="hidden"
+                    animate="visible"
+                    variants={{
+                      hidden: {},
+                      visible: { transition: { staggerChildren: 0.08, delayChildren: 0.2 } }
+                    }}
+                  >
+                    {"NEUTRON".split("").map((char, i) => (
+                      <motion.span
+                        key={i}
+                        variants={{
+                          hidden: { y: "150%", rotateX: -60, opacity: 0, filter: "blur(10px)" },
+                          visible: { y: "0%", rotateX: 0, opacity: 1, filter: "blur(0px)", transition: { duration: 1.2, ease: [0.76, 0, 0.24, 1] } }
+                        }}
+                        className="text-[17vw] inline-block"
+                        style={{ textShadow: "0 0 40px rgba(255,255,255,0.1)" }}
+                      >
+                        {char}
+                      </motion.span>
+                    ))}
+                  </motion.div>
+                </div>
+
+                <motion.div
+                  className="absolute bottom-16 md:bottom-24 w-1/2 md:w-1/4 h-1 bg-white/10 rounded-full overflow-hidden"
+                >
+                  <motion.div 
+                    className="w-full h-full bg-white/80 rounded-full origin-left"
+                    initial={{ scaleX: 0 }}
+                    animate={{ scaleX: 1 }}
+                    transition={{ duration: 4.5, ease: "easeOut", repeat: Infinity }}
+                  />
+                </motion.div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
