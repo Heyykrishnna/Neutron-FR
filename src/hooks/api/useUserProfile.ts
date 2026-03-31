@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import apiClient from "@/lib/axios";
 
 type UserId = string;
@@ -85,5 +85,17 @@ export function useUpdateUserProfile() {
 
       return data?.data;
     },
+  });
+}
+
+export function useMyQRCode(enabled = true) {
+  return useQuery<string>({
+    queryKey: ["qr", "me"],
+    enabled,
+    queryFn: async () => {
+      const { data } = await apiClient.get("/qr/me");
+      return data?.data?.qrCode || "";
+    },
+    staleTime: 5 * 60 * 1000,
   });
 }

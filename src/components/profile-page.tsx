@@ -22,6 +22,7 @@ import {
   ChevronLeft,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import ProfileCard from "./ProfileCard";
 import { useAuthMe } from "@/src/hooks/api/useAuth";
 import {
@@ -30,9 +31,12 @@ import {
   useMyRegistrations,
   usePendingTeamInvites,
 } from "@/src/hooks/api/usePublicRegistration";
-import { useUpdateUserProfile } from "@/src/hooks/api/useUserProfile";
+import {
+  useMyQRCode,
+  useUpdateUserProfile,
+} from "@/src/hooks/api/useUserProfile";
 
-type NavItem = "profile" | "competitions" | "events" | "calendar" | "inbox";
+type NavItem = "profile" | "competitions" | "events" | "inbox";
 
 const DashboardContext = React.createContext<{
   showToast: (msg: string, type?: "success" | "error" | "info") => void;
@@ -1409,17 +1413,11 @@ function CompetitionsPanel({ competitions }: { competitions: EnrolledItem[] }) {
   );
 }
 
-function EventsPanel({
-  setActive,
-  events,
-}: {
-  setActive?: (v: any) => void;
-  events: EnrolledItem[];
-}) {
+function EventsPanel({ events }: { events: EnrolledItem[] }) {
   const { showToast } = useDashboard();
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
-      <div className="lg:col-span-8">
+      <div className="lg:col-span-12">
         <DashboardWidget
           title="Enrolled Events"
           onManage={() =>
@@ -1450,33 +1448,6 @@ function EventsPanel({
                 ))}
               </div>
             )}
-          </div>
-        </DashboardWidget>
-      </div>
-
-      <div className="lg:col-span-4">
-        <DashboardWidget
-          title="Calendar View"
-          onManage={() => showToast("Syncing with Google Calendar...", "info")}
-        >
-          <div
-            className="aspect-square bg-white/3 border border-white/5 rounded-3xl p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-white/5 transition-colors"
-            onClick={() => setActive?.("calendar")}
-          >
-            <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex flex-col items-center justify-center mb-4">
-              <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest font-mono">
-                MAR
-              </p>
-              <p className="text-2xl font-bold text-white uppercase tracking-tighter">
-                30
-              </p>
-            </div>
-            <p className="text-xs font-bold text-white uppercase tracking-widest">
-              No Events Today
-            </p>
-            <p className="text-[10px] text-white/20 mt-2 font-mono uppercase tracking-[0.2em]">
-              Next: Web3 Summit (Apr 4)
-            </p>
           </div>
         </DashboardWidget>
       </div>
@@ -1936,7 +1907,6 @@ function SidebarNav({
     { id: "profile", label: "Profile", icon: User },
     { id: "competitions", label: "Competitions", icon: Award },
     { id: "events", label: "Events", icon: Zap },
-    { id: "calendar", label: "Calendar", icon: Calendar },
     { id: "inbox", label: "Inbox", icon: Mail },
   ];
 
@@ -1978,6 +1948,7 @@ function SidebarNav({
 }
 
 export default function ProfilePage() {
+  const router = useRouter();
   const authMeQuery = useAuthMe();
   const updateProfileMutation = useUpdateUserProfile();
   const myRegistrationsQuery = useMyRegistrations(Boolean(authMeQuery.data));
@@ -2072,6 +2043,23 @@ export default function ProfilePage() {
 
   const [expandedID, setExpandedID] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any | null>(null);
+
+  const isPersonalDataComplete = Boolean(
+    (profile.name || profile.email) &&
+    profile.gender &&
+    (profile.city || profile.state),
+  );
+  const isIdentityComplete = Boolean(
+    isPersonalDataComplete &&
+    profile.college &&
+    profile.year &&
+    profile.email &&
+    profile.whatsapp &&
+    profile.collegeIdPic &&
+    profile.govtIdPic,
+  );
+  const myQRCodeQuery = useMyQRCode(expandedID && isIdentityComplete);
+  const shouldFlipToQR = isIdentityComplete && Boolean(myQRCodeQuery.data);
 
   const registrations = Array.isArray(myRegistrationsQuery.data)
     ? myRegistrationsQuery.data
@@ -2188,21 +2176,62 @@ export default function ProfilePage() {
                 transition={{ type: "spring", damping: 20 }}
                 className="relative z-10 w-full max-w-md perspective-2000"
               >
-                <ProfileCard
-                  name={profile.name}
-                  title={profile.college}
-                  handle={(profile.email || "").split("@")[0] || ""}
-                  status={profile.year}
-                  contactText="DOWNLOAD ID"
-                  avatarUrl="/images/bg.jpeg"
-                  showUserInfo={false}
-                  enableTilt={true}
-                  enableMobileTilt={true}
-                  behindGlowColor="rgba(125, 190, 255, 0.6)"
-                  iconUrl="https://static.vecteezy.com/system/resources/thumbnails/010/332/153/small_2x/code-flat-color-outline-icon-free-png.png"
-                  behindGlowEnabled
-                  innerGradient="linear-gradient(145deg,#2e106520 0%,#1e3a8a40 100%)"
-                />
+                <motion.div
+                  animate={{ rotateY: shouldFlipToQR ? 180 : 0 }}
+                  transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                  style={{ transformStyle: "preserve-3d" }}
+                  className="relative w-full"
+                >
+                  <div style={{ backfaceVisibility: "hidden" }}>
+                    <ProfileCard
+                      name={profile.name}
+                      title={profile.college}
+                      handle={(profile.email || "").split("@")[0] || ""}
+                      status={profile.year}
+                      contactText={
+                        isIdentityComplete
+                          ? "SCANNABLE ID READY"
+                          : "DOWNLOAD ID"
+                      }
+                      avatarUrl="/images/bg.jpeg"
+                      showUserInfo={false}
+                      enableTilt={true}
+                      enableMobileTilt={true}
+                      behindGlowColor="rgba(125, 190, 255, 0.6)"
+                      iconUrl="https://static.vecteezy.com/system/resources/thumbnails/010/332/153/small_2x/code-flat-color-outline-icon-free-png.png"
+                      behindGlowEnabled
+                      innerGradient="linear-gradient(145deg,#2e106520 0%,#1e3a8a40 100%)"
+                    />
+                  </div>
+
+                  <div
+                    style={{
+                      backfaceVisibility: "hidden",
+                      transform: "rotateY(180deg)",
+                    }}
+                    className="absolute inset-0 rounded-[30px] border border-white/10 bg-[#0a0a0a] p-6 flex flex-col items-center justify-center"
+                  >
+                    <p className="text-[10px] uppercase tracking-widest text-white/40 font-mono mb-4">
+                      Entry QR
+                    </p>
+                    {myQRCodeQuery.data ? (
+                      <img
+                        src={myQRCodeQuery.data}
+                        alt="Identity QR"
+                        className="w-44 h-44 rounded-xl bg-white p-2"
+                      />
+                    ) : (
+                      <div className="w-44 h-44 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+                        <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                      </div>
+                    )}
+                    <p className="text-[10px] text-white/40 mt-4 font-mono uppercase tracking-widest">
+                      {isIdentityComplete
+                        ? "Auto-flips at 100% completion"
+                        : "Complete profile to unlock QR"}
+                    </p>
+                  </div>
+                </motion.div>
                 <button
                   onClick={() => setExpandedID(false)}
                   className="mt-12 mx-auto flex items-center gap-2 text-[10px] font-bold text-white/20 hover:text-rose-400 uppercase tracking-widest transition-all group"
@@ -2416,30 +2445,40 @@ export default function ProfilePage() {
                   {active === "competitions" && (
                     <CompetitionsPanel competitions={competitionItems} />
                   )}
-                  {active === "events" && (
-                    <EventsPanel setActive={setActive} events={eventItems} />
-                  )}
-                  {active === "calendar" && (
-                    <CalendarPanel
-                      competitions={competitionItems}
-                      events={eventItems}
-                    />
-                  )}
+                  {active === "events" && <EventsPanel events={eventItems} />}
                   {active === "inbox" && (
                     <InboxPanel
                       invites={inboxInvites}
-                      onAccept={(inviteToken) => {
-                        acceptInviteMutation.mutate(
-                          { inviteToken },
-                          {
-                            onSuccess: () =>
-                              showToast("Invite accepted.", "success"),
-                            onError: () =>
-                              showToast("Failed to accept invite.", "error"),
-                          },
-                        );
+                      onAccept={async (inviteToken) => {
+                        if (!inviteToken) {
+                          showToast("Invalid invite token.", "error");
+                          return;
+                        }
+
+                        try {
+                          const data = await acceptInviteMutation.mutateAsync({
+                            inviteToken,
+                          });
+                          const competitionId = data?.competition?.id;
+                          const teamId = data?.team?.id;
+
+                          showToast("Invite accepted.", "success");
+
+                          if (competitionId && teamId) {
+                            router.push(
+                              `/competitions/${competitionId}/register?mode=member&teamId=${teamId}`,
+                            );
+                          }
+                        } catch {
+                          showToast("Failed to accept invite.", "error");
+                        }
                       }}
                       onDecline={(inviteToken) => {
+                        if (!inviteToken) {
+                          showToast("Invalid invite token.", "error");
+                          return;
+                        }
+
                         declineInviteMutation.mutate(
                           { inviteToken },
                           {
