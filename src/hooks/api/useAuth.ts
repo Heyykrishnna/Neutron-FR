@@ -40,8 +40,8 @@ export function useAuthMe() {
   return useQuery<User>({
     queryKey: queryKeys.auth.me(),
     queryFn: async () => {
-      const { data } = await apiClient.get<User>("/auth/me");
-      return data;
+      const { data } = await apiClient.get<any>("/auth/me");
+      return data?.data?.user || data?.user || data;
     },
     retry: false,
     staleTime: 10 * 60 * 1000, // 10 minutes

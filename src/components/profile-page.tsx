@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Plus,
   Trash2,
   X,
   ChevronRight,
@@ -132,6 +131,15 @@ function formatDisplayDate(value?: string | Date): string {
   });
 }
 
+const GENDER_OPTIONS = ["MALE", "FEMALE", "OTHER"] as const;
+
+function normalizeGender(value: string): string {
+  const normalized = value.trim().toUpperCase();
+  return GENDER_OPTIONS.includes(normalized as (typeof GENDER_OPTIONS)[number])
+    ? normalized
+    : "";
+}
+
 function timeAgo(value?: string | Date): string {
   if (!value) return "";
   const then = new Date(value).getTime();
@@ -205,6 +213,7 @@ function EditableRow({
   onChange,
   locked = false,
   type = "text",
+  options,
   placeholder = "",
 }: {
   label: string;
@@ -212,6 +221,7 @@ function EditableRow({
   onChange: (v: string) => void;
   locked?: boolean;
   type?: string;
+  options?: string[];
   placeholder?: string;
 }) {
   const [editing, setEditing] = useState(false);
@@ -231,17 +241,36 @@ function EditableRow({
       <div className="flex-1 flex items-center justify-end gap-3 text-right">
         {editing ? (
           <div className="flex items-center gap-2 w-full max-w-[240px]">
-            <input
-              type={type}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") save();
-                if (e.key === "Escape") setEditing(false);
-              }}
-              autoFocus
-              className="w-full bg-white/5 border border-white/20 rounded-md px-3 py-1.5 text-xs text-white outline-none focus:border-white/40 transition-all font-mono"
-            />
+            {options?.length ? (
+              <select
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setEditing(false);
+                }}
+                autoFocus
+                className="w-full bg-white/5 border border-white/20 rounded-md px-3 py-1.5 text-xs text-white outline-none focus:border-white/40 transition-all font-mono"
+              >
+                {!draft && <option value="">Select</option>}
+                {options.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type={type}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") save();
+                  if (e.key === "Escape") setEditing(false);
+                }}
+                autoFocus
+                className="w-full bg-white/5 border border-white/20 rounded-md px-3 py-1.5 text-xs text-white outline-none focus:border-white/40 transition-all font-mono"
+              />
+            )}
             <button
               onClick={save}
               className="text-emerald-400 hover:text-emerald-300 transition-colors"
@@ -406,33 +435,64 @@ function DocumentCard({
   type,
   date,
   onUpload,
+  existingUrl,
+  file,
+  setFile,
 }: {
   label: string;
   type: string;
   date: string;
-  onUpload: (name: string) => void;
+  onUpload: (file: File) => void;
+  existingUrl?: string;
+  file?: File | null;
+  setFile?: (file: File | null) => void;
 }) {
   const { showToast } = useDashboard();
-  const [file, setFile] = useState<File | null>(null);
+  const [localFile, setLocalFile] = useState<File | null>(file || null);
+  const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
+  const [existingPreviewFailed, setExistingPreviewFailed] =
+    useState<boolean>(false);
   const [uploading, setUploading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const hasExistingFile = Boolean(existingUrl && !localFile);
+  const existingFileName = existingUrl
+    ? decodeURIComponent(existingUrl.split("/").pop() || label)
+    : label;
+  const isImageFile = Boolean(localFile?.type?.startsWith("image/"));
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    setExistingPreviewFailed(false);
+  }, [existingUrl]);
+
+  useEffect(() => {
+    if (!localFile || !isImageFile) {
+      setLocalPreviewUrl(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(localFile);
+    setLocalPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [localFile, isImageFile]);
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
 
     setUploading(true);
-    setTimeout(() => {
-      setFile(f);
+    try {
+      await onUpload(f);
+      setLocalFile(f);
+    } catch {
+      showToast("Failed to upload file.", "error");
+    } finally {
       setUploading(false);
-      onUpload(f.name);
-    }, 1500);
+    }
   };
 
   return (
     <div
-      className={`bg-white/2 border border-white/8 rounded-2xl p-4 flex flex-col gap-3 group/doc hover:border-white/20 hover:bg-white/5 transition-all duration-300 relative ${file ? "border-emerald-500/20" : ""}`}
+      className={`bg-white/2 border border-white/8 rounded-2xl p-4 flex flex-col gap-3 group/doc hover:border-white/20 hover:bg-white/5 transition-all duration-300 relative ${localFile ? "border-emerald-500/20" : ""}`}
     >
       <input
         ref={inputRef}
@@ -452,13 +512,37 @@ function DocumentCard({
                 Uploading...
               </p>
             </div>
-          ) : file ? (
-            <div className="w-full h-full bg-linear-to-br from-emerald-500/10 to-teal-500/10 flex flex-col items-center justify-center p-4 text-center">
-              <CheckCircle2 size={24} className="text-emerald-400 mb-2" />
-              <p className="text-[8px] text-white/50 truncate w-full font-mono">
-                {file.name}
-              </p>
-            </div>
+          ) : localFile ? (
+            isImageFile && localPreviewUrl ? (
+              <img
+                src={localPreviewUrl}
+                alt={`${label} preview`}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-linear-to-br from-emerald-500/10 to-teal-500/10 flex flex-col items-center justify-center p-4 text-center">
+                <CheckCircle2 size={24} className="text-emerald-400 mb-2" />
+                <p className="text-[8px] text-white/50 truncate w-full font-mono">
+                  {localFile.name}
+                </p>
+              </div>
+            )
+          ) : hasExistingFile ? (
+            !existingPreviewFailed ? (
+              <img
+                src={existingUrl}
+                alt={`${label} preview`}
+                className="w-full h-full object-cover"
+                onError={() => setExistingPreviewFailed(true)}
+              />
+            ) : (
+              <div className="w-full h-full bg-linear-to-br from-blue-500/10 to-cyan-500/10 flex flex-col items-center justify-center p-4 text-center">
+                <CheckCircle2 size={24} className="text-blue-400 mb-2" />
+                <p className="text-[8px] text-white/50 truncate w-full font-mono">
+                  {existingFileName}
+                </p>
+              </div>
+            )
           ) : (
             <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover/doc:bg-white/10 transition-all">
               <Upload
@@ -515,7 +599,7 @@ function DocumentCard({
                         label: "Delete",
                         icon: Trash2,
                         action: () => {
-                          setFile(null);
+                          setLocalFile(null);
                           showToast("File deleted.");
                         },
                         destructive: true,
@@ -542,10 +626,13 @@ function DocumentCard({
         </div>
         <div className="flex items-center justify-between mt-1">
           <p className="text-[9px] text-white/30 font-mono uppercase tracking-widest leading-none">
-            {file ? (file.size / 1024 / 1024).toFixed(1) + " MB" : type} &bull;{" "}
-            {file ? "Just now" : date}
+            {localFile
+              ? (localFile.size / 1024 / 1024).toFixed(1) + " MB"
+              : type}{" "}
+            &bull;{" "}
+            {localFile ? "Just now" : hasExistingFile ? "Uploaded" : date}
           </p>
-          {file && (
+          {(localFile || hasExistingFile) && (
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
           )}
         </div>
@@ -665,7 +752,7 @@ function TeamModal({
                 >
                   <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 shrink-0">
                     <img
-                      src={member.avatar}
+                      src="/images/bg.jpeg"
                       alt={member.name}
                       className="w-full h-full object-cover"
                     />
@@ -815,7 +902,7 @@ function EnrolledCard({ item, href }: { item: EnrolledItem; href: string }) {
         <div className="flex gap-4 items-center p-4">
           <div
             className="w-14 h-14 rounded-xl shrink-0 bg-cover bg-center"
-            style={{ backgroundImage: `url(${item.image})` }}
+            style={{ backgroundImage: `url(/images/bg.jpeg)` }}
           />
           <div className="flex-1 min-w-0">
             <Link href={href}>
@@ -852,7 +939,7 @@ function EnrolledCard({ item, href }: { item: EnrolledItem; href: string }) {
                       title={m.name}
                     >
                       <img
-                        src={m.avatar}
+                        src="/images/bg.jpeg"
                         alt={m.name}
                         className="w-full h-full object-cover"
                       />
@@ -912,7 +999,7 @@ function MemberProfileModal({
           <div className="relative group">
             <div className="w-24 h-24 rounded-3xl overflow-hidden border-2 border-white/10 mb-6 shadow-2xl transition-transform group-hover:scale-105 duration-500">
               <img
-                src={member.avatar}
+                src="/images/bg.jpeg"
                 alt={member.name}
                 className="w-full h-full object-cover"
               />
@@ -972,6 +1059,9 @@ function ProfilePanel({
   set,
   onViewMember,
   teamMembers,
+  userId,
+  updateProfileMutation,
+  setProfile,
 }: {
   profile: ProfileState;
   set: (key: keyof ProfileState) => (val: string) => void;
@@ -983,16 +1073,45 @@ function ProfilePanel({
     avatar: string;
     isMe?: boolean;
   }>;
+  userId: string;
+  updateProfileMutation: any;
+  setProfile: (
+    p: ProfileState | ((prev: ProfileState) => ProfileState),
+  ) => void;
 }) {
   const { showToast, setExpandedID } = useDashboard();
 
+  const isPersonalDataComplete = Boolean(
+    (profile.name || profile.email) &&
+    profile.gender &&
+    (profile.city || profile.state),
+  );
+
+  const uploadFile =
+    (field: "collegeIdPic" | "govtIdPic" | "image") => async (file: File) => {
+      if (!userId) return;
+      try {
+        await updateProfileMutation.mutateAsync({
+          userId,
+          [field]: file,
+        });
+        setProfile((p: ProfileState) => ({
+          ...p,
+          [field]: URL.createObjectURL(file),
+        }));
+        showToast(`${field} uploaded successfully.`, "success");
+      } catch {
+        showToast(`Failed to upload ${field}.`, "error");
+      }
+    };
+
   const completedCount = [
-    Boolean(profile.name && profile.gender && profile.city && profile.state),
+    isPersonalDataComplete,
     Boolean(profile.college && profile.year),
     Boolean(profile.email),
     Boolean(profile.whatsapp),
-    Boolean(profile.govtIdPic),
     Boolean(profile.collegeIdPic),
+    Boolean(profile.govtIdPic),
   ].filter(Boolean).length;
   const totalChecks = 6;
   const score = Math.round((completedCount / totalChecks) * 100);
@@ -1018,20 +1137,29 @@ function ProfilePanel({
               locked
             />
             <EditableRow
-              label="Date of birth"
-              value="March 15th, 2004"
-              onChange={() => showToast("DOB updated successfully.")}
-            />
-            <EditableRow
               label="Gender"
               value={profile.gender}
               onChange={set("gender")}
+              options={["MALE", "FEMALE", "OTHER"]}
+              placeholder="Select gender"
             />
             <EditableRow
               label="Phone"
               value={profile.whatsapp}
               onChange={set("whatsapp")}
               placeholder="+91 XXXXX XXXXX"
+            />
+            <EditableRow
+              label="College"
+              value={profile.college}
+              onChange={set("college")}
+              placeholder="Your college"
+            />
+            <EditableRow
+              label="Year of study"
+              value={profile.year}
+              onChange={set("year")}
+              placeholder="e.g. 3rd Year"
             />
             <EditableRow
               label="Email"
@@ -1042,7 +1170,37 @@ function ProfilePanel({
             <EditableRow
               label="Address"
               value={`${profile.city}${profile.city && profile.state ? ", " : ""}${profile.state}`}
-              onChange={() => {}}
+              onChange={async (value: string) => {
+                const [cityPart, ...rest] = value
+                  .split(",")
+                  .map((s) => s.trim());
+                const city = cityPart || "";
+                const state = rest.join(", ") || "";
+
+                if (profile.city === city && profile.state === state) return;
+
+                const previousCity = profile.city;
+                const previousState = profile.state;
+                setProfile((p) => ({ ...p, city, state }));
+
+                if (!userId) return;
+
+                try {
+                  await updateProfileMutation.mutateAsync({
+                    userId,
+                    city,
+                    state,
+                  });
+                  showToast("Profile updated successfully.", "success");
+                } catch {
+                  setProfile((p) => ({
+                    ...p,
+                    city: previousCity,
+                    state: previousState,
+                  }));
+                  showToast("Failed to update profile.", "error");
+                }
+              }}
             />
           </div>
         </DashboardWidget>
@@ -1063,33 +1221,16 @@ function ProfilePanel({
               label="College ID"
               type="Card"
               date="Mar 2026"
-              onUpload={(name) => showToast(`College ID "${name}" uploaded.`)}
+              onUpload={uploadFile("collegeIdPic")}
+              existingUrl={profile.collegeIdPic}
             />
             <DocumentCard
               label="Aadhaar"
               type="Card"
               date="Mar 2026"
-              onUpload={(name) => showToast(`Aadhaar "${name}" uploaded.`)}
+              onUpload={uploadFile("govtIdPic")}
+              existingUrl={profile.govtIdPic}
             />
-            <DocumentCard
-              label="Certificate"
-              type="PDF"
-              date="Feb 2026"
-              onUpload={(name) => showToast(`Certificate "${name}" uploaded.`)}
-            />
-            <div
-              onClick={() =>
-                showToast(
-                  "Additional slots will be available after verification.",
-                  "info",
-                )
-              }
-              className="border-2 border-dashed border-white/5 rounded-2xl flex items-center justify-center aspect-video group cursor-pointer hover:border-white/10 transition-all"
-            >
-              <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/20 group-hover:text-white/40 transition-all">
-                <Plus size={14} />
-              </div>
-            </div>
           </div>
         </DashboardWidget>
       </div>
@@ -1112,7 +1253,7 @@ function ProfilePanel({
               handle={(profile.email || "").split("@")[0] || ""}
               status={profile.year}
               contactText="VIEW FULL ID"
-              avatarUrl={profile.image || ""}
+              avatarUrl="/images/bg.jpeg"
               showUserInfo={false}
               enableTilt={true}
               enableMobileTilt={false}
@@ -1140,7 +1281,7 @@ function ProfilePanel({
                 onClick={() => onViewMember(member)}
               >
                 <img
-                  src={member.avatar}
+                  src="/images/bg.jpeg"
                   alt={member.name}
                   className="w-10 h-10 rounded-xl object-cover border border-white/10"
                 />
@@ -1175,12 +1316,7 @@ function ProfilePanel({
             {[
               {
                 label: "Personal data",
-                done: Boolean(
-                  profile.name &&
-                  profile.gender &&
-                  profile.city &&
-                  profile.state,
-                ),
+                done: isPersonalDataComplete,
               },
               {
                 label: "Education",
@@ -1188,8 +1324,8 @@ function ProfilePanel({
               },
               { label: "Email address", done: Boolean(profile.email) },
               { label: "Phone number", done: Boolean(profile.whatsapp) },
-              { label: "Government ID", done: Boolean(profile.govtIdPic) },
               { label: "College ID", done: Boolean(profile.collegeIdPic) },
+              { label: "Government ID", done: Boolean(profile.govtIdPic) },
             ].map((item) => (
               <div
                 key={item.label}
@@ -1235,7 +1371,7 @@ function CompetitionsPanel({ competitions }: { competitions: EnrolledItem[] }) {
   const { showToast } = useDashboard();
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
-      <div className="lg:col-span-8">
+      <div className="lg:col-span-12">
         <DashboardWidget
           title="My Competitions"
           onManage={() =>
@@ -1266,46 +1402,6 @@ function CompetitionsPanel({ competitions }: { competitions: EnrolledItem[] }) {
                 ))}
               </div>
             )}
-          </div>
-        </DashboardWidget>
-      </div>
-
-      <div className="lg:col-span-4">
-        <DashboardWidget
-          title="Stats & Filters"
-          onManage={() =>
-            showToast("Custom analytics views are being built.", "info")
-          }
-        >
-          <div className="space-y-4">
-            {[
-              { label: "Active", value: "3", color: "emerald-400" },
-              { label: "Completed", value: "2", color: "blue-400" },
-              { label: "Rank", value: "Top 1%", color: "amber-400" },
-            ].map((stat) => (
-              <div
-                key={stat.label}
-                className="bg-white/3 border border-white/5 rounded-2xl p-4 flex items-center justify-between group cursor-pointer active:bg-white/5 transition-colors"
-                onClick={() =>
-                  showToast(
-                    `Detailed stats for ${stat.label} coming soon.`,
-                    "info",
-                  )
-                }
-              >
-                <div>
-                  <p className="text-[10px] uppercase font-bold text-white/20 tracking-widest font-mono">
-                    {stat.label}
-                  </p>
-                  <p className="text-xl font-bold text-white mt-1">
-                    {stat.value}
-                  </p>
-                </div>
-                <div
-                  className={`w-1.5 h-6 rounded-full bg-${stat.color} opacity-40 shadow-[0_0_12px_rgba(255,255,255,0.1)] group-hover:opacity-100 transition-opacity`}
-                ></div>
-              </div>
-            ))}
           </div>
         </DashboardWidget>
       </div>
@@ -1607,7 +1703,7 @@ function CalendarPanel({
                                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 relative z-10">
                                     <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl overflow-hidden border border-white/10 shrink-0 group-hover/card:scale-105 transition-transform duration-500">
                                       <img
-                                        src={item.image}
+                                        src="/images/bg.jpeg"
                                         alt={item.title}
                                         className="w-full h-full object-cover"
                                       />
@@ -1778,7 +1874,7 @@ function InboxPanel({
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-2xl overflow-hidden shrink-0 border border-white/10">
                     <img
-                      src={inv.avatar || ""}
+                      src="/images/bg.jpeg"
                       alt={inv.user}
                       className="w-full h-full object-cover"
                     />
@@ -1907,7 +2003,9 @@ export default function ProfilePage() {
 
   const [profile, setProfile] = useState<ProfileState>(EMPTY_PROFILE);
 
-  const authUser = authMeQuery.data as Record<string, any> | undefined;
+  const authUser = ((authMeQuery.data as any)?.data?.user ||
+    (authMeQuery.data as any)?.user ||
+    authMeQuery.data) as Record<string, any> | undefined;
   const userId = (authUser?.id || authUser?._id || "") as string;
 
   useEffect(() => {
@@ -1930,28 +2028,44 @@ export default function ProfilePage() {
   }, [authUser]);
 
   const set = (key: keyof ProfileState) => async (val: string) => {
-    setProfile((p) => ({ ...p, [key]: val }));
+    let normalized =
+      key === "gender" ? normalizeGender(val ?? "") : (val ?? "").trim();
+
+    if (key === "whatsapp") {
+      const digitsOnly = normalized.replace(/\D/g, "");
+      if (digitsOnly.length < 10 || digitsOnly.length > 15) {
+        showToast("Phone number must be between 10 and 15 digits.", "error");
+        return;
+      }
+    }
+
+    if (profile[key] === normalized) return;
+
+    const previous = profile[key];
+    setProfile((p) => ({ ...p, [key]: normalized }));
 
     if (!userId) return;
 
     const payloadByField: Partial<
       Record<keyof ProfileState, Record<string, string>>
     > = {
-      city: { city: val },
-      state: { state: val },
-      college: { collegeName: val },
-      gender: { gender: val },
-      whatsapp: { whatsappNumber: val },
-      year: { yearOfStudy: val },
+      city: { city: normalized },
+      state: { state: normalized },
+      college: { collegeName: normalized },
+      gender: { gender: normalized },
+      whatsapp: { whatsappNumber: normalized },
+      year: { yearOfStudy: normalized },
     };
 
     const payload = payloadByField[key];
     if (!payload) return;
+    if (key === "gender" && !normalized) return;
 
     try {
       await updateProfileMutation.mutateAsync({ userId, ...payload });
       showToast("Profile updated successfully.", "success");
     } catch {
+      setProfile((p) => ({ ...p, [key]: previous }));
       showToast("Failed to update profile.", "error");
     }
   };
@@ -2080,7 +2194,7 @@ export default function ProfilePage() {
                   handle={(profile.email || "").split("@")[0] || ""}
                   status={profile.year}
                   contactText="DOWNLOAD ID"
-                  avatarUrl={profile.image || ""}
+                  avatarUrl="/images/bg.jpeg"
                   showUserInfo={false}
                   enableTilt={true}
                   enableMobileTilt={true}
@@ -2159,7 +2273,7 @@ export default function ProfilePage() {
           <div className="hidden md:flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg overflow-hidden border border-white/15">
               <img
-                src={profile.image || ""}
+                src="/images/bg.jpeg"
                 alt={profile.name}
                 className="w-full h-full object-cover"
               />
@@ -2217,7 +2331,7 @@ export default function ProfilePage() {
             <div className="flex items-center gap-3 px-3 pb-8 mb-6 border-b border-white/6">
               <div className="w-10 h-10 rounded-2xl overflow-hidden border border-white/10 shrink-0">
                 <img
-                  src={profile.image || ""}
+                  src="/images/bg.jpeg"
                   alt={profile.name}
                   className="w-full h-full object-cover"
                 />
@@ -2294,6 +2408,9 @@ export default function ProfilePage() {
                       set={set}
                       onViewMember={(m) => setSelectedMember(m)}
                       teamMembers={teamMembers}
+                      userId={userId}
+                      updateProfileMutation={updateProfileMutation}
+                      setProfile={setProfile}
                     />
                   )}
                   {active === "competitions" && (
