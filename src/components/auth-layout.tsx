@@ -13,13 +13,21 @@ interface AuthLayoutProps {
 
 export default function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
   return (
-    <div className="min-h-screen w-full flex bg-[#050505] text-white selection:bg-purple-500/30">
+    <div className="min-h-screen w-full flex bg-[#050505] text-white selection:bg-amber-900/30 relative overflow-hidden">
+      {/* Universal Page Frame */}
+      <div className="fixed inset-0 z-50 pointer-events-none">
+        <img 
+          src="https://ik.imagekit.io/yatharth/AUTH_FRAME.png" 
+          alt="Page Frame" 
+          className="w-full h-full object-fill opacity-60"
+        />
+      </div>
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden items-center justify-center p-12">
         <div className="absolute inset-0 z-0">
           <Grainient
-            color1="#ad18f2"
-            color2="#3a0bf4"
-            color3="#07001f"
+            color1="#5d4037"
+            color2="#3e2723"
+            color3="#1a0f0a"
             timeSpeed={0.8}
             colorBalance={0}
             warpStrength={1}
@@ -56,7 +64,7 @@ export default function AuthLayout({ children, title, subtitle }: AuthLayoutProp
               alt="Neutron Logo"
               width={80}
               height={80}
-              className="drop-shadow-[0_0_15px_rgba(168,85,247,0.5)]"
+              className="drop-shadow-[0_0_15px_rgba(189,121,64,0.5)]"
             />
           </div>
           <h1 className="text-4xl font-bold mb-6 tracking-tight bg-clip-text text-transparent bg-linear-to-b from-white to-white/50">
@@ -83,18 +91,20 @@ export default function AuthLayout({ children, title, subtitle }: AuthLayoutProp
         </motion.div>
       </div>
 
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 relative">
-        <div className="absolute inset-0 lg:hidden pointer-events-none overflow-hidden">
-             <div className="absolute top-[-10%] left-[-10%] w-[80%] h-[80%] bg-purple-600/10 blur-[100px] rounded-full" />
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 relative overflow-hidden">
+        <div className="absolute inset-0 lg:hidden pointer-events-none">
+             <div className="absolute top-[-10%] left-[-10%] w-[80%] h-[80%] bg-amber-900/10 blur-[120px] rounded-full" />
         </div>
         
         <motion.div 
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="w-full max-w-md relative z-10"
+          className="w-full max-w-md relative"
         >
-          {children}
+          <div className="relative z-10 p-2 sm:p-2">
+            {children}
+          </div>
         </motion.div>
       </div>
     </div>

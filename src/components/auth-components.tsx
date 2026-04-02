@@ -13,7 +13,7 @@ export const AuthInput = React.forwardRef<HTMLInputElement, AuthInputProps>(
   ({ label, error, icon, ...props }, ref) => {
     return (
       <div className="space-y-2 group">
-        <label className="text-sm font-medium text-white/60 ml-1 transition-colors group-focus-within:text-purple-400">
+        <label className="text-sm font-medium text-white/60 ml-1 transition-colors group-focus-within:text-amber-500/80">
           {label}
         </label>
         <div className="relative">
@@ -24,7 +24,7 @@ export const AuthInput = React.forwardRef<HTMLInputElement, AuthInputProps>(
           )}
           <input
             ref={ref}
-            className={`w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3.5 text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500/50 transition-all ${
+            className={`w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3.5 text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-amber-900/40 focus:border-amber-700/50 transition-all ${
               icon ? "pl-12" : ""
             } ${error ? "border-red-500/50 ring-red-500/20" : ""}`}
             {...props}
@@ -52,7 +52,7 @@ export const AuthButton = ({
 }: AuthButtonProps) => {
   const variants = {
     primary: "bg-white text-black hover:bg-white/90 shadow-[0_0_20px_rgba(255,255,255,0.15)]",
-    secondary: "bg-purple-600 text-white hover:bg-purple-700 shadow-[0_0_20px_rgba(168,85,247,0.2)]",
+    secondary: "bg-[#6f4e37] text-white hover:bg-[#5d4037] shadow-[0_0_20px_rgba(111,78,55,0.2)]",
     outline: "bg-transparent border border-white/10 text-white hover:bg-white/5",
   };
 

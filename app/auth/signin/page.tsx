@@ -195,7 +195,7 @@ function SignInContent() {
                 fill="#EA4335"
               />
             </svg>
-            <span>Sign in with Google</span>
+            <span> Sign in with Google</span>
           </AuthButton>
         </div>
 
@@ -242,7 +242,7 @@ function SignInContent() {
                 setIsResetSent(false);
                 setIsForgotModalOpen(true);
               }}
-              className="text-sm text-purple-400 hover:text-purple-300 transition-colors cursor-pointer"
+              className="text-sm text-amber-500/80 hover:text-amber-400 transition-colors cursor-pointer"
             >
               Forgot password?
             </button>
@@ -261,7 +261,7 @@ function SignInContent() {
           Don't have an account?{" "}
           <Link
             href="/auth/signup"
-            className="text-white font-semibold hover:underline decoration-purple-500 underline-offset-4"
+            className="text-white font-semibold hover:underline decoration-amber-700/50 underline-offset-4"
           >
             Create account
           </Link>
@@ -339,7 +339,7 @@ export default function SignInPage() {
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center bg-[#050505]">
-          <div className="w-8 h-8 border-2 border-purple-500/20 border-t-purple-500 rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-amber-900/20 border-t-amber-700 rounded-full animate-spin" />
         </div>
       }
     >

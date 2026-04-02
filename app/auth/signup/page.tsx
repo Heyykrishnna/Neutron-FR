@@ -90,8 +90,8 @@ function SignUpContent() {
             animate={{ opacity: 1, scale: 1 }}
             className="text-center space-y-8 py-4"
           >
-            <div className="w-20 h-20 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center mx-auto mb-6 relative">
-              <div className="absolute inset-0 bg-purple-500/20 blur-xl rounded-full animate-pulse" />
+            <div className="w-20 h-20 bg-amber-900/20 text-amber-500/80 rounded-full flex items-center justify-center mx-auto mb-6 relative">
+              <div className="absolute inset-0 bg-amber-900/20 blur-xl rounded-full animate-pulse" />
               <svg
                 width="40"
                 height="40"
@@ -146,7 +146,7 @@ function SignUpContent() {
                   disabled={resendMutation.isPending}
                 >
                   Didn't receive the transmission?{" "}
-                  <span className="text-purple-400 font-medium">
+                  <span className="text-amber-500/80 font-medium">
                     Resend link
                   </span>
                 </button>
@@ -269,7 +269,7 @@ function SignUpContent() {
               Already have an account?{" "}
               <Link
                 href="/auth/signin"
-                className="text-white font-semibold hover:underline decoration-purple-500 underline-offset-4"
+                className="text-white font-semibold hover:underline decoration-amber-700/50 underline-offset-4"
               >
                 Log in
               </Link>
@@ -286,7 +286,7 @@ export default function SignUpPage() {
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center bg-[#050505]">
-          <div className="w-8 h-8 border-2 border-purple-500/20 border-t-purple-500 rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-amber-900/20 border-t-amber-700 rounded-full animate-spin" />
         </div>
       }
     >

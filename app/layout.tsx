@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Sora, Geist } from "next/font/google";
+import { Space_Grotesk } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import LoaderWrapper from "@/components/LoaderWrapper";
@@ -8,12 +9,14 @@ import Noise from "@/components/Noise";
 import SmoothScroll from "@/components/smooth-scroll";
 import { AppProviders } from "@/src/providers/AppProviders";
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
-
-const sora = Sora({
+const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
-  weight: ["100", "200", "300", "400", "500", "600", "700", "800"],
-  variable: "--font-sora",
+  variable: "--font-space-grotesk",
+});
+
+const arcSpace = localFont({
+  src: "./fonts/arc-space-font (1)/arc-space.ttf",
+  variable: "--font-arc-space",
 });
 
 export const metadata: Metadata = {
@@ -29,10 +32,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cn("antialiased", sora.variable, "font-sans", geist.variable)}
+      className={cn(
+        "antialiased",
+        spaceGrotesk.variable,
+        arcSpace.variable,
+      )}
     >
       <body
-        className={`${sora.className} bg-[#0d0a08] text-white selection:bg-orange-500/30 overflow-x-hidden`}
+        className={`${spaceGrotesk.className} bg-[#0d0a08] text-white selection:bg-orange-500/30 overflow-x-hidden`}
       >
         <AppProviders>
           <Noise
