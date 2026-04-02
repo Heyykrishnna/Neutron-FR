@@ -1,19 +1,20 @@
 "use client";
 
-import * as THREE from 'three';
 import React, { useRef, useEffect, useState, useMemo } from "react";
-import { motion, useScroll, useTransform, AnimatePresence, useSpring, useMotionValue } from "framer-motion";
+import {
+  motion,
+  useScroll,
+  useTransform,
+  AnimatePresence,
+  useMotionValue,
+  useSpring,
+} from "framer-motion";
+import * as THREE from "three";
 import Link from "next/link";
 import BlurHeading from "./blur-heading";
 import { Filter, CircleDot, ArrowDownUp, ChevronDown } from "lucide-react";
-
-const playSciFiClick = () => {
-  try {
-    const audio = new Audio("https://actions.google.com/sounds/v1/science_fiction/sci_fi_beep.ogg");
-    audio.volume = 0.2;
-    audio.play().catch(() => {});
-  } catch (e) {}
-};
+import { useCompetitions } from "@/hooks/api/useCompetitions";
+import { playSciFiClick } from "./audio-controller";
 
 const ThreeStarsBackground = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -110,10 +111,20 @@ type CardProps = {
   slug: string;
   category: string;
   teamSize: string;
-  status: "open" | "closed" | "cancelled" | "postponed";
+  status: "OPEN" | "CLOSED" | "CANCELLED" | "POSTPONED";
 };
 
-function EventParallaxCard({ title, description, image, heightClass, delay = 0, slug, category, teamSize, status }: CardProps) {
+function ParallaxCard({
+  title,
+  description,
+  image,
+  heightClass,
+  delay = 0,
+  slug,
+  category,
+  teamSize,
+  status,
+}: CardProps) {
   const ref = useRef<HTMLDivElement>(null);
   
   const [isHovered, setIsHovered] = useState(false);
@@ -150,7 +161,11 @@ function EventParallaxCard({ title, description, image, heightClass, delay = 0, 
   };
 
   return (
-    <Link href={`/events/${slug}`} className="block w-full perspective-[1500px]" onClick={handleCardClick}>
+    <Link
+      href={`/events/${slug}`}
+      className="block w-full perspective-[1500px]"
+      onClick={handleCardClick}
+    >
       <motion.div
         ref={ref}
         onMouseMove={handleMouseMove}
@@ -159,7 +174,11 @@ function EventParallaxCard({ title, description, image, heightClass, delay = 0, 
         initial={{ opacity: 0, y: 150, scale: 0.95 }}
         whileInView={{ opacity: 1, y: 0, scale: 1 }}
         viewport={{ once: true, margin: "-100px" }}
-        transition={{ duration: 1.2, delay: delay * 0.1, ease: [0.16, 1, 0.3, 1] }}
+        transition={{
+          duration: 1.2,
+          delay: delay * 0.1,
+          ease: [0.16, 1, 0.3, 1],
+        }}
         style={{
           rotateX,
           rotateY,
@@ -167,26 +186,27 @@ function EventParallaxCard({ title, description, image, heightClass, delay = 0, 
         }}
         className={`relative w-full overflow-hidden group rounded-xl border border-white/5 ${heightClass} shadow-[0_0_30px_rgba(0,0,0,0.8)] will-change-transform`}
       >
+        {/* Glow Element */}
         <motion.div
           className="pointer-events-none absolute inset-0 z-50 mix-blend-screen transition-opacity duration-300"
           style={{
             opacity: isHovered ? 1 : 0,
-            background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(255,255,255,0.18), transparent 40%)`
+            background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(255,255,255,0.18), transparent 40%)`,
           }}
         />
 
         <motion.div
-          className="absolute inset-0 z-0 bg-cover bg-center transition-transform duration-1000 group-hover:scale-110"
+          className="absolute inset-0 z-0 bg-cover bg-center transition-transform duration-1500 group-hover:scale-110"
           style={{
             backgroundImage: `url(${image})`,
             filter: "grayscale(80%) contrast(1.1) brightness(0.6)",
-            transform: "translateZ(-30px)"
+            transform: "translateZ(-30px)",
           }}
         />
 
         <div className="absolute inset-0 z-10 bg-linear-to-t from-black/95 via-black/40 to-transparent transition-opacity duration-500 group-hover:from-black" />
 
-        <div 
+        <div
           className="absolute bottom-0 left-0 right-0 z-20 p-8 md:p-10 flex flex-col items-start transition-all duration-500 group-hover:-translate-y-4"
           style={{ transform: "translateZ(40px)" }}
         >
@@ -206,18 +226,23 @@ function EventParallaxCard({ title, description, image, heightClass, delay = 0, 
             <span className="px-3 py-1.5 rounded-sm bg-white/5 border border-white/10 text-[10px] uppercase tracking-wider text-white/50 font-mono backdrop-blur-md">
               {teamSize}
             </span>
-            <span className={`px-3 py-1.5 rounded-sm border text-[10px] uppercase tracking-wider font-mono backdrop-blur-md ${
-              status === 'open' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
-              status === 'closed' ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' :
-              status === 'postponed' ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' :
-              'bg-white/5 border-white/10 text-white/30'
-            }`}>
+            <span
+              className={`px-3 py-1.5 rounded-sm border text-[10px] uppercase tracking-wider font-mono backdrop-blur-md ${
+                status === "OPEN"
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                  : status === "CLOSED"
+                    ? "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                    : status === "POSTPONED"
+                      ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                      : "bg-white/5 border-white/10 text-white/30"
+              }`}
+            >
               {status}
             </span>
           </div>
         </div>
 
-        <div 
+        <div
           className="absolute top-8 right-8 z-30 p-4 border border-white/10 bg-black/40 backdrop-blur-md text-white rounded-full opacity-0 -translate-y-4 transition-all duration-500 group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-105"
           style={{ transform: "translateZ(50px)" }}
         >
@@ -239,9 +264,27 @@ function EventParallaxCard({ title, description, image, heightClass, delay = 0, 
   );
 }
 
-import { EVENTS_DATA } from "@/lib/events-data";
-
 export default function EventsPage() {
+  const {
+    data: competitions = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useCompetitions();
+
+  // Filter to show only events with eventType: EVENT or WORKSHOP
+  const events = useMemo(
+    () =>
+      competitions.filter(
+        (c) =>
+          ["EVENT", "WORKSHOP"].includes(c?.eventType) ||
+          ["EVENT", "WORKSHOP"].includes(c?.event_type) ||
+          ["EVENT", "WORKSHOP"].includes(c?.type)
+      ),
+    [competitions]
+  );
+
   const { scrollYProgress } = useScroll();
   const bgY = useTransform(scrollYProgress, [0, 1], ["0%", "-10%"]);
 
@@ -255,54 +298,77 @@ export default function EventsPage() {
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+      if (
+        filterRef.current &&
+        !filterRef.current.contains(event.target as Node)
+      ) {
         setActiveDropdown(null);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
+
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const categories = useMemo(() => {
-    const cats = Array.from(new Set(EVENTS_DATA.map(e => e.category)));
+    const cats = Array.from(
+      new Set(
+        events
+          .map((e) => e?.category)
+          .filter((category): category is string => Boolean(category)),
+      ),
+    );
     return ["All Categories", ...cats];
-  }, []);
+  }, [events]);
 
-  const statuses = ["All Status", "open", "closed", "postponed", "cancelled"];
+  const statuses = ["All Status", "OPEN", "CLOSED", "POSTPONED", "CANCELLED"];
   const sortOptions = ["Default", "Title (A-Z)", "Title (Z-A)", "Date (Newest)", "Date (Oldest)"];
 
   const filteredEvents = useMemo(() => {
-    let result = [...EVENTS_DATA];
+    let result = [...events];
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(e => 
-        e.title.toLowerCase().includes(query) || 
-        e.category.toLowerCase().includes(query) ||
-        (e.description && e.description.toLowerCase().includes(query))
+      result = result.filter(
+        (e) =>
+          (e?.title || e?.name || "")
+            .toLowerCase()
+            .includes(query) ||
+          (e?.category || "").toLowerCase().includes(query) ||
+          (e?.description && e.description.toLowerCase().includes(query))
       );
     }
 
     if (selectedCategory !== "All Categories") {
-      result = result.filter(e => e.category === selectedCategory);
+      result = result.filter((e) => e?.category === selectedCategory);
     }
 
     if (selectedStatus !== "All Status") {
-      result = result.filter(e => e.status === selectedStatus);
+      result = result.filter((e) => e?.status === selectedStatus);
     }
 
     if (sortBy === "Title (A-Z)") {
-      result.sort((a, b) => a.title.localeCompare(b.title));
+      result.sort((a, b) =>
+        (a?.title || a?.name || "").localeCompare(b?.title || b?.name || "")
+      );
     } else if (sortBy === "Title (Z-A)") {
-      result.sort((a, b) => b.title.localeCompare(a.title));
+      result.sort((a, b) =>
+        (b?.title || b?.name || "").localeCompare(a?.title || a?.name || "")
+      );
     } else if (sortBy === "Date (Newest)") {
-      result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      result.sort(
+        (a, b) =>
+          new Date(b?.date || 0).getTime() - new Date(a?.date || 0).getTime()
+      );
     } else if (sortBy === "Date (Oldest)") {
-      result.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      result.sort(
+        (a, b) =>
+          new Date(a?.date || 0).getTime() - new Date(b?.date || 0).getTime()
+      );
     }
 
     return result;
-  }, [searchQuery, selectedCategory, selectedStatus, sortBy]);
+  }, [searchQuery, selectedCategory, selectedStatus, sortBy, events]);
 
   const leftColumnEvents = filteredEvents.filter((_, i) => i % 2 === 0);
   const rightColumnEvents = filteredEvents.filter((_, i) => i % 2 !== 0);
@@ -475,9 +541,9 @@ export default function EventsPage() {
                           }`}
                         >
                           <div className={`w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] ${
-                             status === 'open' ? 'bg-emerald-500 text-emerald-500' : 
-                             status === 'closed' ? 'bg-rose-500 text-rose-500' : 
-                             status === 'postponed' ? 'bg-amber-500 text-amber-500' : 'bg-white/20 text-white/20'
+                             status === 'OPEN' ? 'bg-emerald-500 text-emerald-500' : 
+                             status === 'CLOSED' ? 'bg-rose-500 text-rose-500' : 
+                             status === 'POSTPONED' ? 'bg-amber-500 text-amber-500' : 'bg-white/20 text-white/20'
                           }`} />
                           <span className="font-mono text-[10px] uppercase tracking-widest">{status === "All Status" ? "All Status" : status}</span>
                         </button>
@@ -556,34 +622,34 @@ export default function EventsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 lg:gap-16 relative z-10 items-start mt-8 md:mt-0">
           <div className="flex flex-col gap-8 lg:gap-12 w-full">
             {leftColumnEvents.map((event, index) => (
-              <EventParallaxCard
-                key={event.slug}
-                slug={event.slug}
-                title={event.title}
-                description={event.description}
-                image={event.image}
-                heightClass={event.heightClass}
+              <ParallaxCard
+                key={String(event.id || event._id || `event-${index}`)}
+                slug={event?.slug || String(event?.id || event?._id || "")}
+                title={event?.title || event?.name || "Untitled Event"}
+                description={event?.description}
+                image={event?.posterPath || ""}
+                heightClass={event?.heightClass || "h-[600px]"}
                 delay={index}
-                category={event.category}
-                teamSize={event.teamSize}
-                status={event.status}
+                category={event?.category || ""}
+                teamSize={event?.minTeamSize && event?.maxTeamSize ? `${event.minTeamSize}-${event.maxTeamSize} Members` : ""}
+                status={(event?.status || "OPEN").toUpperCase() as "OPEN" | "CLOSED" | "CANCELLED" | "POSTPONED"}
               />
             ))}
           </div>
 
           <div className="flex flex-col gap-8 lg:gap-12 w-full pt-0 md:pt-40 lg:pt-56">
             {rightColumnEvents.map((event, index) => (
-              <EventParallaxCard
-                key={event.slug}
-                slug={event.slug}
-                title={event.title}
-                description={event.description}
-                image={event.image}
-                heightClass={event.heightClass}
+              <ParallaxCard
+                key={String(event.id || event._id || `event-${index}`)}
+                slug={event?.slug || String(event?.id || event?._id || "")}
+                title={event?.title || event?.name || "Untitled Event"}
+                description={event?.description}
+                image={event?.image || ""}
+                heightClass={event?.heightClass || "h-[600px]"}
                 delay={index}
-                category={event.category}
-                teamSize={event.teamSize}
-                status={event.status}
+                category={event?.category || ""}
+                teamSize={event?.minTeamSize && event?.maxTeamSize ? `${event.minTeamSize}-${event.maxTeamSize} Members` : ""}
+                status={(event?.status || "OPEN").toUpperCase() as "OPEN" | "CLOSED" | "CANCELLED" | "POSTPONED"}
               />
             ))}
           </div>
