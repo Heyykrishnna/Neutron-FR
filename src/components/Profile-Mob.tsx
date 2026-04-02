@@ -732,6 +732,12 @@ function TeamModal({
     ? teamDetails.invites.filter((invite: any) => invite?.status === "PENDING")
     : [];
 
+  const rejectedRegistrations = Array.isArray(
+    teamDetails?.rejectedRegistrations,
+  )
+    ? teamDetails.rejectedRegistrations
+    : [];
+
   const occupiedSlots = members.length + pendingInvites.length;
   const canAdd = isTeamLeader && occupiedSlots < maxMembers;
 
@@ -983,6 +989,73 @@ function TeamModal({
                   </p>
                 )}
               </div>
+
+              {rejectedRegistrations.length > 0 ? (
+                <div className="space-y-4 pt-4 border-t border-rose-500/20">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-[10px] uppercase tracking-[0.2em] font-bold text-rose-300 font-mono">
+                      Rejected Members
+                    </h3>
+                    <span className="text-[9px] uppercase tracking-widest font-mono text-rose-300">
+                      Needs review
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {rejectedRegistrations.map((entry: any) => {
+                      const rejectedUser = entry?.user || {};
+                      const reason =
+                        entry?.registration?.rejectionReason ||
+                        "Registration was rejected.";
+                      const memberId = String(rejectedUser?.id || "");
+
+                      return (
+                        <div
+                          key={entry?.registration?.id || memberId}
+                          className="flex items-center justify-between p-3 rounded-xl border border-rose-500/30 bg-rose-500/10"
+                        >
+                          <div className="min-w-0 pr-4">
+                            <p className="text-sm font-semibold text-white truncate">
+                              {rejectedUser?.name ||
+                                rejectedUser?.email ||
+                                "Rejected user"}
+                            </p>
+                            <p className="text-[10px] text-rose-200/70 uppercase tracking-widest font-mono mt-0.5 truncate">
+                              {reason}
+                            </p>
+                          </div>
+                          {isTeamLeader && memberId ? (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!teamId) return;
+                                try {
+                                  await removeMemberMutation.mutateAsync({
+                                    teamId,
+                                    memberId,
+                                  });
+                                  showToast(
+                                    "Rejected user removed from team.",
+                                    "info",
+                                  );
+                                  await teamDetailsQuery.refetch();
+                                } catch {
+                                  showToast(
+                                    "Failed to remove rejected user.",
+                                    "error",
+                                  );
+                                }
+                              }}
+                              className="px-3 py-1.5 rounded-lg border border-rose-300/30 text-[10px] font-mono uppercase tracking-wider text-rose-200 hover:bg-rose-500/15"
+                            >
+                              Remove
+                            </button>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
 
               <div className="space-y-3 pt-4 border-t border-white/5">
                 <h3 className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/20 font-mono">
