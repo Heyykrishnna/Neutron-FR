@@ -65,7 +65,9 @@ function VerifyEmailContent() {
             router.push("/auth/signin");
           }, 2000);
         } else {
-          setVerificationErrorKind(classifyVerificationError(response.message || ""));
+          setVerificationErrorKind(
+            classifyVerificationError(response.message || ""),
+          );
           setVerificationError(
             response.message || "Verification failed. Please try again.",
           );
@@ -86,9 +88,9 @@ function VerifyEmailContent() {
             router.push("/auth/signin");
           }, 2000);
           return;
-        setVerificationErrorKind(classifyVerificationError(message));
         }
 
+        setVerificationErrorKind(classifyVerificationError(message));
         setVerificationError(message);
       }
     };
@@ -236,12 +238,6 @@ function VerifyEmailContent() {
                   Back to Sign Up
                 </AuthButton>
               )}
-              <button
-                onClick={() => router.push("/auth/signup")}
-                className="text-white/40 hover:text-white text-sm transition-colors cursor-pointer w-full"
-              >
-                Back to Sign Up
-              </button>
             </div>
           </motion.div>
         ) : (
