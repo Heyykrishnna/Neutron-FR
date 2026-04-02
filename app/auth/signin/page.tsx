@@ -15,6 +15,25 @@ const normalizeAuthResponseUser = (payload: any) => {
   return payload;
 };
 
+const safeRedirectTo = (
+  target: string,
+  router: ReturnType<typeof useRouter>,
+) => {
+  if (!target) return;
+
+  if (/^https?:\/\//i.test(target)) {
+    window.location.replace(target);
+    return;
+  }
+
+  if (!target.startsWith("/")) {
+    window.location.replace(`/${target}`);
+    return;
+  }
+
+  router.replace(target);
+};
+
 function SignInContent() {
   const router = useRouter();
   const { login, logout, checkAuth } = useAuth();
@@ -39,7 +58,7 @@ function SignInContent() {
 
   useEffect(() => {
     if (!forceLogin && authMeQuery.data) {
-      router.replace(callbackUrl);
+      safeRedirectTo(callbackUrl, router);
     }
   }, [forceLogin, authMeQuery.data, callbackUrl, router]);
 
@@ -70,10 +89,13 @@ function SignInContent() {
     }
 
     if (authStatus === "success") {
-      checkAuth();
-      authMeQuery.refetch();
+      (async () => {
+        await checkAuth();
+        await authMeQuery.refetch();
+        safeRedirectTo(callbackUrl, router);
+      })();
     }
-  }, [authReason, authStatus, authMeQuery, checkAuth]);
+  }, [authReason, authStatus, authMeQuery, checkAuth, callbackUrl, router]);
 
   const isRequestingReset = requestResetMutation.isPending;
   const submitDisabled = useMemo(
@@ -98,7 +120,7 @@ function SignInContent() {
         throw new Error("Login failed. Please try again.");
       }
 
-      router.replace(callbackUrl);
+      safeRedirectTo(callbackUrl, router);
     } catch (error: any) {
       const message =
         error?.response?.data?.message ||
