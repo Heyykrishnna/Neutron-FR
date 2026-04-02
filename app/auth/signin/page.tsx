@@ -21,16 +21,25 @@ const safeRedirectTo = (
 ) => {
   if (!target) return;
 
+  console.info("[auth/signin] redirect target", { target });
+
   if (/^https?:\/\//i.test(target)) {
+    console.info("[auth/signin] using hard redirect", { target });
     window.location.replace(target);
     return;
   }
 
   if (!target.startsWith("/")) {
+    const normalizedTarget = `/${target}`;
+    console.info("[auth/signin] normalized redirect target", {
+      target,
+      normalizedTarget,
+    });
     window.location.replace(`/${target}`);
     return;
   }
 
+  console.info("[auth/signin] router.replace redirect", { target });
   router.replace(target);
 };
 
@@ -57,7 +66,28 @@ function SignInContent() {
   const requestResetMutation = useRequestPasswordReset();
 
   useEffect(() => {
+    console.info("[auth/signin] page state", {
+      callbackUrl,
+      authStatus,
+      forceLogin,
+      authMeLoading: authMeQuery.isLoading,
+      authMeFetched: authMeQuery.isFetched,
+      hasAuthUser: Boolean(authMeQuery.data),
+    });
+  }, [
+    callbackUrl,
+    authStatus,
+    forceLogin,
+    authMeQuery.isLoading,
+    authMeQuery.isFetched,
+    authMeQuery.data,
+  ]);
+
+  useEffect(() => {
     if (!forceLogin && authMeQuery.data) {
+      console.info("[auth/signin] existing session detected, redirecting", {
+        callbackUrl,
+      });
       safeRedirectTo(callbackUrl, router);
     }
   }, [forceLogin, authMeQuery.data, callbackUrl, router]);
@@ -84,14 +114,35 @@ function SignInContent() {
       const reason = authReason
         ? decodeURIComponent(authReason).replace(/_/g, " ")
         : "Google sign-in failed";
+      console.warn("[auth/signin] auth status failed", {
+        authStatus,
+        authReason,
+        decodedReason: reason,
+        callbackUrl,
+      });
       setLoginError(reason);
       return;
     }
 
     if (authStatus === "success") {
+      console.info("[auth/signin] auth status success, refreshing session", {
+        callbackUrl,
+        forceLogin,
+      });
       (async () => {
-        await checkAuth();
-        await authMeQuery.refetch();
+        try {
+          await checkAuth();
+          const refreshed = await authMeQuery.refetch();
+          console.info("[auth/signin] auth refresh completed", {
+            hasUser: Boolean(refreshed.data),
+            callbackUrl,
+          });
+        } catch (error) {
+          console.error("[auth/signin] auth refresh failed", {
+            error,
+            callbackUrl,
+          });
+        }
         safeRedirectTo(callbackUrl, router);
       })();
     }
@@ -107,6 +158,12 @@ function SignInContent() {
     e.preventDefault();
     setLoginError("");
 
+    console.info("[auth/signin] email login submit", {
+      callbackUrl,
+      email: email.trim().toLowerCase(),
+      forceLogin,
+    });
+
     try {
       setIsSigningIn(true);
 
@@ -116,12 +173,26 @@ function SignInContent() {
       });
       const user = normalizeAuthResponseUser(payload);
 
+      console.info("[auth/signin] email login response", {
+        success: Boolean(user),
+        callbackUrl,
+        userId: user?.id,
+        userRole: user?.role,
+      });
+
       if (!user) {
         throw new Error("Login failed. Please try again.");
       }
 
+      console.info("[auth/signin] redirecting after email login", {
+        callbackUrl,
+      });
       safeRedirectTo(callbackUrl, router);
     } catch (error: any) {
+      console.error("[auth/signin] email login failed", {
+        callbackUrl,
+        error,
+      });
       const message =
         error?.response?.data?.message ||
         error?.message ||
@@ -162,6 +233,13 @@ function SignInContent() {
       : `${normalizedBackendUrl}/api/v1`;
     const signinReturnUrl = `${window.location.origin}/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}${forceLogin ? "&forceLogin=1" : ""}`;
     const redirectUrl = encodeURIComponent(signinReturnUrl);
+
+    console.info("[auth/signin] starting google login", {
+      callbackUrl,
+      forceLogin,
+      oauthBaseUrl,
+      signinReturnUrl,
+    });
 
     window.location.href = `${oauthBaseUrl}/auth/google?redirect=${redirectUrl}`;
   };
