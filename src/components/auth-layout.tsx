@@ -15,7 +15,7 @@ export default function AuthLayout({ children, title, subtitle }: AuthLayoutProp
   return (
     <div className="min-h-screen w-full flex bg-[#050505] text-white selection:bg-amber-900/30 relative overflow-hidden">
       {/* Universal Page Frame */}
-      <div className="fixed inset-0 z-50 pointer-events-none">
+      <div className="fixed inset-0 z-50 pointer-events-none hidden md:block">
         <img 
           src="https://ik.imagekit.io/yatharth/AUTH_FRAME.png" 
           alt="Page Frame" 

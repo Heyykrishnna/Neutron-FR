@@ -239,3 +239,21 @@ export function useVerifyEmail() {
     },
   });
 }
+/**
+ * Reset password with token
+ */
+export function useResetPassword() {
+  return useMutation<
+    { success: boolean; message?: string },
+    Error,
+    { token: string; password: string }
+  >({
+    mutationFn: async ({ token, password }) => {
+      const { data } = await apiClient.post("/auth/password-reset/reset", {
+        token,
+        password,
+      });
+      return data;
+    },
+  });
+}
