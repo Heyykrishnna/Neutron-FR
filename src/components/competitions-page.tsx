@@ -283,7 +283,7 @@ export default function CompetitionsPage() {
               filteredCompetitions.map((comp, idx) => {
                 const competitionId = comp.slug || comp.id || comp._id || String(idx);
                 const title = comp.title || comp.name || "Untitled Mission";
-                const image = comp.bannerPath || comp.bannerMediaPath || comp.image || "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa";
+                const image = comp.posterPath || comp.image || "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa";
                 const date = new Date(comp.startTime || comp.startDate || comp.date || comp.createdAt || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
                 return (
