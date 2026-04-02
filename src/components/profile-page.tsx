@@ -26,6 +26,7 @@ import {
   Zap,
   Award,
   ChevronLeft,
+  Star,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -49,7 +50,12 @@ import {
   useUpdateUserProfile,
 } from "@/src/hooks/api/useUserProfile";
 
-type NavItem = "profile" | "competitions" | "events" | "inbox";
+type NavItem =
+  | "profile"
+  | "competitions"
+  | "events"
+  | "inbox"
+  | "campus-ambassador";
 
 const DashboardContext = React.createContext<{
   showToast: (msg: string, type?: "success" | "error" | "info") => void;
@@ -259,7 +265,7 @@ function EditableRow({
 
       <div className="flex-1 flex items-center justify-end gap-3 text-right">
         {editing ? (
-          <div className="flex items-center gap-2 w-full max-w-[240px]">
+          <div className="flex items-center gap-2 w-full max-w-60">
             {options?.length ? (
               <select
                 value={draft}
@@ -1928,7 +1934,7 @@ function CalendarPanel({
                                 key={item.slug}
                                 className="relative group/item"
                               >
-                                <div className="absolute -left-[37px] md:-left-[53px] top-5 w-4 h-4 rounded-full border-4 border-[#000000] bg-white/10 group-hover/item:bg-emerald-500 group-hover/item:scale-125 transition-all duration-300 z-10 shadow-[0_0_15px_rgba(16,185,129,0)] group-hover/item:shadow-[0_0_15px_rgba(16,185,129,0.5)]"></div>
+                                <div className="absolute -left-9.25 md:-left-13.25 top-5 w-4 h-4 rounded-full border-4 border-[#000000] bg-white/10 group-hover/item:bg-emerald-500 group-hover/item:scale-125 transition-all duration-300 z-10 shadow-[0_0_15px_rgba(16,185,129,0)] group-hover/item:shadow-[0_0_15px_rgba(16,185,129,0.5)]"></div>
 
                                 <div className="bg-white/2 border border-white/8 rounded-3xl p-6 md:p-8 hover:border-white/20 hover:bg-white/4 transition-all duration-500 flex flex-col lg:flex-row lg:items-center justify-between gap-8 group/card overflow-hidden relative">
                                   <div className="absolute inset-0 bg-linear-to-br from-white/2 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity"></div>
@@ -2035,7 +2041,7 @@ function CalendarPanel({
                       return (
                         <div
                           key={`${d.full}-${i}`}
-                          className={`bg-[#030303] min-h-[120px] p-4 border-r border-b border-white/5 group hover:bg-white/2 transition-all relative ${d.day ? "cursor-pointer" : "opacity-10 pointer-events-none"}`}
+                          className={`bg-[#030303] min-h-30 p-4 border-r border-b border-white/5 group hover:bg-white/2 transition-all relative ${d.day ? "cursor-pointer" : "opacity-10 pointer-events-none"}`}
                           onClick={() => hasEvents && setViewMode("schedule")}
                         >
                           <span className="text-sm font-light text-white/20 group-hover:text-white transition-colors">
@@ -2168,6 +2174,7 @@ function SidebarNav({
     { id: "profile", label: "Profile", icon: User },
     { id: "competitions", label: "Competitions", icon: Award },
     { id: "events", label: "Events", icon: Zap },
+    { id: "campus-ambassador", label: "Campus Ambassador", icon: Star },
     { id: "inbox", label: "Inbox", icon: Mail },
   ];
 
@@ -2205,6 +2212,95 @@ function SidebarNav({
         </button>
       ))}
     </nav>
+  );
+}
+
+function CampusAmbassadorPanel({
+  campusAmbassador,
+  profileName,
+}: {
+  campusAmbassador: Record<string, any> | null;
+  profileName: string;
+}) {
+  const [origin, setOrigin] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setOrigin(window.location.origin);
+  }, []);
+
+  const referralCode = String(campusAmbassador?.referralCode || "").trim();
+  const referralLink = referralCode
+    ? `${origin || ""}/?ref=${encodeURIComponent(referralCode)}`
+    : "";
+
+  const copyLink = async () => {
+    if (!referralLink || typeof navigator === "undefined") return;
+    await navigator.clipboard.writeText(referralLink);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <div className="space-y-6">
+      <DashboardWidget title="Campus Ambassador" onManage={() => {}}>
+        {campusAmbassador ? (
+          <div className="space-y-5">
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-white/3 p-4">
+                <p className="text-[10px] uppercase tracking-widest text-white/30 font-mono">
+                  Referral Code
+                </p>
+                <p className="mt-2 text-lg font-bold text-white">
+                  {referralCode || "—"}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/3 p-4">
+                <p className="text-[10px] uppercase tracking-widest text-white/30 font-mono">
+                  Approved Registrations
+                </p>
+                <p className="mt-2 text-lg font-bold text-white">
+                  {campusAmbassador.totalRegistrations || 0}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/3 p-4">
+                <p className="text-[10px] uppercase tracking-widest text-white/30 font-mono">
+                  Ambassador
+                </p>
+                <p className="mt-2 text-lg font-bold text-white">
+                  {profileName || campusAmbassador.name || "User"}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+              <p className="text-[10px] uppercase tracking-widest text-white/30 font-mono">
+                Referral Link
+              </p>
+              <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center">
+                <input
+                  readOnly
+                  value={referralLink}
+                  className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={copyLink}
+                  className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white/70 hover:bg-white/10"
+                >
+                  {copied ? "Copied" : "Copy Link"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-white/10 bg-white/3 p-5 text-sm text-white/60">
+            You are not currently a Campus Ambassador.
+          </div>
+        )}
+      </DashboardWidget>
+    </div>
   );
 }
 
@@ -2363,6 +2459,12 @@ export default function ProfilePage() {
     const normalized = section.toLowerCase();
     if (normalized === "inbox" || normalized === "invites") {
       setActive("inbox");
+    } else if (
+      normalized === "campus-ambassador" ||
+      normalized === "campus ambassador" ||
+      normalized === "ca"
+    ) {
+      setActive("campus-ambassador");
     }
   }, [searchParams]);
 
@@ -2385,6 +2487,10 @@ export default function ProfilePage() {
     (authMeQuery.data as any)?.user ||
     authMeQuery.data) as Record<string, any> | undefined;
   const userId = (authUser?.id || authUser?._id || "") as string;
+  const campusAmbassador = (authUser?.campusAmbassador || null) as Record<
+    string,
+    any
+  > | null;
 
   useEffect(() => {
     if (!authUser) return;
@@ -2625,7 +2731,7 @@ export default function ProfilePage() {
                     )}
                     <p className="text-[10px] text-white/40 mt-4 font-mono uppercase tracking-widest">
                       {isIdentityComplete
-                        ? "Auto-flips at 100% completion"
+                        ? ""
                         : "Complete profile to unlock QR"}
                     </p>
                   </div>
@@ -2868,6 +2974,12 @@ export default function ProfilePage() {
                     />
                   )}
                   {active === "events" && <EventsPanel events={eventItems} />}
+                  {active === "campus-ambassador" && (
+                    <CampusAmbassadorPanel
+                      campusAmbassador={campusAmbassador}
+                      profileName={profile.name}
+                    />
+                  )}
                   {active === "inbox" && (
                     <InboxPanel
                       invites={inboxInvites}

@@ -74,6 +74,7 @@ export default function CompetitionRegistration({
     inviteInput: "",
     inviteEmails: [],
   });
+  const [referralCode, setReferralCode] = useState("");
   const [dynamicFormValues, setDynamicFormValues] = useState<
     Record<string, any>
   >({});
@@ -110,6 +111,17 @@ export default function CompetitionRegistration({
   const hasPublishedForm =
     Boolean(formFieldsQuery.data?.formId) || competitionFormFields.length > 0;
   const isFormMissing = !formFieldsQuery.isLoading && !hasPublishedForm;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const stored = window.localStorage.getItem("referral_code") || "";
+      setReferralCode(stored.trim().toUpperCase());
+    } catch {
+      setReferralCode("");
+    }
+  }, []);
 
   const alreadyRegistered = useMemo(() => {
     return registrations.some((entry: any) => {
@@ -212,6 +224,7 @@ export default function CompetitionRegistration({
           competitionId,
           teamName: teamDetails.teamName.trim(),
           formData,
+          referralCode: referralCode || undefined,
         });
 
         const createdTeamId = registrationResult?.team?.id;
@@ -461,6 +474,19 @@ export default function CompetitionRegistration({
                 type="text"
                 placeholder="Neutron Crew"
                 className="bg-black border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/20 focus:outline-hidden focus:border-white/40"
+              />
+            </div>
+          ) : null}
+
+          {!isSolo && referralCode ? (
+            <div className="flex flex-col space-y-2">
+              <label className="text-xs uppercase tracking-wider text-white/50 font-medium ml-1">
+                Referral Code
+              </label>
+              <input
+                value={referralCode}
+                readOnly
+                className="bg-black border border-white/10 rounded-lg px-4 py-3 text-white/70 placeholder-white/20 focus:outline-hidden focus:border-white/40"
               />
             </div>
           ) : null}

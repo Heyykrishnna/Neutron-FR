@@ -36,6 +36,11 @@ const SA_NAVIGATION = [
   { name: "Users", href: "/admin/sa/users", icon: Users },
   { name: "Departments", href: "/admin/sa/departments", icon: Building2 },
   { name: "Clubs", href: "/admin/sa/clubs", icon: UserCircle2 },
+  {
+    name: "Campus Ambassadors",
+    href: "/admin/sa/campus-ambassadors",
+    icon: Star,
+  },
   { name: "Requests", href: "/admin/sa/approvals", icon: ShieldCheck },
   { name: "Audit Logs", href: "/admin/sa/audit", icon: ClipboardList },
   { name: "Campaign Manager", href: "/admin/sa/campaigns", icon: Megaphone },
@@ -296,7 +301,7 @@ export function Sidebar({ user, onLogout, mobileOpen, onMobileClose }: any) {
 
       {/* ── Nav ── */}
       <Box
-      data-lenis-prevent
+        data-lenis-prevent
         sx={{
           flex: 1,
           px: 2,
@@ -507,31 +512,31 @@ function SidebarNavItem({ href, icon: Icon, label, onClick }: any) {
         border: "1px solid transparent",
         ...(active
           ? {
-            background: "rgba(255,255,255,0.06)",
-            borderColor: "rgba(255,255,255,0.08)",
-            "& .nav-icon": { color: "#fff" },
-            "& .nav-label": { color: "#f4f4f5" },
-            "&::before": {
-              content: '""',
-              position: "absolute",
-              left: 0,
-              top: "20%",
-              bottom: "20%",
-              width: "2px",
-              borderRadius: "0 2px 2px 0",
-              background: "rgba(255,255,255,0.6)",
-            },
-          }
+              background: "rgba(255,255,255,0.06)",
+              borderColor: "rgba(255,255,255,0.08)",
+              "& .nav-icon": { color: "#fff" },
+              "& .nav-label": { color: "#f4f4f5" },
+              "&::before": {
+                content: '""',
+                position: "absolute",
+                left: 0,
+                top: "20%",
+                bottom: "20%",
+                width: "2px",
+                borderRadius: "0 2px 2px 0",
+                background: "rgba(255,255,255,0.6)",
+              },
+            }
           : {
-            "& .nav-icon": { color: "rgba(255,255,255,0.3)" },
-            "& .nav-label": { color: "rgba(255,255,255,0.45)" },
-            "&:hover": {
-              background: "rgba(255,255,255,0.04)",
-              borderColor: "rgba(255,255,255,0.05)",
-              "& .nav-icon": { color: "rgba(255,255,255,0.7)" },
-              "& .nav-label": { color: "rgba(255,255,255,0.8)" },
-            },
-          }),
+              "& .nav-icon": { color: "rgba(255,255,255,0.3)" },
+              "& .nav-label": { color: "rgba(255,255,255,0.45)" },
+              "&:hover": {
+                background: "rgba(255,255,255,0.04)",
+                borderColor: "rgba(255,255,255,0.05)",
+                "& .nav-icon": { color: "rgba(255,255,255,0.7)" },
+                "& .nav-label": { color: "rgba(255,255,255,0.8)" },
+              },
+            }),
       }}
     >
       <Box

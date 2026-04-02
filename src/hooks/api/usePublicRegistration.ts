@@ -1,5 +1,3 @@
-
-
 export function useMyRegistrations(enabled = true) {
   return useQuery({
     queryKey: queryKeys.publicRegistrations.my(),
@@ -24,8 +22,6 @@ export function useTeamInvitePreview(inviteToken: string, enabled = true) {
     retry: false,
   });
 }
-
-
 
 export function useTeamDetails(teamId: string, enabled = true) {
   return useQuery({
@@ -84,6 +80,7 @@ interface RegisterTeamParams {
   teamName: string;
   formData?: any[];
   promoCode?: string | null;
+  referralCode?: string | null;
 }
 
 interface TeamInviteParams {
@@ -182,7 +179,10 @@ export function useSendTeamInvite() {
 
   return useMutation({
     mutationFn: async (params: TeamInviteParams) => {
-      const { data } = await apiClient.post("/registration/team/invite", params);
+      const { data } = await apiClient.post(
+        "/registration/team/invite",
+        params,
+      );
       return data?.data || data;
     },
     onSuccess: (_, variables) => {
