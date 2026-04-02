@@ -31,17 +31,17 @@ export default function TeamInvitePage() {
   const [requiresDifferentAccount, setRequiresDifferentAccount] =
     useState(false);
   const hasAttemptedAutoAccept = useRef(false);
+  const profileInboxCallback = "/profile?section=inbox";
 
   useEffect(() => {
     if (loading || !inviteToken) return;
 
     if (!user) {
-      const callbackUrl = `/team-invite/${inviteToken}`;
       router.replace(
-        `/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`,
+        `/auth/signin?callbackUrl=${encodeURIComponent(profileInboxCallback)}`,
       );
     }
-  }, [loading, user, inviteToken, router]);
+  }, [loading, user, inviteToken, router, profileInboxCallback]);
 
   useEffect(() => {
     if (loading || !user || !inviteToken || hasAttemptedAutoAccept.current) {
@@ -71,14 +71,28 @@ export default function TeamInvitePage() {
           error?.message ||
           "Unable to process invite. Please try again.";
 
-        setRequiresDifferentAccount(isWrongAccountInviteError(message));
+        if (isWrongAccountInviteError(message)) {
+          router.replace(
+            `/auth/signin?forceLogin=1&callbackUrl=${encodeURIComponent(profileInboxCallback)}`,
+          );
+          return;
+        }
+
+        setRequiresDifferentAccount(false);
         setErrorMessage(message);
         setFlowState("error");
       }
     };
 
     autoAccept();
-  }, [loading, user, inviteToken, acceptInviteMutation, router]);
+  }, [
+    loading,
+    user,
+    inviteToken,
+    acceptInviteMutation,
+    router,
+    profileInboxCallback,
+  ]);
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center px-6">
@@ -129,7 +143,7 @@ export default function TeamInvitePage() {
             </h1>
             <p className="text-white/60">
               {flowState === "auth"
-                ? "Verifying your account session..."
+                ? "Verifying your account session before opening team invites..."
                 : "You will be taken directly to the member registration form."}
             </p>
           </>

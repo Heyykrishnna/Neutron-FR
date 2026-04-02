@@ -104,6 +104,12 @@ export default function CompetitionRegistration({
   const registrations = Array.isArray(myRegistrationsQuery.data)
     ? myRegistrationsQuery.data
     : [];
+  const competitionFormFields = Array.isArray(formFieldsQuery.data?.fields)
+    ? formFieldsQuery.data.fields
+    : [];
+  const hasPublishedForm =
+    Boolean(formFieldsQuery.data?.formId) || competitionFormFields.length > 0;
+  const isFormMissing = !formFieldsQuery.isLoading && !hasPublishedForm;
 
   const alreadyRegistered = useMemo(() => {
     return registrations.some((entry: any) => {
@@ -174,11 +180,14 @@ export default function CompetitionRegistration({
     e.preventDefault();
     setErrorMessage("");
 
-    const fields = Array.isArray(formFieldsQuery.data?.fields)
-      ? formFieldsQuery.data.fields
-      : [];
+    if (isFormMissing) {
+      setErrorMessage(
+        "Registration is currently unavailable because no active competition form was found.",
+      );
+      return;
+    }
 
-    const formData = fields.map((field: FormField) => {
+    const formData = competitionFormFields.map((field: FormField) => {
       const fieldId = String(field._id || field.id || "");
       const fieldName = field.name || field.label || fieldId;
       const rawValue = dynamicFormValues[fieldName];
@@ -397,6 +406,7 @@ export default function CompetitionRegistration({
         </p>
         <button
           type="button"
+          disabled={isFormMissing || formFieldsQuery.isError}
           onClick={() => {
             if (isSolo || isMemberMode) {
               setStep("form");
@@ -409,9 +419,11 @@ export default function CompetitionRegistration({
             }));
             setStep("team");
           }}
-          className="bg-white text-black px-8 py-3 rounded-full font-semibold hover:bg-gray-200 transition-colors cursor-pointer"
+          className="bg-white text-black px-8 py-3 rounded-full font-semibold hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
         >
-          Register Now
+          {isFormMissing || formFieldsQuery.isError
+            ? "Registration Unavailable"
+            : "Register Now"}
         </button>
       </div>
     );
@@ -578,10 +590,6 @@ export default function CompetitionRegistration({
     );
   }
 
-  const fields = Array.isArray(formFieldsQuery.data?.fields)
-    ? formFieldsQuery.data.fields
-    : [];
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -600,12 +608,13 @@ export default function CompetitionRegistration({
           <div className="flex justify-center py-8">
             <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
           </div>
-        ) : fields.length === 0 ? (
-          <p className="text-white/60 text-sm border border-white/10 rounded-lg px-4 py-3">
-            No additional form fields are required for this competition.
+        ) : formFieldsQuery.isError || isFormMissing ? (
+          <p className="text-rose-200 text-sm border border-rose-300/30 bg-rose-900/20 rounded-lg px-4 py-3">
+            Registration is currently unavailable because no active competition
+            form was found.
           </p>
         ) : (
-          fields.map((field: FormField, index: number) => (
+          competitionFormFields.map((field: FormField, index: number) => (
             <div
               key={String(field._id || field.id || `field-${index}`)}
               className="flex flex-col space-y-2"
@@ -628,6 +637,8 @@ export default function CompetitionRegistration({
         <button
           type="submit"
           disabled={
+            isFormMissing ||
+            formFieldsQuery.isError ||
             registerSoloMutation.isPending ||
             registerTeamMutation.isPending ||
             submitMemberFormMutation.isPending ||
@@ -660,6 +671,8 @@ export default function CompetitionRegistration({
               </svg>
               Submitting...
             </>
+          ) : isFormMissing || formFieldsQuery.isError ? (
+            "Registration Unavailable"
           ) : (
             "Submit Registration"
           )}

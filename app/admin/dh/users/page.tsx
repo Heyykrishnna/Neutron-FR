@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useDHDepartmentMembers } from "@/src/hooks/api/useUsers";
 import { Box, Typography } from "@mui/material";
 import {
@@ -13,6 +14,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { LoadingState } from "@/src/components/LoadingState";
+import { useAuth } from "@/contexts/AuthContext";
 
 const ROLE_COLORS: any = {
   SA: {
@@ -166,12 +168,24 @@ const RowDivider = () => (
 );
 
 export default function DHUsersPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const isDH = user?.role === "DH";
+
+  useEffect(() => {
+    if (!authLoading && user?.role === "SA") {
+      router.replace("/admin/sa/users");
+    }
+  }, [authLoading, user?.role, router]);
+
   /**
    * Security: The backend derives the department from the DH's own session.
    * No departmentId is passed from the client — a DH cannot request another
    * department's members by modifying the request.
    */
-  const { data, isLoading, isError, error } = useDHDepartmentMembers() as any;
+  const { data, isLoading, isError, error } = useDHDepartmentMembers(
+    !authLoading && isDH,
+  ) as any;
 
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -193,6 +207,12 @@ export default function DHUsersPage() {
       month: "short",
       day: "numeric",
     });
+
+  if (authLoading) return <LoadingState />;
+
+  if (user?.role === "SA") return <LoadingState />;
+
+  if (!isDH) return null;
 
   if (isLoading) return <LoadingState />;
 
@@ -451,8 +471,8 @@ export default function DHUsersPage() {
               </Typography>
             </Box>
           ) : (
-            members.map(({ user, idx }: any) => (
-              <Box key={user.id}>
+            members.map((user: any, idx: number) => (
+              <Box key={user?.id || `member-${idx}`}>
                 <Box
                   sx={{
                     display: "grid",
