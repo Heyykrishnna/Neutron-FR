@@ -19,6 +19,14 @@ const isWrongAccountInviteError = (message: string): boolean => {
   );
 };
 
+const isInviteAlreadyProcessedError = (message: string): boolean => {
+  const normalized = String(message || "").toLowerCase();
+  return (
+    normalized.includes("already been processed") ||
+    normalized.includes("already processed")
+  );
+};
+
 export default function TeamInvitePage() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -70,6 +78,11 @@ export default function TeamInvitePage() {
           error?.response?.data?.message ||
           error?.message ||
           "Unable to process invite. Please try again.";
+
+        if (isInviteAlreadyProcessedError(message)) {
+          router.replace(profileInboxCallback);
+          return;
+        }
 
         if (isWrongAccountInviteError(message)) {
           router.replace(

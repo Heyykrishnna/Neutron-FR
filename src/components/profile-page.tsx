@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { AnimatePresence, motion, useScroll, useTransform } from "framer-motion";
+import {
+  AnimatePresence,
+  motion,
+  useScroll,
+  useTransform,
+} from "framer-motion";
 import * as THREE from "three";
 import {
   Trash2,
@@ -23,15 +28,21 @@ import {
   ChevronLeft,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import ProfileCard from "./ProfileCard";
 import { useAuthMe } from "@/src/hooks/api/useAuth";
 import {
   useAcceptTeamInvite,
   useDeclineTeamInvite,
+  useLeaveTeam,
   useMyRegistrations,
   usePendingTeamInvites,
+  useRemovePendingTeamInvite,
+  useRemoveTeamMember,
+  useSendTeamInvite,
+  useTeamDetails,
+  useTransferTeamLeadership,
 } from "@/src/hooks/api/usePublicRegistration";
 import {
   useMyQRCode,
@@ -65,6 +76,8 @@ interface EnrolledItem {
   kind: "competition" | "event";
   id: string;
   slug: string;
+  teamId?: string;
+  currentUserId?: string;
   title: string;
   image: string;
   category: string;
@@ -674,28 +687,65 @@ function DashboardWidget({
 
 function TeamModal({
   item,
+  userId,
   onClose,
 }: {
   item: EnrolledItem;
+  userId: string;
   onClose: () => void;
 }) {
   const { showToast } = useDashboard();
   const [inviteEmail, setInviteEmail] = useState("");
-  const [members, setMembers] = useState<TeamMember[]>(item.team || []);
-
-  const maxStr = item.teamSize.match(/\d+/g);
-  const maxMembers = maxStr ? parseInt(maxStr[maxStr.length - 1]) : 1;
-  const canAdd = members.length < maxMembers;
-
   const [inviteError, setInviteError] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<TeamMember | null>(null);
 
-  const handleInvite = () => {
+  const maxStr = item.teamSize.match(/\d+/g);
+  const maxMembers = maxStr ? parseInt(maxStr[maxStr.length - 1]) : 1;
+  const teamId = item.teamId || "";
+
+  const teamDetailsQuery = useTeamDetails(teamId, Boolean(teamId));
+  const sendInviteMutation = useSendTeamInvite();
+  const transferLeaderMutation = useTransferTeamLeadership();
+  const removeMemberMutation = useRemoveTeamMember();
+  const removePendingInviteMutation = useRemovePendingTeamInvite();
+  const leaveTeamMutation = useLeaveTeam();
+
+  const teamDetails = teamDetailsQuery.data;
+  const isTeamLeader =
+    Boolean(teamDetails?.leaderId) &&
+    String(teamDetails.leaderId) === String(userId);
+  const members: TeamMember[] = Array.isArray(teamDetails?.members)
+    ? teamDetails.members.map((entry: any) => {
+        const memberUser = entry?.user || {};
+        const teamMember = entry?.teamMember || {};
+        const isLeader =
+          Boolean(teamMember?.isLeader) ||
+          String(memberUser?.id || "") === String(teamDetails?.leaderId || "");
+
+        return {
+          id: String(memberUser?.id || teamMember?.userId || ""),
+          name: memberUser?.name || memberUser?.email || "Member",
+          email: memberUser?.email || "",
+          role: isLeader ? "leader" : "member",
+          status: "confirmed",
+          avatar: memberUser?.image || "",
+        };
+      })
+    : [];
+
+  const pendingInvites = Array.isArray(teamDetails?.invites)
+    ? teamDetails.invites.filter((invite: any) => invite?.status === "PENDING")
+    : [];
+
+  const occupiedSlots = members.length + pendingInvites.length;
+  const canAdd = isTeamLeader && occupiedSlots < maxMembers;
+
+  const handleInvite = async () => {
     setInviteError("");
 
     const val = inviteEmail.trim();
-    if (!val || !canAdd) return;
+    if (!teamId || !val || !canAdd) return;
 
     if (
       members.some(
@@ -708,8 +758,18 @@ function TeamModal({
       return;
     }
 
-    showToast(`Invite sent to ${val}.`, "success");
-    setInviteEmail("");
+    try {
+      await sendInviteMutation.mutateAsync({ teamId, invitedEmail: val });
+      showToast(`Invite sent to ${val}.`, "success");
+      setInviteEmail("");
+      await teamDetailsQuery.refetch();
+    } catch (error: any) {
+      setInviteError(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Failed to send invite.",
+      );
+    }
   };
 
   return (
@@ -733,7 +793,7 @@ function TeamModal({
               {item.title}
             </h2>
             <p className="text-xs text-white/30 mt-1 font-mono uppercase tracking-widest">
-              Team Management &bull; {members.length}/{maxMembers} Slots
+              Team Management &bull; {occupiedSlots}/{maxMembers} Slots
             </p>
           </div>
           <button
@@ -745,133 +805,265 @@ function TeamModal({
         </div>
 
         <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto overflow-x-visible custom-scrollbar">
-          {/* Members List */}
-          <div className="space-y-4">
-            <h3 className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/20 font-mono">
-              Active Members
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {members.map((member) => (
-                <div
-                  key={member.id}
-                  className="flex items-center gap-3 p-3 rounded-2xl bg-white/3 border border-white/5 group hover:border-white/10 transition-all"
-                >
-                  <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 shrink-0">
-                    <img
-                      src="/images/bg.jpeg"
-                      alt={member.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-white truncate">
-                      {member.name}
-                    </p>
-                    <p className="text-[10px] text-white/30 uppercase tracking-widest font-mono mt-0.5">
-                      {member.role}
-                    </p>
-                  </div>
-                  {member.role !== "leader" && (
-                    <button
-                      onClick={() => setMemberToRemove(member)}
-                      className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center hover:bg-rose-500/20"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-              ))}
+          {teamDetailsQuery.isLoading ? (
+            <div className="py-8 flex items-center justify-center">
+              <div className="w-7 h-7 border-2 border-white/20 border-t-white rounded-full animate-spin" />
             </div>
-          </div>
-
-          <AnimatePresence>
-            {memberToRemove && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="absolute inset-0 z-60 bg-black/95 flex items-center justify-center p-8"
-              >
-                <div className="text-center max-w-xs">
-                  <div className="w-16 h-16 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center justify-center mx-auto mb-6">
-                    <Trash2 size={24} />
-                  </div>
-                  <h4 className="text-lg font-bold text-white">
-                    Remove {memberToRemove.name}?
-                  </h4>
-                  <p className="text-xs text-white/40 mt-2 leading-relaxed">
-                    This will revoke their access to this project immediately.
-                  </p>
-                  <div className="flex gap-3 mt-8">
-                    <button
-                      onClick={() => setMemberToRemove(null)}
-                      className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:bg-white/10 transition-all"
+          ) : teamDetailsQuery.isError ? (
+            <p className="text-sm text-rose-300 border border-rose-300/30 bg-rose-900/20 rounded-xl px-4 py-3">
+              Failed to load team details.
+            </p>
+          ) : (
+            <>
+              {/* Members List */}
+              <div className="space-y-4">
+                <h3 className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/20 font-mono">
+                  Active Members
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {members.map((member) => (
+                    <div
+                      key={member.id}
+                      className="flex items-center gap-3 p-3 rounded-2xl bg-white/3 border border-white/5 group hover:border-white/10 transition-all"
                     >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => {
-                        setMembers((prev) =>
-                          prev.filter((m) => m.id !== memberToRemove.id),
-                        );
-                        showToast(`${memberToRemove.name} removed.`, "info");
-                        setMemberToRemove(null);
-                      }}
-                      className="flex-1 py-3 rounded-xl bg-rose-500 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-rose-600 transition-all"
-                    >
-                      Remove
-                    </button>
-                  </div>
+                      <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 shrink-0">
+                        <img
+                          src="/images/bg.jpeg"
+                          alt={member.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-white truncate">
+                          {member.name}
+                        </p>
+                        <p className="text-[10px] text-white/30 uppercase tracking-widest font-mono mt-0.5">
+                          {member.role}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isTeamLeader && member.role !== "leader" && (
+                          <>
+                            <button
+                              onClick={async () => {
+                                if (!teamId) return;
+                                try {
+                                  await transferLeaderMutation.mutateAsync({
+                                    teamId,
+                                    newLeaderId: member.id,
+                                  });
+                                  showToast(
+                                    "Leadership transferred.",
+                                    "success",
+                                  );
+                                  await teamDetailsQuery.refetch();
+                                } catch {
+                                  showToast(
+                                    "Failed to transfer leadership.",
+                                    "error",
+                                  );
+                                }
+                              }}
+                              className="px-2.5 py-1 rounded-md bg-white/10 border border-white/15 text-[9px] uppercase tracking-wider text-white/70 hover:text-white"
+                            >
+                              Make Lead
+                            </button>
+                            <button
+                              onClick={() => setMemberToRemove(member)}
+                              className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center hover:bg-rose-500/20"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Invitation Section */}
-          <div className="space-y-4 pt-4 border-t border-white/5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/20 font-mono">
-                Invite Peers
-              </h3>
-              <span
-                className={`text-[9px] uppercase tracking-widest font-mono ${canAdd ? "text-emerald-400" : "text-rose-400"}`}
-              >
-                {canAdd ? "Available Slots Open" : "Limit Reached"}
-              </span>
-            </div>
-
-            <div className="relative">
-              <div
-                className={`p-1.5 rounded-2.5xl border transition-all flex items-center gap-2 ${isFocused ? "bg-white/5 border-white/20" : "bg-white/3 border-white/5"}`}
-              >
-                <div className="pl-3 text-white/20">
-                  <Mail size={18} />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Enter name or email..."
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  onFocus={() => setIsFocused(true)}
-                  onBlur={() => setTimeout(() => setIsFocused(false), 200)}
-                  disabled={!canAdd}
-                  className="bg-transparent border-none outline-none flex-1 py-3 text-sm text-white placeholder:text-white/10 font-medium"
-                />
-                <button
-                  onClick={() => handleInvite()}
-                  disabled={!canAdd || !inviteEmail.trim()}
-                  className="h-10 px-6 rounded-2xl bg-white text-black text-[10px] font-extrabold uppercase tracking-widest hover:bg-white/90 transition-all disabled:opacity-20 disabled:grayscale"
-                >
-                  Send
-                </button>
               </div>
-            </div>
-            {inviteError && (
-              <p className="text-[10px] text-rose-400 font-mono ml-2">
-                {inviteError}
-              </p>
-            )}
-          </div>
+
+              <AnimatePresence>
+                {memberToRemove && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="absolute inset-0 z-60 bg-black/95 flex items-center justify-center p-8"
+                  >
+                    <div className="text-center max-w-xs">
+                      <div className="w-16 h-16 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center justify-center mx-auto mb-6">
+                        <Trash2 size={24} />
+                      </div>
+                      <h4 className="text-lg font-bold text-white">
+                        Remove {memberToRemove.name}?
+                      </h4>
+                      <p className="text-xs text-white/40 mt-2 leading-relaxed">
+                        This will revoke their access to this project
+                        immediately.
+                      </p>
+                      <div className="flex gap-3 mt-8">
+                        <button
+                          onClick={() => setMemberToRemove(null)}
+                          className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:bg-white/10 transition-all"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!teamId) return;
+
+                            try {
+                              await removeMemberMutation.mutateAsync({
+                                teamId,
+                                memberId: memberToRemove.id,
+                              });
+                              showToast(
+                                `${memberToRemove.name} removed.`,
+                                "info",
+                              );
+                              setMemberToRemove(null);
+                              await teamDetailsQuery.refetch();
+                            } catch {
+                              showToast("Failed to remove member.", "error");
+                            }
+                          }}
+                          className="flex-1 py-3 rounded-xl bg-rose-500 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-rose-600 transition-all"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Invitation Section */}
+              <div className="space-y-4 pt-4 border-t border-white/5">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/20 font-mono">
+                    Invite Peers
+                  </h3>
+                  <span
+                    className={`text-[9px] uppercase tracking-widest font-mono ${canAdd ? "text-emerald-400" : "text-rose-400"}`}
+                  >
+                    {canAdd
+                      ? "Available Slots Open"
+                      : isTeamLeader
+                        ? "Limit Reached"
+                        : "Leader Access Required"}
+                  </span>
+                </div>
+
+                <div className="relative">
+                  <div
+                    className={`p-1.5 rounded-2.5xl border transition-all flex items-center gap-2 ${isFocused ? "bg-white/5 border-white/20" : "bg-white/3 border-white/5"}`}
+                  >
+                    <div className="pl-3 text-white/20">
+                      <Mail size={18} />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Enter name or email..."
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      onFocus={() => setIsFocused(true)}
+                      onBlur={() => setTimeout(() => setIsFocused(false), 200)}
+                      disabled={!canAdd || sendInviteMutation.isPending}
+                      className="bg-transparent border-none outline-none flex-1 py-3 text-sm text-white placeholder:text-white/10 font-medium"
+                    />
+                    <button
+                      onClick={() => handleInvite()}
+                      disabled={
+                        !canAdd ||
+                        !inviteEmail.trim() ||
+                        sendInviteMutation.isPending
+                      }
+                      className="h-10 px-6 rounded-2xl bg-white text-black text-[10px] font-extrabold uppercase tracking-widest hover:bg-white/90 transition-all disabled:opacity-20 disabled:grayscale"
+                    >
+                      {sendInviteMutation.isPending ? "Sending..." : "Send"}
+                    </button>
+                  </div>
+                </div>
+                {inviteError && (
+                  <p className="text-[10px] text-rose-400 font-mono ml-2">
+                    {inviteError}
+                  </p>
+                )}
+              </div>
+
+              {/* Pending Invites */}
+              <div className="space-y-3 pt-4 border-t border-white/5">
+                <h3 className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/20 font-mono">
+                  Pending Invites
+                </h3>
+                {pendingInvites.length === 0 ? (
+                  <p className="text-xs text-white/40">No pending invites.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {pendingInvites.map((invite: any) => (
+                      <div
+                        key={invite.id}
+                        className="flex items-center justify-between p-3 rounded-xl border border-white/10 bg-white/3"
+                      >
+                        <div>
+                          <p className="text-xs text-white font-medium">
+                            {invite.invitedEmail}
+                          </p>
+                          <p className="text-[10px] text-white/40 font-mono">
+                            Expires {formatDisplayDate(invite.expiresAt)}
+                          </p>
+                        </div>
+                        {isTeamLeader && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!teamId) return;
+                              try {
+                                await removePendingInviteMutation.mutateAsync({
+                                  teamId,
+                                  inviteId: invite.id,
+                                });
+                                showToast("Pending invite removed.", "info");
+                                await teamDetailsQuery.refetch();
+                              } catch {
+                                showToast(
+                                  "Failed to remove pending invite.",
+                                  "error",
+                                );
+                              }
+                            }}
+                            className="px-3 py-1.5 rounded-lg border border-rose-400/30 text-[10px] font-mono uppercase tracking-wider text-rose-300 hover:bg-rose-500/10"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {!isTeamLeader && teamId ? (
+                <div className="pt-4 border-t border-white/5">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await leaveTeamMutation.mutateAsync(teamId);
+                        showToast("You left the team.", "info");
+                        onClose();
+                      } catch {
+                        showToast("Failed to leave team.", "error");
+                      }
+                    }}
+                    className="w-full py-3 rounded-xl border border-rose-400/30 text-rose-300 text-[10px] font-bold uppercase tracking-widest hover:bg-rose-500/10"
+                  >
+                    Leave Team
+                  </button>
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
 
         <div className="px-8 py-6 bg-white/2 border-t border-white/5 flex items-center justify-between">
@@ -892,7 +1084,7 @@ function TeamModal({
 
 function EnrolledCard({ item, href }: { item: EnrolledItem; href: string }) {
   const [showTeam, setShowTeam] = useState(false);
-  const hasTeam = isTeamEvent(item.teamSize);
+  const hasTeam = Boolean(item.teamId);
 
   const statusColor: Record<string, string> = {
     open: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400",
@@ -974,7 +1166,13 @@ function EnrolledCard({ item, href }: { item: EnrolledItem; href: string }) {
         )}
       </div>
 
-      {showTeam && <TeamModal item={item} onClose={() => setShowTeam(false)} />}
+      {showTeam && (
+        <TeamModal
+          item={item}
+          userId={String(item.currentUserId || "")}
+          onClose={() => setShowTeam(false)}
+        />
+      )}
     </>
   );
 }
@@ -1373,7 +1571,13 @@ function ProfilePanel({
   );
 }
 
-function CompetitionsPanel({ competitions }: { competitions: EnrolledItem[] }) {
+function CompetitionsPanel({
+  competitions,
+  userId,
+}: {
+  competitions: EnrolledItem[];
+  userId: string;
+}) {
   const { showToast } = useDashboard();
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
@@ -1402,7 +1606,7 @@ function CompetitionsPanel({ competitions }: { competitions: EnrolledItem[] }) {
                 {competitions.map((c) => (
                   <EnrolledCard
                     key={c.slug}
-                    item={c}
+                    item={{ ...c, currentUserId: userId }}
                     href={`/competitions/${c.slug}`}
                   />
                 ))}
@@ -2084,6 +2288,7 @@ export default function ProfilePage() {
   const bgY = useTransform(scrollYProgress, [0, 1], ["0%", "-10%"]);
 
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { logout } = useAuth();
   const authMeQuery = useAuthMe();
   const updateProfileMutation = useUpdateUserProfile();
@@ -2095,6 +2300,16 @@ export default function ProfilePage() {
   const [active, setActive] = useState<NavItem>("profile");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  useEffect(() => {
+    const section = searchParams.get("section");
+    if (!section) return;
+
+    const normalized = section.toLowerCase();
+    if (normalized === "inbox" || normalized === "invites") {
+      setActive("inbox");
+    }
+  }, [searchParams]);
 
   // Toast System
   const [toast, setToast] = useState<{
@@ -2218,6 +2433,7 @@ export default function ProfilePage() {
         kind,
         id,
         slug: id,
+        teamId: entry?.team?.id || entry?.registration?.teamId || undefined,
         title: competition?.title || "",
         image: competition?.posterPath || "",
         category: competition?.category || competition?.type || "",
@@ -2397,7 +2613,7 @@ export default function ProfilePage() {
           }}
         />
         <div className="pointer-events-none fixed inset-0 z-0 bg-linear-to-b from-[#030303]/40 via-[#030303]/80 to-[#030303]" />
-        
+
         <ThreeStarsBackground />
 
         <header className="fixed top-0 left-0 right-0 z-50 h-14 border-b border-white/15 backdrop-blur-3xl bg-white/2 flex items-center px-6 gap-4 shadow-2xl">
@@ -2503,71 +2719,71 @@ export default function ProfilePage() {
             <div className="absolute inset-0 bg-black/20 pointer-events-none" />
             <div className="relative z-10 flex flex-col h-full">
               <div className="flex items-center gap-3 px-3 pb-8 mb-6 border-b border-white/10">
-              <div className="w-10 h-10 rounded-2xl overflow-hidden border border-white/10 shrink-0">
-                <img
-                  src="/images/bg.jpeg"
-                  alt={profile.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-white truncate">
-                  {profile.name}
-                </p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
-                  <p className="text-[9px] uppercase tracking-widest text-white/30 font-mono">
-                    Verified
+                <div className="w-10 h-10 rounded-2xl overflow-hidden border border-white/10 shrink-0">
+                  <img
+                    src="/images/bg.jpeg"
+                    alt={profile.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-white truncate">
+                    {profile.name}
                   </p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                    <p className="text-[9px] uppercase tracking-widest text-white/30 font-mono">
+                      Verified
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <SidebarNav active={active} setActive={setActive} />
+              <SidebarNav active={active} setActive={setActive} />
 
-            <div className="mt-auto flex flex-col gap-1.5 pt-6 border-t border-white/6">
-              <button
-                onClick={async () => {
-                  if (isLoggingOut) return;
-                  setIsLoggingOut(true);
-                  try {
-                    await logout();
-                  } finally {
-                    setIsLoggingOut(false);
-                  }
-                }}
-                disabled={isLoggingOut}
-                className="flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] uppercase tracking-widest font-mono text-white/20 hover:text-rose-400 transition-all duration-300 disabled:opacity-50"
-              >
-                {isLoggingOut ? "Logging out..." : "Logout"}
-                <svg
-                  width="10"
-                  height="10"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
+              <div className="mt-auto flex flex-col gap-1.5 pt-6 border-t border-white/6">
+                <button
+                  onClick={async () => {
+                    if (isLoggingOut) return;
+                    setIsLoggingOut(true);
+                    try {
+                      await logout();
+                    } finally {
+                      setIsLoggingOut(false);
+                    }
+                  }}
+                  disabled={isLoggingOut}
+                  className="flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] uppercase tracking-widest font-mono text-white/20 hover:text-rose-400 transition-all duration-300 disabled:opacity-50"
                 >
-                  <path
-                    d="M9 5H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M16 17l5-5-5-5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M21 12H9"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
+                  {isLoggingOut ? "Logging out..." : "Logout"}
+                  <svg
+                    width="10"
+                    height="10"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      d="M9 5H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M16 17l5-5-5-5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M21 12H9"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
             </div>
-          </div>
-        </aside>
+          </aside>
 
           <main className="flex-1 w-full overflow-x-hidden min-h-screen bg-[#030303]/20">
             <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-10 w-full">
@@ -2603,7 +2819,10 @@ export default function ProfilePage() {
                     />
                   )}
                   {active === "competitions" && (
-                    <CompetitionsPanel competitions={competitionItems} />
+                    <CompetitionsPanel
+                      competitions={competitionItems}
+                      userId={userId}
+                    />
                   )}
                   {active === "events" && <EventsPanel events={eventItems} />}
                   {active === "inbox" && (

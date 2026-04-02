@@ -6,12 +6,8 @@ import AuthLayout from "@/components/auth-layout";
 import { AuthInput, AuthButton } from "@/components/auth-components";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthModal } from "@/components/auth-modal";
-import {
-  useAuthMe,
-  useLogin,
-  useLogout,
-  useRequestPasswordReset,
-} from "@/src/hooks/api/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
+import { useAuthMe, useRequestPasswordReset } from "@/src/hooks/api/useAuth";
 
 const normalizeAuthResponseUser = (payload: any) => {
   if (payload?.data?.user) return payload.data.user;
@@ -21,6 +17,7 @@ const normalizeAuthResponseUser = (payload: any) => {
 
 function SignInContent() {
   const router = useRouter();
+  const { login, logout, checkAuth } = useAuth();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
   const authStatus = searchParams.get("auth");
@@ -34,13 +31,11 @@ function SignInContent() {
   const [resetMessage, setResetMessage] = useState("");
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
   const [isResetSent, setIsResetSent] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isForceLogoutPending, setIsForceLogoutPending] = useState(false);
 
   const authMeQuery = useAuthMe();
-  const loginMutation = useLogin();
-  const logoutMutation = useLogout();
   const requestResetMutation = useRequestPasswordReset();
-  const isForceLogoutPending = logoutMutation.isPending;
-  const triggerForceLogout = logoutMutation.mutate;
 
   useEffect(() => {
     if (!forceLogin && authMeQuery.data) {
@@ -53,8 +48,17 @@ function SignInContent() {
     if (!authMeQuery.data) return;
     if (isForceLogoutPending) return;
 
-    triggerForceLogout();
-  }, [forceLogin, authMeQuery.data, isForceLogoutPending, triggerForceLogout]);
+    const forceSignOut = async () => {
+      setIsForceLogoutPending(true);
+      try {
+        await logout();
+      } finally {
+        setIsForceLogoutPending(false);
+      }
+    };
+
+    forceSignOut();
+  }, [forceLogin, authMeQuery.data, isForceLogoutPending, logout]);
 
   useEffect(() => {
     if (authStatus === "failed") {
@@ -66,11 +70,11 @@ function SignInContent() {
     }
 
     if (authStatus === "success") {
+      checkAuth();
       authMeQuery.refetch();
     }
-  }, [authReason, authStatus, authMeQuery]);
+  }, [authReason, authStatus, authMeQuery, checkAuth]);
 
-  const isSigningIn = loginMutation.isPending;
   const isRequestingReset = requestResetMutation.isPending;
   const submitDisabled = useMemo(
     () => isSigningIn || !email.trim() || !password,
@@ -82,7 +86,9 @@ function SignInContent() {
     setLoginError("");
 
     try {
-      const payload = await loginMutation.mutateAsync({
+      setIsSigningIn(true);
+
+      const payload = await login({
         email: email.trim(),
         password,
       });
@@ -99,6 +105,8 @@ function SignInContent() {
         error?.message ||
         "Invalid email or password.";
       setLoginError(message);
+    } finally {
+      setIsSigningIn(false);
     }
   };
 
