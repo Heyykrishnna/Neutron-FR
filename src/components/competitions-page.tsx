@@ -280,19 +280,26 @@ export default function CompetitionsPage() {
         ) : (
           <div className="h-full pt-[30vh]">
             {filteredCompetitions.length > 0 ? (
-              filteredCompetitions.map((comp, idx) => (
-                <PolaroidCard
-                  key={String(comp.id || comp._id || idx)}
-                  title={comp.title || comp.name || "Untitled Mission"}
-                  image={comp.image || "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa"}
-                  slug={comp.slug || ""}
-                  category={comp.category || "General"}
-                  date={new Date(comp.date || comp.createdAt || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  index={idx}
-                  total={filteredCompetitions.length}
-                  scrollToCard={scrollToCard}
-                />
-              ))
+              filteredCompetitions.map((comp, idx) => {
+                const competitionId = comp.slug || comp.id || comp._id || String(idx);
+                const title = comp.title || comp.name || "Untitled Mission";
+                const image = comp.bannerPath || comp.bannerMediaPath || comp.image || "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa";
+                const date = new Date(comp.startTime || comp.startDate || comp.date || comp.createdAt || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+                return (
+                  <PolaroidCard
+                    key={String(comp.id || comp._id || idx)}
+                    title={title}
+                    image={image}
+                    slug={competitionId}
+                    category={comp.category || "General"}
+                    date={date}
+                    index={idx}
+                    total={filteredCompetitions.length}
+                    scrollToCard={scrollToCard}
+                  />
+                );
+              })
             ) : (
               <div className="h-screen flex items-center justify-center">
                  <span className="font-mono text-[10px] tracking-[0.5em] text-white/40 uppercase">NO MISSIONS DETECTED</span>
