@@ -619,6 +619,120 @@ const normalizeSubVenues = (subVenues = []) => {
     .filter(Boolean);
 };
 
+export function validateVenueScopeOnClient(values: any, venueCatalog: any) {
+  if (!venueCatalog || !Array.isArray(venueCatalog?.venues)) {
+    return [];
+  }
+
+  const normalize = (value: any) => {
+    if (value === undefined || value === null) return "";
+    return String(value).trim();
+  };
+
+  const venueName = normalize(values?.venueName);
+  const venueRoom = normalize(values?.venueRoom);
+  const venueFloor = normalize(values?.venueFloor);
+  const subVenues = Array.isArray(values?.subVenues) ? values.subVenues : [];
+
+  const venueMap = new Map(
+    venueCatalog.venues
+      .filter((venue: any) => normalize(venue?.venueName))
+      .map((venue: any) => [
+        normalize(venue.venueName),
+        {
+          ...venue,
+          subVenueMap: new Map(
+            (Array.isArray(venue?.subVenues) ? venue.subVenues : [])
+              .filter((subVenue: any) => normalize(subVenue?.name))
+              .map((subVenue: any) => [normalize(subVenue.name), subVenue]),
+          ),
+        },
+      ]),
+  );
+
+  const errors: Array<{ field: string; message: string }> = [];
+
+  if (!venueName) {
+    if (venueRoom || venueFloor || subVenues.length > 0) {
+      errors.push({
+        field: "venueName",
+        message: "Select a venue before choosing room, floor, or sub venues.",
+      });
+    }
+    return errors;
+  }
+
+  const selectedVenue = venueMap.get(venueName);
+  if (!selectedVenue) {
+    errors.push({
+      field: "venueName",
+      message: "Selected venue is not in the allowed venue catalog.",
+    });
+    return errors;
+  }
+
+  if (venueRoom && !selectedVenue.subVenueMap.has(venueRoom)) {
+    errors.push({
+      field: "venueRoom",
+      message: "Room must belong to the selected venue.",
+    });
+  }
+
+  const floorSet = new Set(
+    (Array.isArray(selectedVenue?.subVenues) ? selectedVenue.subVenues : [])
+      .map((subVenue: any) => normalize(subVenue?.floor))
+      .filter(Boolean),
+  );
+
+  if (venueFloor) {
+    if (venueRoom) {
+      const roomMeta = selectedVenue.subVenueMap.get(venueRoom);
+      const allowedFloor = normalize(roomMeta?.floor);
+      if (allowedFloor && allowedFloor !== venueFloor) {
+        errors.push({
+          field: "venueFloor",
+          message: "Floor does not match the selected room.",
+        });
+      }
+    } else if (floorSet.size > 0 && !floorSet.has(venueFloor)) {
+      errors.push({
+        field: "venueFloor",
+        message: "Floor must belong to the selected venue.",
+      });
+    }
+  }
+
+  subVenues.forEach((subVenue: any, index: number) => {
+    const subVenueName = normalize(subVenue?.name);
+    if (!subVenueName) return;
+
+    const subVenueMeta = selectedVenue.subVenueMap.get(subVenueName);
+    if (!subVenueMeta) {
+      errors.push({
+        field: "subVenues",
+        message: `Sub venue #${index + 1} is not valid for ${venueName}.`,
+      });
+      return;
+    }
+
+    const selectedSubVenueFloor = normalize(subVenue?.floor);
+    const allowedSubVenueFloor = normalize(subVenueMeta?.floor);
+
+    if (
+      selectedSubVenueFloor &&
+      allowedSubVenueFloor &&
+      selectedSubVenueFloor !== allowedSubVenueFloor
+    ) {
+      errors.push({
+        field: "subVenues",
+        message: `Sub venue #${index + 1} floor does not match the selected sub venue.`,
+      });
+    }
+  });
+
+  return errors;
+}
+
 export function buildCompetitionPayloadFormData(
   values: any,
   poster: any,

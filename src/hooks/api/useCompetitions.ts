@@ -13,6 +13,22 @@ interface CompetitionFilters {
   [key: string]: any;
 }
 
+interface VenueCatalogSubVenue {
+  name: string;
+  floor?: string | null;
+  capacity?: number | null;
+}
+
+interface VenueCatalogVenue {
+  venueName: string;
+  subVenues: VenueCatalogSubVenue[];
+}
+
+interface CompetitionVenueCatalog {
+  venueNames: string[];
+  venues: VenueCatalogVenue[];
+}
+
 const normalizeList = (data: any): Competition[] =>
   data?.data?.competitions ||
   data?.competitions ||
@@ -109,6 +125,27 @@ export function useCompetition(competitionId: string) {
 }
 
 /**
+ * Canonical venue/sub-venue catalog for scoped dropdowns
+ */
+export function useCompetitionVenueCatalog(enabled: boolean = true) {
+  return useQuery<CompetitionVenueCatalog>({
+    queryKey: ["competitions", "venue-catalog"],
+    queryFn: async () => {
+      const { data } = await apiClient.get("/competitions/venue-catalog");
+      const payload = data?.data || data || {};
+
+      return {
+        venueNames: Array.isArray(payload?.venueNames)
+          ? payload.venueNames
+          : [],
+        venues: Array.isArray(payload?.venues) ? payload.venues : [],
+      };
+    },
+    enabled,
+  });
+}
+
+/**
  * Create competition (SA/DH)
  */
 export function useCreateCompetition() {
@@ -130,7 +167,15 @@ export function useCreateCompetition() {
 export function useUpdateCompetition() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ competitionId, formData, ...rest }: { competitionId: string; formData?: FormData; [key: string]: any }) => {
+    mutationFn: async ({
+      competitionId,
+      formData,
+      ...rest
+    }: {
+      competitionId: string;
+      formData?: FormData;
+      [key: string]: any;
+    }) => {
       // Accept either a FormData instance (for file uploads) or a plain object
       const body = formData instanceof FormData ? formData : rest;
       const { data } = await apiClient.put(
@@ -170,7 +215,13 @@ export function useDeleteCompetition() {
 export function useToggleRegistrations() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ competitionId, registrationsOpen }: { competitionId: string; registrationsOpen: boolean }) => {
+    mutationFn: async ({
+      competitionId,
+      registrationsOpen,
+    }: {
+      competitionId: string;
+      registrationsOpen: boolean;
+    }) => {
       const { data } = await apiClient.patch(
         `/competitions/${competitionId}/toggle-registrations`,
         { registrationsOpen },
@@ -192,7 +243,13 @@ export function useToggleRegistrations() {
 export function useFreezeChanges() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ competitionId, frozen }: { competitionId: string; frozen: boolean }) => {
+    mutationFn: async ({
+      competitionId,
+      frozen,
+    }: {
+      competitionId: string;
+      frozen: boolean;
+    }) => {
       const { data } = await apiClient.patch(
         `/competitions/${competitionId}/freeze-changes`,
         { frozen },
@@ -214,7 +271,13 @@ export function useFreezeChanges() {
 export function useToggleReadOnlyMode() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ competitionId, readOnly }: { competitionId: string; readOnly: boolean }) => {
+    mutationFn: async ({
+      competitionId,
+      readOnly,
+    }: {
+      competitionId: string;
+      readOnly: boolean;
+    }) => {
       const { data } = await apiClient.patch(
         `/competitions/${competitionId}/read-only-mode`,
         { readOnly },

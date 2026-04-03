@@ -20,6 +20,7 @@ import {
   getEditDefaults,
   STATUS_OPTS,
   STEP_FIELDS,
+  validateVenueScopeOnClient,
 } from "./competitionSchemas";
 import CompetitionBasicInfoStep from "./steps/CompetitionBasicInfoStep";
 import CompetitionScheduleVenueStep from "./steps/CompetitionScheduleVenueStep";
@@ -28,6 +29,7 @@ import CompetitionRegistrationConfigStep from "./steps/CompetitionRegistrationCo
 import CompetitionPosterReviewStep from "./steps/CompetitionPosterReviewStep";
 import {
   useCompetition,
+  useCompetitionVenueCatalog,
   useCreateCompetition,
   useUpdateCompetition,
 } from "@/src/hooks/api/useCompetitions";
@@ -64,7 +66,10 @@ const BACKEND_FIELD_TOKEN_TO_FORM_FIELD: any = {
   VENUENAME: "venueName",
   VENUEROOM: "venueRoom",
   VENUEFLOOR: "venueFloor",
+  VENUENAMEREQUIREDFORSCOPEDSELECTION: "venueName",
   SUBVENUE: "subVenues",
+  SUBVENUENAME: "subVenues",
+  SUBVENUEFLOOR: "subVenues",
   REGISTRATIONFEE: "registrationFee",
   UNSTOPLINK: "unstopLink",
   MAXREGISTRATIONS: "maxRegistrations",
@@ -93,6 +98,12 @@ const ERROR_MESSAGE_MAP: any = {
     "Registration deadline must be in the future",
   INVALID_REGISTRATION_DEADLINE:
     "Registration deadline must be before event start time",
+  VENUE_NAME_REQUIRED_FOR_SCOPED_SELECTION:
+    "Select a venue before choosing room, floor, or sub venues",
+  INVALID_VENUE_NAME_VALUE: "Selected venue is not allowed",
+  INVALID_VENUE_ROOM_VALUE: "Selected room does not belong to the venue",
+  INVALID_VENUE_FLOOR_VALUE: "Selected floor is not valid for this venue",
+  INVALID_SUB_VENUES_FORMAT: "Sub venues format is invalid",
   INVALID_PROMO_CODES_FORMAT: "Promo codes have invalid format or values",
   INVALID_MIN_TEAM_SIZE_VALUE: "Minimum team size must be a positive number",
   INVALID_MAX_TEAM_SIZE_VALUE: "Maximum team size must be greater than minimum",
@@ -493,6 +504,7 @@ export default function CompetitionFormModal({
 
   const { data: fetchedCompetition, isLoading: isCompetitionLoading } =
     useCompetition(isVisible && competition?.id ? competition.id : null);
+  const { data: venueCatalog } = useCompetitionVenueCatalog(isVisible);
 
   const currentCompetition = useMemo(
     () => fetchedCompetition || competition || null,
@@ -581,6 +593,23 @@ export default function CompetitionFormModal({
       return;
     }
 
+    if (activeStep === 1) {
+      const venueScopeErrors = validateVenueScopeOnClient(
+        watch(),
+        venueCatalog,
+      );
+      if (venueScopeErrors.length > 0) {
+        venueScopeErrors.forEach((error) => {
+          setError(error.field as any, {
+            type: "manual",
+            message: error.message,
+          });
+        });
+        setShowErrorBanner(true);
+        return;
+      }
+    }
+
     setShowErrorBanner(false);
     const next = Math.min(activeStep + 1, STEP_LABELS.length - 1);
     setActiveStep(next);
@@ -598,6 +627,26 @@ export default function CompetitionFormModal({
   };
 
   const onSubmit = async (values: any) => {
+    const venueScopeErrors = validateVenueScopeOnClient(values, venueCatalog);
+    if (venueScopeErrors.length > 0) {
+      venueScopeErrors.forEach((error) => {
+        setError(error.field as any, {
+          type: "manual",
+          message: error.message,
+        });
+      });
+      setActiveStep(1);
+      setVisitedUpTo((v) => Math.max(v, 1));
+      setShowErrorBanner(true);
+      enqueueSnackbar(
+        venueScopeErrors[0]?.message || "Venue selection is invalid",
+        {
+          variant: "error",
+        },
+      );
+      return;
+    }
+
     const formData = buildCompetitionPayloadFormData(values, poster, banner);
 
     const handleError = (error: any) => {
@@ -674,6 +723,8 @@ export default function CompetitionFormModal({
       key="schedule"
       control={control}
       errors={errors}
+      setValue={setValue}
+      venueCatalog={venueCatalog}
     />,
     <CompetitionRulesStep key="rules" control={control} errors={errors} />,
     <CompetitionRegistrationConfigStep

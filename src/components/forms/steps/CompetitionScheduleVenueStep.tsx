@@ -1,19 +1,124 @@
 "use client";
 
-import { Controller, useFieldArray } from "react-hook-form";
+import { useEffect, useMemo } from "react";
+import { Controller, useFieldArray, useWatch } from "react-hook-form";
 import { Box } from "@mui/material";
 import { Plus, Trash2 } from "lucide-react";
 import { FieldGroup, inputCss } from "./CompetitionBasicInfoStep";
 
-export default function CompetitionScheduleVenueStep({ control, errors }: any) {
+export default function CompetitionScheduleVenueStep({
+  control,
+  errors,
+  setValue,
+  venueCatalog,
+}: any) {
   const { fields, append, remove } = useFieldArray({
     control,
     name: "subVenues",
   });
 
+  const selectedVenueName = useWatch({ control, name: "venueName" });
+  const selectedVenueRoom = useWatch({ control, name: "venueRoom" });
+  const selectedVenueFloor = useWatch({ control, name: "venueFloor" });
+
+  const venueNameOptions = useMemo(
+    () =>
+      Array.isArray(venueCatalog?.venueNames)
+        ? venueCatalog.venueNames
+        : Array.isArray(venueCatalog?.venues)
+          ? venueCatalog.venues
+              .map((venue: any) => venue?.venueName)
+              .filter(Boolean)
+          : [],
+    [venueCatalog],
+  );
+
+  const selectedVenue = useMemo(() => {
+    if (!Array.isArray(venueCatalog?.venues) || !selectedVenueName) return null;
+    return (
+      venueCatalog.venues.find(
+        (venue: any) => venue?.venueName === selectedVenueName,
+      ) || null
+    );
+  }, [venueCatalog, selectedVenueName]);
+
+  const venueRoomOptions = useMemo(
+    () =>
+      Array.isArray(selectedVenue?.subVenues)
+        ? selectedVenue.subVenues
+            .map((subVenue: any) => String(subVenue?.name || "").trim())
+            .filter(Boolean)
+        : [],
+    [selectedVenue],
+  );
+
+  const subVenueMetaMap = useMemo(() => {
+    const map = new Map<string, any>();
+    (selectedVenue?.subVenues || []).forEach((subVenue: any) => {
+      const name = String(subVenue?.name || "").trim();
+      if (!name) return;
+      map.set(name, subVenue);
+    });
+    return map;
+  }, [selectedVenue]);
+
+  const venueFloorOptions = useMemo(() => {
+    if (!selectedVenue) return [];
+
+    if (selectedVenueRoom && subVenueMetaMap.has(selectedVenueRoom)) {
+      const floor = String(
+        subVenueMetaMap.get(selectedVenueRoom)?.floor || "",
+      ).trim();
+      return floor ? [floor] : [];
+    }
+
+    return Array.from(
+      new Set(
+        (selectedVenue.subVenues || [])
+          .map((subVenue: any) => String(subVenue?.floor || "").trim())
+          .filter(Boolean),
+      ),
+    );
+  }, [selectedVenue, selectedVenueRoom, subVenueMetaMap]);
+
+  useEffect(() => {
+    if (!selectedVenue) {
+      if (selectedVenueRoom) {
+        setValue("venueRoom", "", { shouldDirty: true, shouldValidate: true });
+      }
+      if (selectedVenueFloor) {
+        setValue("venueFloor", "", { shouldDirty: true, shouldValidate: true });
+      }
+      return;
+    }
+
+    if (selectedVenueRoom && !subVenueMetaMap.has(selectedVenueRoom)) {
+      setValue("venueRoom", "", { shouldDirty: true, shouldValidate: true });
+    }
+
+    if (selectedVenueFloor && !venueFloorOptions.includes(selectedVenueFloor)) {
+      setValue("venueFloor", "", { shouldDirty: true, shouldValidate: true });
+    }
+  }, [
+    selectedVenue,
+    selectedVenueRoom,
+    selectedVenueFloor,
+    setValue,
+    subVenueMetaMap,
+    venueFloorOptions,
+  ]);
+
   const dateInputCss = {
     ...inputCss,
     colorScheme: "dark",
+  };
+
+  const selectCss = {
+    ...inputCss,
+    appearance: "none" as const,
+    WebkitAppearance: "none" as const,
+    MozAppearance: "none" as const,
+    paddingRight: 28,
   };
 
   return (
@@ -61,11 +166,29 @@ export default function CompetitionScheduleVenueStep({ control, errors }: any) {
           name="venueName"
           control={control}
           render={({ field }) => (
-            <input
+            <select
               {...field}
-              placeholder="e.g. Main Auditorium"
-              style={inputCss}
-            />
+              style={selectCss}
+              onChange={(event) => {
+                const nextVenueName = event.target.value;
+                field.onChange(nextVenueName);
+                setValue("venueRoom", "", {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                });
+                setValue("venueFloor", "", {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                });
+              }}
+            >
+              <option value="">Select venue</option>
+              {venueNameOptions.map((venueName: string) => (
+                <option key={venueName} value={venueName}>
+                  {venueName}
+                </option>
+              ))}
+            </select>
           )}
         />
       </FieldGroup>
@@ -76,7 +199,18 @@ export default function CompetitionScheduleVenueStep({ control, errors }: any) {
           name="venueRoom"
           control={control}
           render={({ field }) => (
-            <input {...field} placeholder="e.g. Room 201" style={inputCss} />
+            <select
+              {...field}
+              disabled={!selectedVenue}
+              style={{ ...selectCss, opacity: selectedVenue ? 1 : 0.6 }}
+            >
+              <option value="">Select room</option>
+              {venueRoomOptions.map((roomName: string) => (
+                <option key={roomName} value={roomName}>
+                  {roomName}
+                </option>
+              ))}
+            </select>
           )}
         />
       </FieldGroup>
@@ -87,7 +221,18 @@ export default function CompetitionScheduleVenueStep({ control, errors }: any) {
           name="venueFloor"
           control={control}
           render={({ field }) => (
-            <input {...field} placeholder="e.g. 2nd Floor" style={inputCss} />
+            <select
+              {...field}
+              disabled={!selectedVenue}
+              style={{ ...selectCss, opacity: selectedVenue ? 1 : 0.6 }}
+            >
+              <option value="">Select floor</option>
+              {venueFloorOptions.map((floor: string) => (
+                <option key={floor} value={floor}>
+                  {floor}
+                </option>
+              ))}
+            </select>
           )}
         />
       </FieldGroup>
@@ -216,7 +361,54 @@ export default function CompetitionScheduleVenueStep({ control, errors }: any) {
                   name={`subVenues.${index}.name`}
                   control={control}
                   render={({ field: f }) => (
-                    <input {...f} placeholder="e.g. Stage A" style={inputCss} />
+                    <select
+                      {...f}
+                      disabled={!selectedVenue}
+                      style={{ ...selectCss, opacity: selectedVenue ? 1 : 0.6 }}
+                      onChange={(event) => {
+                        const selectedSubVenueName = event.target.value;
+                        f.onChange(selectedSubVenueName);
+
+                        const selectedSubVenueMeta =
+                          subVenueMetaMap.get(selectedSubVenueName);
+
+                        setValue(
+                          `subVenues.${index}.room`,
+                          selectedSubVenueName || "",
+                          {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          },
+                        );
+
+                        setValue(
+                          `subVenues.${index}.floor`,
+                          selectedSubVenueMeta?.floor || "",
+                          {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          },
+                        );
+
+                        setValue(
+                          `subVenues.${index}.capacity`,
+                          selectedSubVenueMeta?.capacity
+                            ? String(selectedSubVenueMeta.capacity)
+                            : "",
+                          {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          },
+                        );
+                      }}
+                    >
+                      <option value="">Select sub venue</option>
+                      {venueRoomOptions.map((subVenueName: string) => (
+                        <option key={subVenueName} value={subVenueName}>
+                          {subVenueName}
+                        </option>
+                      ))}
+                    </select>
                   )}
                 />
               </FieldGroup>
