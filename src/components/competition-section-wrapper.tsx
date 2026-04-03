@@ -36,6 +36,9 @@ export default function SectionWrapper({ competition }: { competition: any }) {
     .split(/\n{2,}/)
     .map((part) => part.trim())
     .filter(Boolean);
+  const rulesText = Array.isArray(competition.rulesRichText)
+    ? competition.rulesRichText.join("\n")
+    : String(competition.rulesRichText || "").trim();
 
   return (
     <div className="flex flex-col space-y-32">
@@ -57,7 +60,7 @@ export default function SectionWrapper({ competition }: { competition: any }) {
         </div>
 
         <div className="absolute -inset-12 bg-white/5 border border-white/10 blur-3xl rounded-[4rem] -z-10 opacity-30"></div>
-        <div className="relative z-10 max-w-[1400px] pt-40 md:pt-60">
+        <div className="relative z-10 max-w-350 pt-40 md:pt-60">
           <div className="flex items-center space-x-4 mb-8 md:mb-12 overflow-hidden">
             <div className="h-px w-12 bg-white/20"></div>
             <span className="text-white/70 font-mono text-xs tracking-widest uppercase">
@@ -140,12 +143,14 @@ export default function SectionWrapper({ competition }: { competition: any }) {
                     </ScrollReveal>
                   ))}
 
-                  {Array.isArray(competition.rulesRichText) &&
-                  competition.rulesRichText.length > 0 ? (
+                  {rulesText ? (
                     <div className="pt-12">
-                      <RulesSection rules={competition.rulesRichText} />
+                      <RulesSection rules={rulesText} />
                     </div>
                   ) : null}
+
+                  
+                  
 
                   <p className="opacity-30 italic font-mono text-xs tracking-[0.3em] pt-12 uppercase border-t border-white/5">
                     End of Briefing • Awaiting Commander Input

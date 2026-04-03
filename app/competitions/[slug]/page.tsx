@@ -108,15 +108,104 @@ const toDisplayText = (value: any): string => {
 };
 
 const normalizeRulesRichText = (rulesRichText: any): string => {
-  if (Array.isArray(rulesRichText)) {
-    return rulesRichText.join("\n");
+  const rawText = Array.isArray(rulesRichText)
+    ? rulesRichText.join("\n")
+    : typeof rulesRichText === "string"
+      ? rulesRichText
+      : "";
+
+  if (!rawText.trim()) return "";
+
+  const normalizeInline = (value: string): string =>
+    value
+      .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+|\/[^)\s]+)\)/g, "[$1]($2)")
+      .replace(/\*\*\*([^*]+)\*\*\*/g, "***$1***")
+      .replace(/\*\*([^*]+)\*\*/g, "**$1**")
+      .replace(/__([^_]+)__/g, "__$1__")
+      .replace(/\*([^*]+)\*/g, "*$1*")
+      .replace(/_([^_]+)_/g, "_$1_")
+      .replace(/`([^`]+)`/g, "`$1`")
+      .replace(/~~([^~]+)~~/g, "~~$1~~")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const normalizedLines: string[] = [];
+  const lines = rawText.replace(/\r\n/g, "\n").split("\n");
+
+  let inCodeBlock = false;
+  const codeLines: string[] = [];
+
+  const flushCodeBlock = () => {
+    if (!codeLines.length) return;
+    const codeContent = codeLines.join("\n").trimEnd();
+    if (codeContent) normalizedLines.push("```", codeContent, "```");
+    codeLines.length = 0;
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+
+    if (!line) {
+      if (inCodeBlock) {
+        codeLines.push("");
+      } else if (normalizedLines[normalizedLines.length - 1] !== "") {
+        normalizedLines.push("");
+      }
+      continue;
+    }
+
+    if (line.startsWith("```") || line.startsWith("~~~")) {
+      inCodeBlock = !inCodeBlock;
+      if (!inCodeBlock) {
+        flushCodeBlock();
+      }
+      if (inCodeBlock) {
+        normalizedLines.push("```");
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeLines.push(rawLine);
+      continue;
+    }
+
+    if (/^[-*_]{3,}$/.test(line)) {
+      normalizedLines.push("---");
+      continue;
+    }
+
+    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+    if (headingMatch) {
+      normalizedLines.push(`${headingMatch[1]} ${normalizeInline(headingMatch[2])}`);
+      continue;
+    }
+
+    const bulletMatch = line.match(/^[-*+]\s+(.+)$/);
+    if (bulletMatch) {
+      normalizedLines.push(`- ${normalizeInline(bulletMatch[1])}`);
+      continue;
+    }
+
+    const orderedMatch = line.match(/^\d+[.)]\s+(.+)$/);
+    if (orderedMatch) {
+      normalizedLines.push(`1. ${normalizeInline(orderedMatch[1])}`);
+      continue;
+    }
+
+    const quoteMatch = line.match(/^>\s*(.+)$/);
+    if (quoteMatch) {
+      normalizedLines.push(`> ${normalizeInline(quoteMatch[1])}`);
+      continue;
+    }
+
+    normalizedLines.push(normalizeInline(rawLine));
   }
 
-  if (typeof rulesRichText === "string") {
-    return rulesRichText;
-  }
+  flushCodeBlock();
 
-  return "";
+  return normalizedLines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 };
 
 export default function CompetitionSlugPage({
@@ -212,6 +301,7 @@ export default function CompetitionSlugPage({
       <ParallaxBackground imageUrl={normalizedCompetition.image} />
       <AudioController />
       <ScrollProgressIndicator />
+   
 
       <ReturnButton href="/planets/jupiter" />
 
