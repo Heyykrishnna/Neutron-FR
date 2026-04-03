@@ -53,6 +53,19 @@ const normalizeFieldValue = (field: FormField, value: any) => {
   return value;
 };
 
+const extractCheckoutUrl = (payload: any): string | null => {
+  if (!payload || typeof payload !== "object") return null;
+
+  const payment = payload?.payment || null;
+  const directUrl = payment?.session?.checkoutUrl || payment?.checkoutUrl;
+
+  if (typeof directUrl === "string" && directUrl.trim().length > 0) {
+    return directUrl;
+  }
+
+  return null;
+};
+
 export default function CompetitionRegistration({
   competitionId,
   competitionTitle,
@@ -68,6 +81,7 @@ export default function CompetitionRegistration({
     "start",
   );
   const [errorMessage, setErrorMessage] = useState("");
+  const [checkoutRedirecting, setCheckoutRedirecting] = useState(false);
   const [teamDetails, setTeamDetails] = useState<TeamDetails>({
     teamName: "",
     selectedTeamSize: "",
@@ -212,15 +226,20 @@ export default function CompetitionRegistration({
     });
 
     try {
+      let registrationResult: any = null;
+
       if (isMemberMode) {
         await submitMemberFormMutation.mutateAsync({
           teamId: teamIdFromQuery,
           formData,
         });
       } else if (isSolo) {
-        await registerSoloMutation.mutateAsync({ competitionId, formData });
+        registrationResult = await registerSoloMutation.mutateAsync({
+          competitionId,
+          formData,
+        });
       } else {
-        const registrationResult = await registerTeamMutation.mutateAsync({
+        registrationResult = await registerTeamMutation.mutateAsync({
           competitionId,
           teamName: teamDetails.teamName.trim(),
           formData,
@@ -239,6 +258,13 @@ export default function CompetitionRegistration({
             ),
           );
         }
+      }
+
+      const checkoutUrl = extractCheckoutUrl(registrationResult);
+      if (checkoutUrl && typeof window !== "undefined") {
+        setCheckoutRedirecting(true);
+        window.location.assign(checkoutUrl);
+        return;
       }
 
       await myRegistrationsQuery.refetch();
@@ -699,14 +725,17 @@ export default function CompetitionRegistration({
             registerSoloMutation.isPending ||
             registerTeamMutation.isPending ||
             submitMemberFormMutation.isPending ||
-            sendTeamInviteMutation.isPending
+            sendTeamInviteMutation.isPending ||
+            checkoutRedirecting
           }
           className="mt-2 w-full bg-white text-black font-semibold py-4 rounded-xl hover:bg-gray-200 transition-colors duration-300 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          {registerSoloMutation.isPending ||
-          registerTeamMutation.isPending ||
-          submitMemberFormMutation.isPending ||
-          sendTeamInviteMutation.isPending ? (
+          {checkoutRedirecting ? (
+            "Redirecting To Secure Payment..."
+          ) : registerSoloMutation.isPending ||
+            registerTeamMutation.isPending ||
+            submitMemberFormMutation.isPending ||
+            sendTeamInviteMutation.isPending ? (
             <>
               <svg
                 className="animate-spin w-5 h-5"

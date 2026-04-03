@@ -45,6 +45,7 @@ import {
   useTeamDetails,
   useTransferTeamLeadership,
 } from "@/src/hooks/api/usePublicRegistration";
+import { useRetryRegistrationPayment } from "@/src/hooks/api/usePayments";
 import {
   useMyQRCode,
   useUpdateUserProfile,
@@ -82,6 +83,14 @@ interface EnrolledItem {
   kind: "competition" | "event";
   id: string;
   slug: string;
+  registrationId?: string;
+  registrationStatus?: string;
+  paymentStatus?: string;
+  paymentRequired?: boolean;
+  paymentVerifiedAt?: string;
+  onRetryPayment?: (registrationId: string) => Promise<void> | void;
+  retryingRegistrationId?: string | null;
+  disablePaymentAction?: boolean;
   teamId?: string;
   currentUserId?: string;
   title: string;
@@ -1200,6 +1209,20 @@ function EnrolledCard({ item, href }: { item: EnrolledItem; href: string }) {
     cancelled: "bg-white/5 border-white/10 text-white/30",
   };
 
+  const normalizedRegistrationStatus = String(
+    item.registrationStatus || "",
+  ).toUpperCase();
+  const normalizedPaymentStatus = String(
+    item.paymentStatus || "",
+  ).toUpperCase();
+  const canCompletePayment = Boolean(
+    item.kind === "competition" &&
+    item.paymentRequired &&
+    normalizedRegistrationStatus === "APPROVED" &&
+    normalizedPaymentStatus !== "PAID" &&
+    item.registrationId,
+  );
+
   return (
     <>
       <div className="bg-white/3 border border-white/8 rounded-2xl overflow-hidden hover:border-white/14 transition-all duration-200 group">
@@ -1224,12 +1247,50 @@ function EnrolledCard({ item, href }: { item: EnrolledItem; href: string }) {
               >
                 {item.status}
               </span>
+              {item.kind === "competition" && item.paymentRequired ? (
+                <span
+                  className={`px-2 py-0.5 rounded-md border text-[10px] uppercase tracking-wider font-mono ${normalizedPaymentStatus === "PAID" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : normalizedPaymentStatus === "FAILED" || normalizedPaymentStatus === "EXPIRED" ? "bg-rose-500/10 border-rose-500/20 text-rose-400" : "bg-amber-500/10 border-amber-500/20 text-amber-300"}`}
+                >
+                  {normalizedPaymentStatus || "PENDING"}
+                </span>
+              ) : null}
               <span className="text-[10px] text-white/25 font-mono">
                 {item.teamSize}
               </span>
             </div>
           </div>
         </div>
+
+        {item.kind === "competition" && item.paymentRequired ? (
+          <div className="px-4 pb-4 border-t border-white/5 pt-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <p className="text-[10px] uppercase tracking-widest font-mono text-white/30">
+                {normalizedPaymentStatus === "PAID"
+                  ? "Payment completed"
+                  : normalizedRegistrationStatus !== "APPROVED"
+                    ? "Payment unlocks after approval"
+                    : "Payment pending"}
+              </p>
+              {canCompletePayment ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    item.onRetryPayment?.(String(item.registrationId || ""))
+                  }
+                  disabled={
+                    item.retryingRegistrationId === item.registrationId ||
+                    Boolean(item.disablePaymentAction)
+                  }
+                  className="px-3 py-1.5 rounded-lg border border-amber-400/30 bg-amber-500/10 text-[10px] uppercase tracking-wider font-mono text-amber-300 hover:bg-amber-500/20 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {item.retryingRegistrationId === item.registrationId
+                    ? "Opening..."
+                    : "Complete Payment"}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         {hasTeam && (
           <div className="px-4 pb-4 border-t border-white/5 pt-3">
@@ -1635,9 +1696,15 @@ function ProfilePanel({
 function CompetitionsPanel({
   competitions,
   userId,
+  onRetryPayment,
+  retryingRegistrationId,
+  disablePaymentAction,
 }: {
   competitions: EnrolledItem[];
   userId: string;
+  onRetryPayment: (registrationId: string) => Promise<void>;
+  retryingRegistrationId: string | null;
+  disablePaymentAction: boolean;
 }) {
   const { showToast } = useDashboard();
   return (
@@ -1667,7 +1734,13 @@ function CompetitionsPanel({
                 {competitions.map((c) => (
                   <EnrolledCard
                     key={c.slug}
-                    item={{ ...c, currentUserId: userId }}
+                    item={{
+                      ...c,
+                      currentUserId: userId,
+                      onRetryPayment,
+                      retryingRegistrationId,
+                      disablePaymentAction,
+                    }}
                     href={`/competitions/${c.slug}`}
                   />
                 ))}
@@ -2444,6 +2517,7 @@ export default function ProfilePage() {
   const authMeQuery = useAuthMe();
   const updateProfileMutation = useUpdateUserProfile();
   const myRegistrationsQuery = useMyRegistrations(Boolean(authMeQuery.data));
+  const retryPaymentMutation = useRetryRegistrationPayment();
   const pendingInvitesQuery = usePendingTeamInvites(Boolean(authMeQuery.data));
   const acceptInviteMutation = useAcceptTeamInvite();
   const declineInviteMutation = useDeclineTeamInvite();
@@ -2451,6 +2525,9 @@ export default function ProfilePage() {
   const [active, setActive] = useState<NavItem>("profile");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [retryingRegistrationId, setRetryingRegistrationId] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     const section = searchParams.get("section");
@@ -2577,9 +2654,41 @@ export default function ProfilePage() {
   const registrations = Array.isArray(myRegistrationsQuery.data)
     ? myRegistrationsQuery.data
     : [];
+
+  const handleRetryPayment = async (registrationId: string) => {
+    if (!registrationId) return;
+
+    setRetryingRegistrationId(registrationId);
+    try {
+      const result = await retryPaymentMutation.mutateAsync(registrationId);
+      const checkoutUrl =
+        result?.paymentSession?.checkoutUrl || result?.checkoutUrl || null;
+
+      if (checkoutUrl && typeof window !== "undefined") {
+        window.location.assign(checkoutUrl);
+        return;
+      }
+
+      showToast(
+        "Payment session created but checkout URL is missing. Please try again.",
+        "error",
+      );
+    } catch (error: any) {
+      showToast(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Failed to start payment retry.",
+        "error",
+      );
+    } finally {
+      setRetryingRegistrationId(null);
+    }
+  };
+
   const enrolledItems: EnrolledItem[] = registrations
     .map((entry: any) => {
       const competition = entry?.competition || {};
+      const registration = entry?.registration || {};
       const competitionType = String(
         competition?.eventType || competition?.type || "",
       ).toUpperCase();
@@ -2594,6 +2703,11 @@ export default function ProfilePage() {
         kind,
         id,
         slug: id,
+        registrationId: String(registration?.id || ""),
+        registrationStatus: String(registration?.status || ""),
+        paymentStatus: String(registration?.paymentStatus || ""),
+        paymentRequired: Boolean(competition?.isPaid),
+        paymentVerifiedAt: registration?.paymentVerifiedAt,
         teamId: entry?.team?.id || entry?.registration?.teamId || undefined,
         title: competition?.title || "",
         image: competition?.posterPath || "",
@@ -2971,6 +3085,9 @@ export default function ProfilePage() {
                     <CompetitionsPanel
                       competitions={competitionItems}
                       userId={userId}
+                      onRetryPayment={handleRetryPayment}
+                      retryingRegistrationId={retryingRegistrationId}
+                      disablePaymentAction={retryPaymentMutation.isPending}
                     />
                   )}
                   {active === "events" && <EventsPanel events={eventItems} />}

@@ -115,6 +115,26 @@ export const queryKeys = {
     ],
   },
 
+  // Payment queries
+  payments: {
+    all: ["payments"],
+    status: (registrationId: string | number) => [
+      ...queryKeys.payments.all,
+      "status",
+      registrationId,
+    ],
+    approvedUnpaid: (filters: any = {}) => [
+      ...queryKeys.payments.all,
+      "approved-unpaid",
+      filters,
+    ],
+    sessions: (registrationId: string | number) => [
+      ...queryKeys.payments.all,
+      "sessions",
+      registrationId,
+    ],
+  },
+
   // Competition queries (DH)
   competitions: {
     all: ["competitions"],
