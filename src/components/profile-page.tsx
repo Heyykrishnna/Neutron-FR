@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { 
-  Plus, 
   Trash2, 
   X, 
   ChevronRight, 
@@ -23,8 +22,10 @@ import {
   ChevronLeft
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import ProfileCard from "./ProfileCard";
 import { useAuthMe } from "@/src/hooks/api/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   useAcceptTeamInvite,
   useDeclineTeamInvite,
@@ -108,6 +109,16 @@ const STATUS_MAP: Record<string, EnrolledItem["status"]> = {
   POSTPONED: "postponed",
   CANCELLED: "cancelled",
 };
+
+const GENDER_OPTIONS = ["MALE", "FEMALE", "OTHER"] as const;
+const COMMON_AVATAR_URL = "/images/bg.jpeg";
+
+function normalizeGender(value: string): string {
+  const normalized = value.trim().toUpperCase();
+  return GENDER_OPTIONS.includes(normalized as (typeof GENDER_OPTIONS)[number])
+    ? normalized
+    : "";
+}
 
 function toDashboardStatus(status?: string): EnrolledItem["status"] {
   if (!status) return "closed";
@@ -304,29 +315,55 @@ function DocumentCard({
   label, 
   type, 
   date, 
-  onUpload 
+  onUpload,
+  existingUrl,
 }: { 
   label: string; 
   type: string; 
   date: string; 
-  onUpload: (name: string) => void 
+  onUpload: (file: File) => Promise<void> | void;
+  existingUrl?: string;
 }) {
   const { showToast } = useDashboard();
   const [file, setFile] = useState<File | null>(null);
+  const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
+  const [existingPreviewFailed, setExistingPreviewFailed] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const hasExistingFile = Boolean(existingUrl && !file);
+  const existingFileName = existingUrl
+    ? decodeURIComponent(existingUrl.split("/").pop() || label)
+    : label;
+  const isImageFile = Boolean(file?.type?.startsWith("image/"));
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    setExistingPreviewFailed(false);
+  }, [existingUrl]);
+
+  useEffect(() => {
+    if (!file || !isImageFile) {
+      setLocalPreviewUrl(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(file);
+    setLocalPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [file, isImageFile]);
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
     
     setUploading(true);
-    setTimeout(() => {
+    try {
+      await onUpload(f);
       setFile(f);
+    } catch {
+      showToast("Failed to upload file.", "error");
+    } finally {
       setUploading(false);
-      onUpload(f.name);
-    }, 1500);
+    }
   };
 
   return (
@@ -340,10 +377,32 @@ function DocumentCard({
                   <p className="text-[8px] text-white/40 uppercase tracking-widest font-mono">Uploading...</p>
                </div>
             ) : file ? (
-               <div className="w-full h-full bg-linear-to-br from-emerald-500/10 to-teal-500/10 flex flex-col items-center justify-center p-4 text-center">
+              isImageFile && localPreviewUrl ? (
+                <img
+                  src={localPreviewUrl}
+                  alt={`${label} preview`}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-linear-to-br from-emerald-500/10 to-teal-500/10 flex flex-col items-center justify-center p-4 text-center">
                   <CheckCircle2 size={24} className="text-emerald-400 mb-2" />
                   <p className="text-[8px] text-white/50 truncate w-full font-mono">{file.name}</p>
-               </div>
+                </div>
+              )
+            ) : hasExistingFile ? (
+              !existingPreviewFailed ? (
+                <img
+                  src={existingUrl}
+                  alt={`${label} preview`}
+                  className="w-full h-full object-cover"
+                  onError={() => setExistingPreviewFailed(true)}
+                />
+              ) : (
+                <div className="w-full h-full bg-linear-to-br from-blue-500/10 to-cyan-500/10 flex flex-col items-center justify-center p-4 text-center">
+                  <CheckCircle2 size={24} className="text-blue-400 mb-2" />
+                  <p className="text-[8px] text-white/50 truncate w-full font-mono">{existingFileName}</p>
+                </div>
+              )
             ) : (
                <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover/doc:bg-white/10 transition-all">
                   <Upload size={18} className="text-white/20 group-hover/doc:text-white" />
@@ -394,9 +453,9 @@ function DocumentCard({
         </div>
         <div className="flex items-center justify-between mt-1">
           <p className="text-[9px] text-white/30 font-mono uppercase tracking-widest leading-none">
-            {file ? (file.size / 1024 / 1024).toFixed(1) + " MB" : type} &bull; {file ? "Just now" : date}
+            {file ? (file.size / 1024 / 1024).toFixed(1) + " MB" : hasExistingFile ? type : type} &bull; {file ? "Just now" : hasExistingFile ? "Uploaded" : date}
           </p>
-          {file && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>}
+          {(file || hasExistingFile) && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>}
         </div>
       </div>
     </div>
@@ -753,16 +812,48 @@ function ProfilePanel({
   set,
   onViewMember,
   teamMembers,
+  userId,
+  updateProfileMutation,
+  setProfile,
 }: { 
   profile: ProfileState,
   set: (key: keyof ProfileState) => (val: string) => void,
   onViewMember: (m: any) => void,
   teamMembers: Array<{ id: string; name: string; role: string; avatar: string; isMe?: boolean }>,
+  userId: string;
+  updateProfileMutation: any;
+  setProfile: (
+    p: ProfileState | ((prev: ProfileState) => ProfileState),
+  ) => void;
 }) {
   const { showToast, setExpandedID } = useDashboard();
+  const isPersonalDataComplete = Boolean(
+    (profile.name || profile.email) &&
+      profile.gender &&
+      (profile.city || profile.state),
+  );
+
+  const uploadFile =
+    (field: "collegeIdPic" | "govtIdPic") => async (file: File) => {
+      if (!userId) return;
+      try {
+        const response = await updateProfileMutation.mutateAsync({
+          userId,
+          [field]: file,
+        });
+        const uploadedUrl = response?.user?.[field];
+        setProfile((p: ProfileState) => ({
+          ...p,
+          [field]: typeof uploadedUrl === "string" && uploadedUrl ? uploadedUrl : URL.createObjectURL(file),
+        }));
+        showToast(`${field} uploaded successfully.`, "success");
+      } catch {
+        showToast(`Failed to upload ${field}.`, "error");
+      }
+    };
 
   const completedCount = [
-    Boolean(profile.name && profile.gender && profile.city && profile.state),
+    isPersonalDataComplete,
     Boolean(profile.college && profile.year),
     Boolean(profile.email),
     Boolean(profile.whatsapp),
@@ -785,8 +876,42 @@ function ProfilePanel({
               <EditableRow label="Date of birth" value="March 15th, 2004" onChange={() => showToast("DOB updated successfully.")} />
               <EditableRow label="Gender" value={profile.gender} onChange={set("gender")} />
               <EditableRow label="Phone" value={profile.whatsapp} onChange={set("whatsapp")} placeholder="+91 XXXXX XXXXX" />
+              <EditableRow label="College" value={profile.college} onChange={set("college")} placeholder="Your college" />
+              <EditableRow label="Year of study" value={profile.year} onChange={set("year")} placeholder="e.g. 3rd Year" />
               <EditableRow label="Email" value={profile.email} onChange={set("email")} locked />
-                <EditableRow label="Address" value={`${profile.city}${profile.city && profile.state ? ", " : ""}${profile.state}`} onChange={() => {}} />
+              <EditableRow
+                label="Address"
+                value={`${profile.city}${profile.city && profile.state ? ", " : ""}${profile.state}`}
+                onChange={async (value) => {
+                  const [cityPart, ...rest] = value.split(",").map((s) => s.trim());
+                  const city = cityPart || "";
+                  const state = rest.join(", ") || "";
+
+                  if (profile.city === city && profile.state === state) return;
+
+                  const previousCity = profile.city;
+                  const previousState = profile.state;
+                  setProfile((p) => ({ ...p, city, state }));
+
+                  if (!userId) return;
+
+                  try {
+                    await updateProfileMutation.mutateAsync({
+                      userId,
+                      city,
+                      state,
+                    });
+                    showToast("Profile updated successfully.", "success");
+                  } catch {
+                    setProfile((p) => ({
+                      ...p,
+                      city: previousCity,
+                      state: previousState,
+                    }));
+                    showToast("Failed to update profile.", "error");
+                  }
+                }}
+              />
            </div>
         </DashboardWidget>
       </div>
@@ -797,17 +922,8 @@ function ProfilePanel({
           onManage={() => showToast("Document verification engine is running in the background.", "info")}
         >
            <div className="grid grid-cols-2 gap-4">
-              <DocumentCard label="College ID" type="Card" date="Mar 2026" onUpload={(name) => showToast(`College ID "${name}" uploaded.`)} />
-              <DocumentCard label="Aadhaar" type="Card" date="Mar 2026" onUpload={(name) => showToast(`Aadhaar "${name}" uploaded.`)} />
-              <DocumentCard label="Certificate" type="PDF" date="Feb 2026" onUpload={(name) => showToast(`Certificate "${name}" uploaded.`)} />
-              <div 
-                onClick={() => showToast("Additional slots will be available after verification.", "info")}
-                className="border-2 border-dashed border-white/5 rounded-2xl flex items-center justify-center aspect-video group cursor-pointer hover:border-white/10 transition-all"
-              >
-                  <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/20 group-hover:text-white/40 transition-all">
-                     <Plus size={14} />
-                  </div>
-              </div>
+              <DocumentCard label="College ID" type="Card" date="Mar 2026" onUpload={uploadFile("collegeIdPic")} existingUrl={profile.collegeIdPic} />
+              <DocumentCard label="Aadhaar" type="Card" date="Mar 2026" onUpload={uploadFile("govtIdPic")} existingUrl={profile.govtIdPic} />
            </div>
         </DashboardWidget>
       </div>
@@ -825,7 +941,7 @@ function ProfilePanel({
                 handle={(profile.email || "").split("@")[0] || ""}
                 status={profile.year}
                 contactText="VIEW FULL ID"
-                avatarUrl={profile.image || ""}
+                avatarUrl={COMMON_AVATAR_URL}
                 showUserInfo={false}
                 enableTilt={true}
                 enableMobileTilt={false}
@@ -867,12 +983,12 @@ function ProfilePanel({
          >
             <div className="space-y-4">
                {[
-              { label: "Personal data", done: Boolean(profile.name && profile.gender && profile.city && profile.state) },
+              { label: "Personal data", done: isPersonalDataComplete },
               { label: "Education", done: Boolean(profile.college && profile.year) },
               { label: "Email address", done: Boolean(profile.email) },
               { label: "Phone number", done: Boolean(profile.whatsapp) },
-              { label: "Government ID", done: Boolean(profile.govtIdPic) },
               { label: "College ID", done: Boolean(profile.collegeIdPic) },
+              { label: "Government ID", done: Boolean(profile.govtIdPic) },
                ].map((item) => (
                  <div key={item.label} className="flex items-center gap-3 group cursor-pointer" onClick={() => showToast(`Requirement: ${item.label} (${item.done ? "Fulfilled" : "Pending"})`, "info")}>
                     <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${item.done ? "bg-emerald-500/20 border-emerald-500 text-emerald-500" : "bg-white/5 border-white/10 text-white/5 group-hover:border-white/20"}`}>
@@ -1327,6 +1443,8 @@ function SidebarNav({ active, setActive }: { active: any; setActive: (v: any) =>
 }
 
 export default function ProfilePage() {
+  const router = useRouter();
+  const { logout } = useAuth();
   const authMeQuery = useAuthMe();
   const updateProfileMutation = useUpdateUserProfile();
   const myRegistrationsQuery = useMyRegistrations(Boolean(authMeQuery.data));
@@ -1336,6 +1454,7 @@ export default function ProfilePage() {
 
   const [active, setActive] = useState<NavItem>("profile");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   
   // Toast System
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
@@ -1346,8 +1465,13 @@ export default function ProfilePage() {
 
   const [profile, setProfile] = useState<ProfileState>(EMPTY_PROFILE);
 
-  const authUser = authMeQuery.data as Record<string, any> | undefined;
+  const authUser = ((authMeQuery.data as any)?.data?.user ||
+    (authMeQuery.data as any)?.user ||
+    authMeQuery.data) as Record<string, any> | undefined;
   const userId = (authUser?.id || authUser?._id || "") as string;
+  const isPanelUser = ["SA", "DH", "JUDGE", "CH", "VOLUNTEER"].includes(
+    String(authUser?.role || "").toUpperCase(),
+  );
 
   useEffect(() => {
     if (!authUser) return;
@@ -1369,26 +1493,41 @@ export default function ProfilePage() {
   }, [authUser]);
 
   const set = (key: keyof ProfileState) => async (val: string) => {
-    setProfile((p) => ({ ...p, [key]: val }));
+    const normalized =
+      key === "gender" ? normalizeGender(val ?? "") : (val ?? "").trim();
+    if (key === "whatsapp") {
+      const digitsOnly = normalized.replace(/\D/g, "");
+      if (digitsOnly.length < 10 || digitsOnly.length > 15) {
+        showToast("Phone number must be between 10 and 15 digits.", "error");
+        return;
+      }
+    }
+
+    if (profile[key] === normalized) return;
+
+    const previous = profile[key];
+    setProfile((p) => ({ ...p, [key]: normalized }));
 
     if (!userId) return;
 
     const payloadByField: Partial<Record<keyof ProfileState, Record<string, string>>> = {
-      city: { city: val },
-      state: { state: val },
-      college: { collegeName: val },
-      gender: { gender: val },
-      whatsapp: { whatsappNumber: val },
-      year: { yearOfStudy: val },
+      city: { city: normalized },
+      state: { state: normalized },
+      college: { collegeName: normalized },
+      gender: { gender: normalized },
+      whatsapp: { whatsappNumber: normalized },
+      year: { yearOfStudy: normalized },
     };
 
     const payload = payloadByField[key];
     if (!payload) return;
+    if (key === "gender" && !normalized) return;
 
     try {
       await updateProfileMutation.mutateAsync({ userId, ...payload });
       showToast("Profile updated successfully.", "success");
     } catch {
+      setProfile((p) => ({ ...p, [key]: previous }));
       showToast("Failed to update profile.", "error");
     }
   };
@@ -1435,7 +1574,7 @@ export default function ProfilePage() {
       id: userId || "me",
       name: profile.name || "",
       role: "You",
-      avatar: profile.image || "",
+      avatar: COMMON_AVATAR_URL,
       isMe: true,
     },
   ];
@@ -1497,7 +1636,7 @@ export default function ProfilePage() {
                   handle={(profile.email || "").split("@")[0] || ""}
                   status={profile.year}
                   contactText="DOWNLOAD ID"
-                  avatarUrl={profile.image || ""}
+                  avatarUrl={COMMON_AVATAR_URL}
                   showUserInfo={false}
                   enableTilt={true}
                   enableMobileTilt={true}
@@ -1553,7 +1692,7 @@ export default function ProfilePage() {
         <div className="hidden md:flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-lg overflow-hidden border border-white/15">
             <img
-              src={profile.image || ""}
+              src={COMMON_AVATAR_URL}
               alt={profile.name}
               className="w-full h-full object-cover"
             />
@@ -1591,7 +1730,7 @@ export default function ProfilePage() {
           <div className="flex items-center gap-3 px-3 pb-8 mb-6 border-b border-white/6">
             <div className="w-10 h-10 rounded-2xl overflow-hidden border border-white/10 shrink-0">
               <img
-                src={profile.image || ""}
+                src={COMMON_AVATAR_URL}
                 alt={profile.name}
                 className="w-full h-full object-cover"
               />
@@ -1610,6 +1749,9 @@ export default function ProfilePage() {
           <div className="mt-auto flex flex-col gap-1.5 pt-6 border-t border-white/6">
             {[
               { href: "/contact", label: "Contact Us" },
+              ...(isPanelUser
+                ? [{ href: "/admin/auth", label: "Admin Panel" }]
+                : []),
             ].map(({ href, label }) => (
               <Link
                 key={href}
@@ -1622,6 +1764,42 @@ export default function ProfilePage() {
                 </svg>
               </Link>
             ))}
+            <button
+              onClick={async () => {
+                if (isLoggingOut) return;
+                setIsLoggingOut(true);
+                try {
+                  await logout();
+                } finally {
+                  setIsLoggingOut(false);
+                  router.replace("/");
+                }
+              }}
+              disabled={isLoggingOut}
+              className="flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] uppercase tracking-widest font-mono text-white/20 hover:text-rose-400 transition-all duration-300 disabled:opacity-50"
+            >
+              {isLoggingOut ? "Logging out..." : "Log Out"}
+              <svg
+                width="10"
+                height="10"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M9 5H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M16 17l5-5-5-5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path d="M21 12H9" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
           </div>
         </aside>
 
@@ -1649,6 +1827,9 @@ export default function ProfilePage() {
                     set={set}
                     onViewMember={(m) => setSelectedMember(m)}
                     teamMembers={teamMembers}
+                    userId={userId}
+                    updateProfileMutation={updateProfileMutation}
+                    setProfile={setProfile}
                   />
                 )}
                 {active === "competitions" && <CompetitionsPanel competitions={competitionItems} />}
