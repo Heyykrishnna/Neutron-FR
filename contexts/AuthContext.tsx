@@ -27,9 +27,7 @@ interface AuthUser {
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  login: (
-    credentials: Record<string, any>,
-  ) => Promise<{
+  login: (credentials: Record<string, any>) => Promise<{
     success: boolean;
     user?: AuthUser;
     errorCode?: string;
@@ -170,12 +168,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return pathname?.startsWith("/admin") ? "/admin/auth" : "/auth/signin";
   }, [pathname]);
 
+  const isAuthRoute = useCallback(() => {
+    if (!pathname) return false;
+    return pathname.startsWith("/auth") || pathname.startsWith("/admin/auth");
+  }, [pathname]);
+
   const clearUserAndRedirect = useCallback((): void => {
     setUser(null);
     cacheUser(null);
     disconnectSocket();
-    router.push(getAuthRedirectPath());
-  }, [getAuthRedirectPath, router]);
+    if (!isAuthRoute()) {
+      router.replace(getAuthRedirectPath());
+    }
+  }, [getAuthRedirectPath, isAuthRoute, router]);
 
   useEffect(() => {
     initSocket({
@@ -310,7 +315,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       disconnectSocket();
       setUser(null);
       cacheUser(null);
-      router.push(getAuthRedirectPath());
+      if (!isAuthRoute()) {
+        router.replace(getAuthRedirectPath());
+      }
     }
   };
 

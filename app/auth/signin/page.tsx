@@ -6,8 +6,9 @@ import AuthLayout from "@/components/auth-layout";
 import { AuthInput, AuthButton } from "@/components/auth-components";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthModal } from "@/components/auth-modal";
+import apiClient from "@/lib/axios";
 import { useAuth } from "@/contexts/AuthContext";
-import { useAuthMe, useRequestPasswordReset } from "@/src/hooks/api/useAuth";
+import { useRequestPasswordReset } from "@/src/hooks/api/useAuth";
 
 const normalizeAuthResponseUser = (payload: any) => {
   if (payload?.data?.user) return payload.data.user;
@@ -45,7 +46,7 @@ const safeRedirectTo = (
 
 function SignInContent() {
   const router = useRouter();
-  const { login, logout, checkAuth } = useAuth();
+  const { login, logout, checkAuth, user, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
   const authStatus = searchParams.get("auth");
@@ -62,7 +63,6 @@ function SignInContent() {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [isForceLogoutPending, setIsForceLogoutPending] = useState(false);
 
-  const authMeQuery = useAuthMe();
   const requestResetMutation = useRequestPasswordReset();
 
   useEffect(() => {
@@ -70,31 +70,24 @@ function SignInContent() {
       callbackUrl,
       authStatus,
       forceLogin,
-      authMeLoading: authMeQuery.isLoading,
-      authMeFetched: authMeQuery.isFetched,
-      hasAuthUser: Boolean(authMeQuery.data),
+      authLoading,
+      hasAuthUser: Boolean(user),
     });
-  }, [
-    callbackUrl,
-    authStatus,
-    forceLogin,
-    authMeQuery.isLoading,
-    authMeQuery.isFetched,
-    authMeQuery.data,
-  ]);
+  }, [callbackUrl, authStatus, forceLogin, authLoading, user]);
 
   useEffect(() => {
-    if (!forceLogin && authMeQuery.data) {
+    if (!forceLogin && !authLoading && user) {
       console.info("[auth/signin] existing session detected, redirecting", {
         callbackUrl,
       });
       safeRedirectTo(callbackUrl, router);
     }
-  }, [forceLogin, authMeQuery.data, callbackUrl, router]);
+  }, [forceLogin, authLoading, user, callbackUrl, router]);
 
   useEffect(() => {
     if (!forceLogin) return;
-    if (!authMeQuery.data) return;
+    if (authLoading) return;
+    if (!user) return;
     if (isForceLogoutPending) return;
 
     const forceSignOut = async () => {
@@ -107,7 +100,7 @@ function SignInContent() {
     };
 
     forceSignOut();
-  }, [forceLogin, authMeQuery.data, isForceLogoutPending, logout]);
+  }, [forceLogin, authLoading, user, isForceLogoutPending, logout]);
 
   useEffect(() => {
     if (authStatus === "failed") {
@@ -132,21 +125,31 @@ function SignInContent() {
       (async () => {
         try {
           await checkAuth();
-          const refreshed = await authMeQuery.refetch();
+          const meResponse = await apiClient.get("/auth/me");
+          const refreshedUser =
+            meResponse?.data?.data?.user || meResponse?.data?.user || null;
+
           console.info("[auth/signin] auth refresh completed", {
-            hasUser: Boolean(refreshed.data),
+            hasUser: Boolean(refreshedUser),
             callbackUrl,
           });
+
+          if (!refreshedUser) {
+            setLoginError("Google sign-in did not complete. Please try again.");
+            return;
+          }
+
+          safeRedirectTo(callbackUrl, router);
         } catch (error) {
           console.error("[auth/signin] auth refresh failed", {
             error,
             callbackUrl,
           });
+          setLoginError("Google sign-in failed. Please try again.");
         }
-        safeRedirectTo(callbackUrl, router);
       })();
     }
-  }, [authReason, authStatus, authMeQuery, checkAuth, callbackUrl, router]);
+  }, [authReason, authStatus, checkAuth, callbackUrl, forceLogin, router]);
 
   const isRequestingReset = requestResetMutation.isPending;
   const submitDisabled = useMemo(

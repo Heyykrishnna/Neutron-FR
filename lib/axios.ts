@@ -1,4 +1,9 @@
-import axios, { AxiosRequestConfig, AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "axios";
+import axios, {
+  AxiosRequestConfig,
+  AxiosError,
+  AxiosInstance,
+  InternalAxiosRequestConfig,
+} from "axios";
 import {
   connectSocket,
   disconnectSocket,
@@ -22,7 +27,9 @@ const AUTH_REJECTION_ERRORS = new Set([
 ]);
 
 const isExplicitAuthRejection = (error: unknown): boolean => {
-  const err = error as { response?: { status?: number; data?: { error?: string } } };
+  const err = error as {
+    response?: { status?: number; data?: { error?: string } };
+  };
   const status = err?.response?.status;
   const code = err?.response?.data?.error;
   if (status !== 401 && status !== 403) return false;
@@ -44,6 +51,7 @@ const PUBLIC_PATHS = [
   "/auth/logout",
   "/auth/google",
   "/auth/google/callback",
+  "/auth/me",
   "/auth/verify-email",
   "/auth/resend-verification-public",
   "/auth/password-reset/request",
@@ -52,7 +60,7 @@ const PUBLIC_PATHS = [
   "/auth/invite/accept",
   "/competitions",
   "/competitions/:id",
-  ""
+  "",
 ];
 
 const isPublicPath = (url: string = ""): boolean => {

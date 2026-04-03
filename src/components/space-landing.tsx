@@ -25,6 +25,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as THREE from "three";
+import { useAuth } from "@/contexts/AuthContext";
 
 gsap.registerPlugin(ScrollTrigger);
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -133,6 +134,7 @@ function popSavedScrollY(): number | null {
 
 export default function SpaceLanding() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const loaderCardRef = useRef<HTMLDivElement | null>(null);
@@ -303,7 +305,13 @@ export default function SpaceLanding() {
           if (slug === "mars") {
             router.push("/about");
           } else if (slug === "moon") {
-            router.push("/profile");
+            if (!authLoading && !user) {
+              router.push(
+                `/auth/signin?callbackUrl=${encodeURIComponent("/profile")}`,
+              );
+            } else {
+              router.push("/profile");
+            }
           } else {
             router.push(`/planets/${slug}`);
           }
@@ -897,8 +905,6 @@ export default function SpaceLanding() {
 
         <AnimatePresence>
           {transitionState && (
-
-            
             <motion.div
               key={`transition-${transitionState.slug}`}
               className="fixed inset-0 z-40 pointer-events-none"
@@ -961,10 +967,6 @@ export default function SpaceLanding() {
                 transition={{ duration: 0.45, ease: "easeIn" }}
               />
             </motion.div>
-
-
-
-            
           )}
         </AnimatePresence>
 

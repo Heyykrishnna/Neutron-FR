@@ -40,6 +40,10 @@ import {
   useReorderCompetitionFormFields,
 } from "@/src/hooks/api/useCompetitionForms";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  toDateTimeLocalInput,
+  toIsoFromDateTimeLocal,
+} from "@/src/lib/datetime";
 
 const FIELD_TYPES = [
   "TEXT",
@@ -230,36 +234,9 @@ function DangerBtn({
   );
 }
 
-const toDateTimeLocal = (value: any) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
+const toDateTimeLocal = (value: any) => toDateTimeLocalInput(value);
 
-  const pad = (num: any) => String(num).padStart(2, "0");
-  const year = date.getFullYear();
-  const month = pad(date.getMonth() + 1);
-  const day = pad(date.getDate());
-  const hours = pad(date.getHours());
-  const minutes = pad(date.getMinutes());
-
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-};
-
-const toIsoOrNull = (value: any) => {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-
-  const pad = (num: any) => String(num).padStart(2, "0");
-  const year = date.getFullYear();
-  const month = pad(date.getMonth() + 1);
-  const day = pad(date.getDate());
-  const hours = pad(date.getHours());
-  const minutes = pad(date.getMinutes());
-  const seconds = pad(date.getSeconds());
-
-  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-};
+const toIsoOrNull = (value: any) => toIsoFromDateTimeLocal(value);
 
 const createEmptyField = (index = 0): any => ({
   tempId: `new-${Date.now()}-${index}`,
@@ -294,9 +271,9 @@ const fieldFromApi = (field: any) => ({
   pattern: field.pattern || "",
   optionsText: Array.isArray(field.options)
     ? field.options
-      .map((option: any) => option?.label || option?.value)
-      .filter(Boolean)
-      .join("\n")
+        .map((option: any) => option?.label || option?.value)
+        .filter(Boolean)
+        .join("\n")
     : "",
 });
 
@@ -506,14 +483,14 @@ function PreviewDialog({ open, onClose, formTitle, fields }: any) {
                   >
                     {OPTIONS_FIELD_TYPES.has(field.fieldType)
                       ? field.optionsText
-                        .split("\n")
-                        .map((line: any) => line.trim())
-                        .filter(Boolean)
-                        .map((optionValue: any) => (
-                          <MenuItem key={optionValue} value={optionValue}>
-                            {optionValue}
-                          </MenuItem>
-                        ))
+                          .split("\n")
+                          .map((line: any) => line.trim())
+                          .filter(Boolean)
+                          .map((optionValue: any) => (
+                            <MenuItem key={optionValue} value={optionValue}>
+                              {optionValue}
+                            </MenuItem>
+                          ))
                       : null}
                   </TextField>
                 )}
@@ -592,7 +569,8 @@ function FormBuilderDialog({
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
 
   const selectedCompetition = useMemo(
-    () => competitions.find((competition: any) => competition.id === competitionId),
+    () =>
+      competitions.find((competition: any) => competition.id === competitionId),
     [competitions, competitionId],
   );
 
@@ -689,11 +667,7 @@ function FormBuilderDialog({
       };
     }
 
-    if (
-      competitionDeadline &&
-      !Number.isNaN(competitionDeadline.getTime()) &&
-      closes.getTime() !== competitionDeadline.getTime()
-    ) {
+    if (isClosesAtLocked && closesAt !== registrationDeadlineLocal) {
       return {
         valid: false,
         message: "Closing time is locked to competition registration deadline.",
@@ -717,6 +691,8 @@ function FormBuilderDialog({
     competitionId,
     opensAt,
     closesAt,
+    isClosesAtLocked,
+    registrationDeadlineLocal,
     selectedCompetition?.registrationDeadline,
   ]);
 
@@ -811,18 +787,18 @@ function FormBuilderDialog({
 
         const response = isEdit
           ? await updateFormMutation.mutateAsync({
-            formId,
-            ...dhPayload,
-          } as any)
+              formId,
+              ...dhPayload,
+            } as any)
           : await createFormMutation.mutateAsync({
-            competitionId,
-            ...dhPayload,
-          } as any);
+              competitionId,
+              ...dhPayload,
+            } as any);
 
         if (response?.pendingApproval) {
           enqueueSnackbar(
             response?.message ||
-            "Form changes submitted for SA approval successfully.",
+              "Form changes submitted for SA approval successfully.",
             { variant: "info" },
           );
         }
@@ -1692,7 +1668,7 @@ export default function CompetitionFormsPage() {
           if (response?.pendingApproval) {
             enqueueSnackbar(
               response?.message ||
-              "Form deletion submitted for SA approval successfully.",
+                "Form deletion submitted for SA approval successfully.",
               { variant: "info" },
             );
           }

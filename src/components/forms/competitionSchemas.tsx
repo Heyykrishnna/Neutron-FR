@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  toDateTimeLocalInput,
+  toIsoFromDateTimeLocal,
+} from "@/src/lib/datetime";
 
 export const EVENT_TYPES = ["COMPETITION", "WORKSHOP", "EVENT"];
 export const COMPETITION_TYPES = ["SOLO", "TEAM"];
@@ -473,20 +477,7 @@ export const DEFAULT_VALUES = {
   promoCodes: [],
 };
 
-const toDateTimeLocal = (value: any) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-
-  const pad = (num: any) => String(num).padStart(2, "0");
-  const year = date.getFullYear();
-  const month = pad(date.getMonth() + 1);
-  const day = pad(date.getDate());
-  const hours = pad(date.getHours());
-  const minutes = pad(date.getMinutes());
-
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-};
+const toDateTimeLocal = (value: any) => toDateTimeLocalInput(value);
 
 export function getEditDefaults(competition: any = {}) {
   return {
@@ -504,12 +495,12 @@ export function getEditDefaults(competition: any = {}) {
     venueFloor: competition.venueFloor ?? "",
     subVenues: Array.isArray(competition.subVenues)
       ? competition.subVenues.map((venue: any) => ({
-        name: venue?.name ?? "",
-        room: venue?.room ?? "",
-        floor: venue?.floor ?? "",
-        capacity: venue?.capacity ?? "",
-        notes: venue?.notes ?? "",
-      }))
+          name: venue?.name ?? "",
+          room: venue?.room ?? "",
+          floor: venue?.floor ?? "",
+          capacity: venue?.capacity ?? "",
+          notes: venue?.notes ?? "",
+        }))
       : [],
     rulesRichText: competition.rulesRichText ?? "",
     registrationFee: competition.registrationFee ?? 0,
@@ -525,42 +516,28 @@ export function getEditDefaults(competition: any = {}) {
     perPerson: competition.perPerson ?? false,
     prizePool: Array.isArray(competition.prizePool)
       ? competition.prizePool.map((prize: any) => ({
-        rank: prize?.rank ?? "",
-        label: prize?.label ?? "",
-        cash: prize?.cash ?? "",
-        inkind: Array.isArray(prize?.inkind)
-          ? prize.inkind.join(", ")
-          : (prize?.inkind ?? ""),
-      }))
+          rank: prize?.rank ?? "",
+          label: prize?.label ?? "",
+          cash: prize?.cash ?? "",
+          inkind: Array.isArray(prize?.inkind)
+            ? prize.inkind.join(", ")
+            : (prize?.inkind ?? ""),
+        }))
       : [],
     promoCodes: Array.isArray(competition.promoCodes)
       ? competition.promoCodes.map((promoCode: any) => ({
-        code: promoCode?.code ?? "",
-        discountType: promoCode?.discountType ?? "PERCENT",
-        discountValue: promoCode?.discountValue ?? "",
-        maxUses: promoCode?.maxUses ?? "",
-        isActive: promoCode?.isActive ?? true,
-        description: promoCode?.description ?? "",
-      }))
+          code: promoCode?.code ?? "",
+          discountType: promoCode?.discountType ?? "PERCENT",
+          discountValue: promoCode?.discountValue ?? "",
+          maxUses: promoCode?.maxUses ?? "",
+          isActive: promoCode?.isActive ?? true,
+          description: promoCode?.description ?? "",
+        }))
       : [],
   };
 }
 
-const toDateTimePayloadOrNull = (value: any) => {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-
-  const pad = (num: any) => String(num).padStart(2, "0");
-  const year = date.getFullYear();
-  const month = pad(date.getMonth() + 1);
-  const day = pad(date.getDate());
-  const hours = pad(date.getHours());
-  const minutes = pad(date.getMinutes());
-  const seconds = pad(date.getSeconds());
-
-  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-};
+const toDateTimePayloadOrNull = (value: any) => toIsoFromDateTimeLocal(value);
 
 const normalizePrizePool = (prizePool = []) => {
   return prizePool
@@ -572,9 +549,9 @@ const normalizePrizePool = (prizePool = []) => {
 
       const inkind = inKindRaw
         ? inKindRaw
-          .split(",")
-          .map((value: any) => value.trim())
-          .filter(Boolean)
+            .split(",")
+            .map((value: any) => value.trim())
+            .filter(Boolean)
         : undefined;
 
       if (!label) return null;
@@ -635,7 +612,11 @@ const normalizeSubVenues = (subVenues = []) => {
     .filter(Boolean);
 };
 
-export function buildCompetitionPayloadFormData(values: any, poster: any, banner: any) {
+export function buildCompetitionPayloadFormData(
+  values: any,
+  poster: any,
+  banner: any,
+) {
   const formData = new FormData();
 
   const append = (key: any, value: any) => {

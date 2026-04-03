@@ -31,6 +31,10 @@ import {
 import { useUsers } from "@/src/hooks/api/useUsers";
 import { useDepartments } from "@/src/hooks/api/useDepartments";
 import { useCompetitions } from "@/src/hooks/api/useCompetitions";
+import {
+  toDateTimeLocalInput,
+  toIsoFromDateTimeLocal,
+} from "@/src/lib/datetime";
 
 const ROLE_OPTIONS = ["USER", "VOLUNTEER", "JUDGE", "DH", "BOARD", "SA"];
 
@@ -74,17 +78,7 @@ const parseCsvEmailsText = (value = "") =>
     .filter(Boolean);
 
 const toDateTimeLocalValue = (dateValue: any) => {
-  if (!dateValue) return "";
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return "";
-
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  const hours = `${date.getHours()}`.padStart(2, "0");
-  const mins = `${date.getMinutes()}`.padStart(2, "0");
-
-  return `${year}-${month}-${day}T${hours}:${mins}`;
+  return toDateTimeLocalInput(dateValue);
 };
 
 const formatDateTime = (value: any) => {
@@ -95,9 +89,7 @@ const formatDateTime = (value: any) => {
 };
 
 const toIsoOrNull = (dateTimeLocal: any) => {
-  if (!dateTimeLocal) return null;
-  const parsed = new Date(dateTimeLocal);
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+  return toIsoFromDateTimeLocal(dateTimeLocal);
 };
 
 const formatHtml = (source = "") => {
@@ -223,7 +215,9 @@ export default function CampaignManagerPage() {
   const [campaignSubject, setCampaignSubject] = useState("");
   const [campaignAudienceType, setCampaignAudienceType] = useState("FILTER");
   const [campaignRoles, setCampaignRoles] = useState<string[]>([]);
-  const [campaignDepartmentIds, setCampaignDepartmentIds] = useState<string[]>([]);
+  const [campaignDepartmentIds, setCampaignDepartmentIds] = useState<string[]>(
+    [],
+  );
   const [campaignUserIds, setCampaignUserIds] = useState<string[]>([]);
   const [campaignCompetitionId, setCampaignCompetitionId] = useState("");
   const [campaignCsvEmailsText, setCampaignCsvEmailsText] = useState("");
@@ -898,15 +892,24 @@ export default function CampaignManagerPage() {
                         return;
                       }
 
+                      const scheduleIso = toIsoFromDateTimeLocal(
+                        selectedCampaignScheduleAt,
+                      );
+
+                      if (!scheduleIso) {
+                        enqueueSnackbar("Choose a valid schedule time.", {
+                          variant: "error",
+                        });
+                        return;
+                      }
+
                       runCampaignAction({
                         campaignId: selectedCampaign.id,
                         action: "schedule",
                         actionFn: () =>
                           scheduleCampaign({
                             campaignId: selectedCampaign.id,
-                            scheduledAt: new Date(
-                              selectedCampaignScheduleAt,
-                            ).toISOString(),
+                            scheduledAt: scheduleIso,
                           }),
                         successMessage: "Campaign scheduled successfully.",
                       });
@@ -961,7 +964,7 @@ export default function CampaignManagerPage() {
                       cursor: "pointer",
                       opacity:
                         Number(selectedCampaign.failedRecipients || 0) <= 0 ||
-                          isCampaignActionLocked(selectedCampaign.id)
+                        isCampaignActionLocked(selectedCampaign.id)
                           ? 0.5
                           : 1,
                     }}

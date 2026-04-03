@@ -44,6 +44,10 @@ import {
 import { useUsers } from "@/src/hooks/api/useUsers";
 import { useDepartments } from "@/src/hooks/api/useDepartments";
 import { useCompetitions } from "@/src/hooks/api/useCompetitions";
+import {
+  toDateTimeLocalInput,
+  toIsoFromDateTimeLocal,
+} from "@/src/lib/datetime";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001";
@@ -162,17 +166,7 @@ const parseCsvEmailsText = (value = "") => {
 };
 
 const toDateTimeLocalValue = (dateValue: any) => {
-  if (!dateValue) return "";
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return "";
-
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  const hours = `${date.getHours()}`.padStart(2, "0");
-  const mins = `${date.getMinutes()}`.padStart(2, "0");
-
-  return `${year}-${month}-${day}T${hours}:${mins}`;
+  return toDateTimeLocalInput(dateValue);
 };
 
 const renderCampaignStatusPill = (status: any) => {
@@ -210,8 +204,10 @@ export default function SettingsPage() {
     useEmailTemplates();
 
   const [selectedTemplateKey, setSelectedTemplateKey] = useState(null);
-  const effectiveTemplateKey: any = selectedTemplateKey || templates[0]?.key || null;
-  const { data: selectedTemplate }: any = useEmailTemplate(effectiveTemplateKey);
+  const effectiveTemplateKey: any =
+    selectedTemplateKey || templates[0]?.key || null;
+  const { data: selectedTemplate }: any =
+    useEmailTemplate(effectiveTemplateKey);
 
   const [subject, setSubject] = useState("");
   const [html, setHtml] = useState("");
@@ -343,7 +339,7 @@ export default function SettingsPage() {
       onError: (error: any) => {
         enqueueSnackbar(
           error?.response?.data?.message ||
-          "Failed to update registration state",
+            "Failed to update registration state",
           { variant: "error" },
         );
       },
@@ -454,7 +450,7 @@ export default function SettingsPage() {
         setCampaignPreviewHtml("");
         setCampaignPreviewError(
           error?.response?.data?.message ||
-          "Failed to generate preview from template.",
+            "Failed to generate preview from template.",
         );
       }
     }, 350);
@@ -576,6 +572,14 @@ export default function SettingsPage() {
       }
 
       const audienceQuery = createAudienceQuery();
+      const scheduledAtIso = toIsoFromDateTimeLocal(campaignScheduledAt);
+
+      if (campaignScheduledAt && !scheduledAtIso) {
+        enqueueSnackbar("Choose a valid schedule date and time.", {
+          variant: "error",
+        });
+        return;
+      }
 
       const createdCampaign = await createCampaign({
         name: campaignName.trim(),
@@ -584,9 +588,7 @@ export default function SettingsPage() {
         audienceType: campaignAudienceType as any,
         audienceQuery,
         csvFile: campaignCsvFile as any,
-        scheduledAt: campaignScheduledAt
-          ? new Date(campaignScheduledAt).toISOString()
-          : null,
+        scheduledAt: scheduledAtIso,
       });
 
       enqueueSnackbar("Campaign created successfully.", { variant: "success" });
@@ -623,9 +625,18 @@ export default function SettingsPage() {
         return;
       }
 
+      const scheduledAtIso = toIsoFromDateTimeLocal(scheduledAt);
+
+      if (!scheduledAtIso) {
+        enqueueSnackbar("Choose a valid schedule date/time.", {
+          variant: "error",
+        });
+        return;
+      }
+
       await scheduleCampaign({
         campaignId,
-        scheduledAt: new Date(scheduledAt).toISOString(),
+        scheduledAt: scheduledAtIso,
       });
 
       enqueueSnackbar("Campaign scheduled successfully.", {
@@ -911,7 +922,7 @@ export default function SettingsPage() {
           }}
         >
           <Box
-          data-lenis-prevent
+            data-lenis-prevent
             sx={{
               p: 2,
               borderRadius: "10px",
@@ -2204,7 +2215,7 @@ export default function SettingsPage() {
                       handleScheduleCampaign(
                         selectedCampaign.id,
                         toDateTimeLocalValue(selectedCampaign.scheduledAt) ||
-                        campaignScheduledAt,
+                          campaignScheduledAt,
                       )
                     }
                     disabled={schedulingCampaign}
@@ -2249,7 +2260,7 @@ export default function SettingsPage() {
                       cursor: "pointer",
                       opacity:
                         Number(selectedCampaign.failedRecipients || 0) <= 0 ||
-                          retryingCampaign
+                        retryingCampaign
                           ? 0.5
                           : 1,
                     }}
