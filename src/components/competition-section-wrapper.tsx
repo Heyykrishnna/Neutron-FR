@@ -95,6 +95,17 @@ export default function SectionWrapper({ competition }: { competition: any }) {
                   {status}
                 </span>
               </div>
+              <div className="w-screen flex justify-end px-80">
+                <a href={`/competitions/${competition.id}/register`}>
+                <button
+                      type="button"
+                    
+                      className="bg-white text-black px-8 py-1.5 rounded-full font-semibold hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed " 
+                    >
+                      Register Now
+                </button>
+                </a>
+              </div>  
             </div>
           </div>
         </div>

@@ -410,34 +410,65 @@ export default function CompetitionRegistration({
 
   if (step === "start") {
     return (
-      <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-8 md:p-10 max-w-2xl mx-auto shadow-2xl text-center">
-        <h3 className="text-2xl md:text-3xl font-bold text-white mb-3">
+      <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-8 md:p-10 max-w-2xl mx-auto shadow-2xl text-center space-x-6">
+        <div className="flex flex-col">
+
+           <h3 className="text-2xl md:text-3xl font-bold text-white mb-3">
           Ready To Register?
         </h3>
         <p className="text-white/60 mb-8">
           We will collect team details first and then open the competition form.
         </p>
-        <button
-          type="button"
-          disabled={isFormMissing || formFieldsQuery.isError}
-          onClick={() => {
-            if (isSolo || isMemberMode) {
-              setStep("form");
-              return;
-            }
-            setTeamDetails((prev) => ({
-              ...prev,
-              selectedTeamSize:
-                prev.selectedTeamSize || String(teamOptions[0] || 1),
-            }));
-            setStep("team");
-          }}
-          className="bg-white text-black px-8 py-3 rounded-full font-semibold hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
-        >
-          {isFormMissing || formFieldsQuery.isError
-            ? "Registration Unavailable"
-            : "Register Now"}
-        </button>
+        </div>
+        <div className="flex flex-row w-full items-center justify-center gap-6">
+              <button
+              type="button"
+              disabled={isFormMissing || formFieldsQuery.isError}
+              onClick={() => {
+                if (isSolo || isMemberMode) {
+                  setStep("form");
+                  return;
+                }
+                setTeamDetails((prev) => ({
+                  ...prev,
+                  selectedTeamSize:
+                    prev.selectedTeamSize || String(teamOptions[0] || 1),
+                }));
+                setStep("team");
+              }}
+              className="bg-white text-black px-8 py-3 rounded-full font-semibold hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {isFormMissing || formFieldsQuery.isError
+                ? "Registration Unavailable"
+                : "Register Now"}
+            </button>
+
+            <button
+              type="button"
+              disabled={isFormMissing || formFieldsQuery.isError}
+              onClick={() => {
+                if (isSolo || isMemberMode) {
+                  setStep("form");
+                  return;
+                }
+                setTeamDetails((prev) => ({
+                  ...prev,
+                  selectedTeamSize:
+                    prev.selectedTeamSize || String(teamOptions[0] || 1),
+                }));
+                setStep("team");
+              }}
+              className="bg-white text-[#1C4980] px-8 py-3 rounded-full font-semibold transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex flex-row justify-center items-center content-center gap-2"
+            >
+              {isFormMissing || formFieldsQuery.isError
+                ? "Registration Unavailable"
+                : (<>
+                    Register on <img src="https://media.glassdoor.com/sqll/714146/dare2compete-com-squareLogo-1650879017582.png" alt="" className="h-6 w-6"/>
+                </>)}
+            </button>
+        </div>
+        
+       
       </div>
     );
   }

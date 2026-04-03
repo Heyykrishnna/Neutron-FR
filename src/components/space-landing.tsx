@@ -897,6 +897,8 @@ export default function SpaceLanding() {
 
         <AnimatePresence>
           {transitionState && (
+
+            
             <motion.div
               key={`transition-${transitionState.slug}`}
               className="fixed inset-0 z-40 pointer-events-none"
@@ -959,6 +961,10 @@ export default function SpaceLanding() {
                 transition={{ duration: 0.45, ease: "easeIn" }}
               />
             </motion.div>
+
+
+
+            
           )}
         </AnimatePresence>
 
