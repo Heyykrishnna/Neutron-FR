@@ -29,6 +29,7 @@ import {
   ClipboardList,
   Eye,
   Loader2,
+  Link2,
 } from "lucide-react";
 import { useSnackbar } from "notistack";
 import {
@@ -36,6 +37,7 @@ import {
   useApproveRegistration,
   useRejectRegistration,
 } from "@/src/hooks/api/useRegistrations";
+import { useResendRegistrationPaymentLink } from "@/src/hooks/api/usePayments";
 import { useCompetitions } from "@/src/hooks/api/useCompetitions";
 import { LoadingState } from "@/src/components/LoadingState";
 
@@ -46,7 +48,7 @@ type Field = {
   fieldType?: string;
   fileUrl?: string;
   label?: string;
-  displayValue: string
+  displayValue: string;
 };
 const renderFieldAnswer = (field: Field) => {
   if (field?.fieldType === "IMAGE" && field?.fileUrl) {
@@ -101,6 +103,7 @@ export default function RegistrationsPage() {
   const [competitionId, setCompetitionId] = useState("");
   const [search, setSearch] = useState("");
   const [createdWindow, setCreatedWindow] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all");
 
   // Reject dialog
   const [rejectDialog, setRejectDialog] = useState<any>({
@@ -113,6 +116,9 @@ export default function RegistrationsPage() {
   // In-flight tracking
   const [approvingId, setApprovingId] = useState(null);
   const [approvingTeamKey, setApprovingTeamKey] = useState(null);
+  const [resendingRegistrationId, setResendingRegistrationId] = useState<
+    string | null
+  >(null);
   const [formDialog, setFormDialog] = useState<any>({
     open: false,
     row: null,
@@ -129,6 +135,23 @@ export default function RegistrationsPage() {
 
   const { mutateAsync: approve } = useApproveRegistration();
   const { mutate: reject, isPending: isRejecting } = useRejectRegistration();
+  const { mutateAsync: resendPaymentLink } = useResendRegistrationPaymentLink();
+
+  function getPaymentStatus(row: any) {
+    const value = row?.paymentStatus || row?.registration?.paymentStatus;
+    if (!value) {
+      return row?.competition?.isPaid ? "PENDING" : "NOT_REQUIRED";
+    }
+    return String(value).toUpperCase();
+  }
+
+  function isRegistrationPaid(row: any) {
+    return getPaymentStatus(row) === "PAID";
+  }
+
+  function isPaymentRequired(row: any) {
+    return Boolean(row?.competition?.isPaid || row?.isPaid);
+  }
 
   // Client-side search filter
   const filtered = useMemo(() => {
@@ -143,6 +166,22 @@ export default function RegistrationsPage() {
             : null;
 
     return registrations.filter((r) => {
+      if (paymentFilter !== "all") {
+        const registrationStatus = String(
+          r?.status || r?.registration?.status || "PENDING",
+        ).toUpperCase();
+        const isPaid = isRegistrationPaid(r);
+        if (paymentFilter === "paid" && !isPaid) {
+          return false;
+        }
+        if (
+          paymentFilter === "unpaid" &&
+          (!isPaymentRequired(r) || isPaid || registrationStatus !== "APPROVED")
+        ) {
+          return false;
+        }
+      }
+
       if (minCreatedAt) {
         const createdAt =
           r.createdAt || r.registration?.createdAt || r.submittedAt || null;
@@ -158,7 +197,7 @@ export default function RegistrationsPage() {
       const team = (r.team?.name || r.teamName || "").toLowerCase();
       return name.includes(q) || email.includes(q) || team.includes(q);
     });
-  }, [registrations, search, createdWindow]);
+  }, [registrations, search, createdWindow, paymentFilter]);
 
   const groupedByTeam = useMemo(() => {
     const groups = new Map();
@@ -206,7 +245,7 @@ export default function RegistrationsPage() {
     const normalized = Array.from(groups.values());
 
     normalized.forEach((group) => {
-      group.members.sort(( a:any, b:any ) => {
+      group.members.sort((a: any, b: any) => {
         const aIsLeader =
           group.teamId &&
           (a.team?.leaderId || a.teamLeaderId) &&
@@ -243,8 +282,15 @@ export default function RegistrationsPage() {
   async function handleApprove(registrationId: any) {
     setApprovingId(registrationId);
     try {
-      await approve(registrationId);
-      enqueueSnackbar("Registration approved", { variant: "success" });
+      const response = await approve(registrationId);
+      const paymentSession =
+        response?.data?.paymentSession || response?.paymentSession;
+      enqueueSnackbar(
+        paymentSession
+          ? "Registration approved and payment link sent"
+          : "Registration approved",
+        { variant: "success" },
+      );
     } catch (err: any) {
       enqueueSnackbar(
         err?.response?.data?.message || err?.message || "Failed to approve",
@@ -252,6 +298,25 @@ export default function RegistrationsPage() {
       );
     } finally {
       setApprovingId(null);
+    }
+  }
+
+  async function handleResendPaymentLink(registrationId: string) {
+    setResendingRegistrationId(registrationId);
+    try {
+      await resendPaymentLink(registrationId);
+      enqueueSnackbar("Payment link resent successfully", {
+        variant: "success",
+      });
+    } catch (err: any) {
+      enqueueSnackbar(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to resend payment link",
+        { variant: "error" },
+      );
+    } finally {
+      setResendingRegistrationId(null);
     }
   }
 
@@ -271,8 +336,8 @@ export default function RegistrationsPage() {
     } catch (err: any) {
       enqueueSnackbar(
         err?.response?.data?.message ||
-        err?.message ||
-        "Failed to approve team",
+          err?.message ||
+          "Failed to approve team",
         { variant: "error" },
       );
     } finally {
@@ -412,6 +477,19 @@ export default function RegistrationsPage() {
         </TextField>
 
         <TextField
+          select
+          label="Payment"
+          value={paymentFilter}
+          onChange={(e) => setPaymentFilter(e.target.value)}
+          size="small"
+          sx={{ minWidth: 170, ...inputSx }}
+        >
+          <MenuItem value="all">All</MenuItem>
+          <MenuItem value="unpaid">Approved / Unpaid</MenuItem>
+          <MenuItem value="paid">Paid</MenuItem>
+        </TextField>
+
+        <TextField
           placeholder="Search by name, email or team…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -520,17 +598,17 @@ export default function RegistrationsPage() {
                       (m.status || m.registrationStatus) === "PENDING" &&
                       getRegistrationId(m),
                   ) && (
-                      <GreenBtn
-                        onClick={() => handleApproveTeam(group)}
-                        loading={approvingTeamKey === group.key}
-                        disabled={approvingTeamKey !== null}
-                        sx={{
-                          ml: 1,
-                        }}
-                      >
-                        <CheckCircle size={14} /> Approve All
-                      </GreenBtn>
-                    )}
+                    <GreenBtn
+                      onClick={() => handleApproveTeam(group)}
+                      loading={approvingTeamKey === group.key}
+                      disabled={approvingTeamKey !== null}
+                      sx={{
+                        ml: 1,
+                      }}
+                    >
+                      <CheckCircle size={14} /> Approve All
+                    </GreenBtn>
+                  )}
                 </Box>
               </Box>
 
@@ -540,6 +618,7 @@ export default function RegistrationsPage() {
                     <TableRow>
                       <TableCell sx={headSx}>Participant</TableCell>
                       <TableCell sx={headSx}>Form</TableCell>
+                      <TableCell sx={headSx}>Payment</TableCell>
                       <TableCell sx={headSx}>Submitted</TableCell>
                       <TableCell sx={{ ...headSx, textAlign: "right" }}>
                         Actions
@@ -547,7 +626,7 @@ export default function RegistrationsPage() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {group.members.map((row:any, memberIndex:any) => {
+                    {group.members.map((row: any, memberIndex: any) => {
                       const name = row.user?.name || row.userName || "Unknown";
                       const email = row.user?.email || row.userEmail || "";
                       const registrationId = getRegistrationId(row);
@@ -556,6 +635,15 @@ export default function RegistrationsPage() {
                       ).toUpperCase();
                       const isPendingRegistration =
                         registrationStatus === "PENDING";
+                      const paymentStatus = getPaymentStatus(row);
+                      const requiresPayment = isPaymentRequired(row);
+                      const isPaidRegistration = paymentStatus === "PAID";
+                      const canResendPaymentLink = Boolean(
+                        registrationId &&
+                        registrationStatus === "APPROVED" &&
+                        requiresPayment &&
+                        !isPaidRegistration,
+                      );
                       const isApproving = approvingId === registrationId;
                       const readiness = row.readiness || null;
                       const readinessReady = readiness?.ready !== false;
@@ -573,8 +661,8 @@ export default function RegistrationsPage() {
                       const approvalTooltip = readinessReady
                         ? "Approve"
                         : readinessReasons[0] ||
-                        readiness?.reason ||
-                        "Registration is not ready for approval";
+                          readiness?.reason ||
+                          "Registration is not ready for approval";
                       const formDetails = row.formDetails || {};
                       const hasSubmittedForm = Boolean(
                         formDetails.hasSubmittedForm,
@@ -701,6 +789,38 @@ export default function RegistrationsPage() {
                           </TableCell>
 
                           <TableCell sx={cellSx}>
+                            <Chip
+                              label={
+                                !requiresPayment
+                                  ? "Not required"
+                                  : paymentStatus
+                              }
+                              size="small"
+                              sx={{
+                                height: 22,
+                                backgroundColor: !requiresPayment
+                                  ? "rgba(113,113,122,0.2)"
+                                  : paymentStatus === "PAID"
+                                    ? "rgba(34,197,94,0.16)"
+                                    : paymentStatus === "FAILED" ||
+                                        paymentStatus === "EXPIRED"
+                                      ? "rgba(239,68,68,0.14)"
+                                      : "rgba(245,158,11,0.2)",
+                                color: !requiresPayment
+                                  ? "#a1a1aa"
+                                  : paymentStatus === "PAID"
+                                    ? "#4ade80"
+                                    : paymentStatus === "FAILED" ||
+                                        paymentStatus === "EXPIRED"
+                                      ? "#fca5a5"
+                                      : "#f59e0b",
+                                fontWeight: 700,
+                                fontSize: 10,
+                              }}
+                            />
+                          </TableCell>
+
+                          <TableCell sx={cellSx}>
                             <Typography
                               variant="body2"
                               sx={{ color: "#a1a1aa" }}
@@ -749,6 +869,25 @@ export default function RegistrationsPage() {
                                   Reject
                                 </DangerBtn>
                               </Tooltip>
+                              {canResendPaymentLink ? (
+                                <Tooltip title="Resend payment link">
+                                  <PrimaryBtn
+                                    onClick={() =>
+                                      handleResendPaymentLink(registrationId)
+                                    }
+                                    loading={
+                                      resendingRegistrationId === registrationId
+                                    }
+                                    disabled={
+                                      resendingRegistrationId !== null &&
+                                      resendingRegistrationId !== registrationId
+                                    }
+                                  >
+                                    <Link2 size={14} />
+                                    Resend Link
+                                  </PrimaryBtn>
+                                </Tooltip>
+                              ) : null}
                             </Box>
                           </TableCell>
                         </TableRow>
