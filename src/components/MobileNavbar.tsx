@@ -6,6 +6,8 @@ import Image from "next/image";
 import Grainient from "./Grainient";
 import Noise from "./Noise";
 import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
+
 
 interface MobileNavbarProps {
   isOpen: boolean;
@@ -35,7 +37,9 @@ const COLORS = [
 ];
 
 export default function MobileNavbar({ isOpen, onClose }: MobileNavbarProps) {
+  const { user } = useAuth();
   return (
+
     <AnimatePresence mode="wait">
       {isOpen && (
         <motion.div 
@@ -137,7 +141,26 @@ export default function MobileNavbar({ isOpen, onClose }: MobileNavbarProps) {
                         </Link>
                       </motion.div>
                     ))}
+                    {user && (
+                      <motion.div
+                        variants={{
+                          hidden: { opacity: 0, x: -20, filter: "blur(5px)" },
+                          visible: { opacity: 1, x: 0, filter: "blur(0px)" }
+                        }}
+                        transition={{ duration: 0.6 }}
+                      >
+                        <Link
+                          href="/logout"
+                          onClick={onClose}
+                          className="text-[2.2rem] font-bold text-rose-500/80 leading-tight hover:text-rose-400 transition-colors tracking-tighter block active:scale-95"
+                          style={{ fontFamily: "var(--font-sora)" }}
+                        >
+                          Logout
+                        </Link>
+                      </motion.div>
+                    )}
                   </motion.div>
+
                 </div>
 
                 <div className="grid grid-cols-[60px_1fr] gap-4 mt-8">
