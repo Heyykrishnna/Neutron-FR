@@ -32,7 +32,7 @@ export default function SectionWrapper({ competition }: { competition: any }) {
   if (!competition) return null;
 
   const status = String(competition.status || "").toUpperCase();
-  const aboutParagraphs = String(competition.about || "")
+  const aboutParagraphs = String(competition.shortDescription || "")
     .split(/\n{2,}/)
     .map((part) => part.trim())
     .filter(Boolean);
@@ -140,10 +140,10 @@ export default function SectionWrapper({ competition }: { competition: any }) {
                     </ScrollReveal>
                   ))}
 
-                  {Array.isArray(competition.rules) &&
-                  competition.rules.length > 0 ? (
+                  {Array.isArray(competition.rulesRichText) &&
+                  competition.rulesRichText.length > 0 ? (
                     <div className="pt-12">
-                      <RulesSection rules={competition.rules} />
+                      <RulesSection rules={competition.rulesRichText} />
                     </div>
                   ) : null}
 

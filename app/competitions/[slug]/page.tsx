@@ -107,6 +107,18 @@ const toDisplayText = (value: any): string => {
   return "";
 };
 
+const normalizeRulesRichText = (rulesRichText: any): string => {
+  if (Array.isArray(rulesRichText)) {
+    return rulesRichText.join("\n");
+  }
+
+  if (typeof rulesRichText === "string") {
+    return rulesRichText;
+  }
+
+  return "";
+};
+
 export default function CompetitionSlugPage({
   params,
 }: {
@@ -163,6 +175,7 @@ export default function CompetitionSlugPage({
   }
 
   const competitionId = String(competition.id || competition._id || slug);
+  const normalizedRules = normalizeRulesRichText(competition.rulesRichText);
 
   const normalizedCompetition = {
     ...competition,
@@ -190,11 +203,8 @@ export default function CompetitionSlugPage({
     eventType: toDisplayText(competition.eventType),
     registrationFee: formatCurrency(competition.registrationFee),
     registrationDeadline: formatDateTime(competition.registrationDeadline),
-    rules: Array.isArray(competition.rules)
-      ? competition.rules
-      : typeof competition.rules === "string" && competition.rules.trim().length
-        ? [competition.rules]
-        : [],
+    rules: normalizedRules,
+    rulesRichText: normalizedRules,
   };
 
   return (

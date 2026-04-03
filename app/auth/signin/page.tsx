@@ -7,7 +7,7 @@ import { AuthInput, AuthButton } from "@/components/auth-components";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthModal } from "@/components/auth-modal";
 import { useAuth } from "@/contexts/AuthContext";
-import { useAuthMe, useRequestPasswordReset } from "@/src/hooks/api/useAuth";
+import { useRequestPasswordReset } from "@/src/hooks/api/useAuth";
 
 const normalizeAuthResponseUser = (payload: any) => {
   if (payload?.data?.user) return payload.data.user;
@@ -45,12 +45,13 @@ const safeRedirectTo = (
 
 function SignInContent() {
   const router = useRouter();
-  const { login, logout, checkAuth } = useAuth();
+  const { login, logout, checkAuth, user, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const callbackUrl = searchParams.get("callbackUrl") || "/profile";
   const authStatus = searchParams.get("auth");
   const authReason = searchParams.get("reason");
   const forceLogin = searchParams.get("forceLogin") === "1";
+  const redirectTarget = forceLogin ? callbackUrl : "/profile";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -62,39 +63,57 @@ function SignInContent() {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [isForceLogoutPending, setIsForceLogoutPending] = useState(false);
 
-  const authMeQuery = useAuthMe();
   const requestResetMutation = useRequestPasswordReset();
 
   useEffect(() => {
     console.info("[auth/signin] page state", {
       callbackUrl,
+      redirectTarget,
       authStatus,
       forceLogin,
-      authMeLoading: authMeQuery.isLoading,
-      authMeFetched: authMeQuery.isFetched,
-      hasAuthUser: Boolean(authMeQuery.data),
+      authLoading,
+      hasContextUser: Boolean(user),
     });
   }, [
     callbackUrl,
+    redirectTarget,
     authStatus,
     forceLogin,
-    authMeQuery.isLoading,
-    authMeQuery.isFetched,
-    authMeQuery.data,
+    authLoading,
+    user,
   ]);
 
   useEffect(() => {
-    if (!forceLogin && authMeQuery.data) {
+    if (forceLogin) return;
+    if (authLoading) return;
+
+    const hasValidSession = Boolean(user);
+    if (!hasValidSession) return;
+
+    if (!redirectTarget || redirectTarget.startsWith("/auth/signin")) {
+      safeRedirectTo("/profile", router);
+      return;
+    }
+
+    if (hasValidSession) {
       console.info("[auth/signin] existing session detected, redirecting", {
         callbackUrl,
+        redirectTarget,
       });
-      safeRedirectTo(callbackUrl, router);
+      safeRedirectTo(redirectTarget, router);
     }
-  }, [forceLogin, authMeQuery.data, callbackUrl, router]);
+  }, [
+    forceLogin,
+    authLoading,
+    user,
+    callbackUrl,
+    redirectTarget,
+    router,
+  ]);
 
   useEffect(() => {
     if (!forceLogin) return;
-    if (!authMeQuery.data) return;
+    if (!user) return;
     if (isForceLogoutPending) return;
 
     const forceSignOut = async () => {
@@ -107,7 +126,12 @@ function SignInContent() {
     };
 
     forceSignOut();
-  }, [forceLogin, authMeQuery.data, isForceLogoutPending, logout]);
+  }, [
+    forceLogin,
+    user,
+    isForceLogoutPending,
+    logout,
+  ]);
 
   useEffect(() => {
     if (authStatus === "failed") {
@@ -127,26 +151,38 @@ function SignInContent() {
     if (authStatus === "success") {
       console.info("[auth/signin] auth status success, refreshing session", {
         callbackUrl,
+        redirectTarget,
         forceLogin,
       });
       (async () => {
         try {
           await checkAuth();
-          const refreshed = await authMeQuery.refetch();
           console.info("[auth/signin] auth refresh completed", {
-            hasUser: Boolean(refreshed.data),
+            hasUser: Boolean(user),
             callbackUrl,
+            redirectTarget,
           });
+
+          // OAuth success callback indicates authenticated state; proceed.
+          safeRedirectTo(redirectTarget, router);
         } catch (error) {
           console.error("[auth/signin] auth refresh failed", {
             error,
             callbackUrl,
+            redirectTarget,
           });
         }
-        safeRedirectTo(callbackUrl, router);
       })();
     }
-  }, [authReason, authStatus, authMeQuery, checkAuth, callbackUrl, router]);
+  }, [
+    authReason,
+    authStatus,
+    checkAuth,
+    callbackUrl,
+    redirectTarget,
+    router,
+    forceLogin,
+  ]);
 
   const isRequestingReset = requestResetMutation.isPending;
   const submitDisabled = useMemo(
@@ -160,6 +196,7 @@ function SignInContent() {
 
     console.info("[auth/signin] email login submit", {
       callbackUrl,
+      redirectTarget,
       email: email.trim().toLowerCase(),
       forceLogin,
     });
@@ -171,26 +208,29 @@ function SignInContent() {
         email: email.trim(),
         password,
       });
-      const user = normalizeAuthResponseUser(payload);
+      const loggedInUser = normalizeAuthResponseUser(payload);
+
+      if (!payload?.success || !loggedInUser?.id) {
+        throw new Error(payload?.error || "Invalid email or password.");
+      }
 
       console.info("[auth/signin] email login response", {
-        success: Boolean(user),
+        success: Boolean(loggedInUser),
         callbackUrl,
-        userId: user?.id,
-        userRole: user?.role,
+        redirectTarget,
+        userId: loggedInUser?.id,
+        userRole: loggedInUser?.role,
       });
-
-      if (!user) {
-        throw new Error("Login failed. Please try again.");
-      }
 
       console.info("[auth/signin] redirecting after email login", {
         callbackUrl,
+        redirectTarget,
       });
-      safeRedirectTo(callbackUrl, router);
+      safeRedirectTo(redirectTarget, router);
     } catch (error: any) {
       console.error("[auth/signin] email login failed", {
         callbackUrl,
+        redirectTarget,
         error,
       });
       const message =
