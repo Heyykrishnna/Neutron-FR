@@ -112,6 +112,8 @@ export default function CompetitionRegistration({
   );
   const [errorMessage, setErrorMessage] = useState("");
   const [checkoutRedirecting, setCheckoutRedirecting] = useState(false);
+  const [pendingPaymentRedirecting, setPendingPaymentRedirecting] =
+    useState(false);
   const [teamDetails, setTeamDetails] = useState<TeamDetails>({
     teamName: "",
     selectedTeamSize: "",
@@ -156,9 +158,14 @@ export default function CompetitionRegistration({
     [unstopLink],
   );
 
-  const registrations = Array.isArray(myRegistrationsQuery.data)
-    ? myRegistrationsQuery.data
-    : [];
+  const registrations = useMemo(() => {
+    const registrationsPayload = myRegistrationsQuery.data as any;
+    return Array.isArray(registrationsPayload)
+      ? registrationsPayload
+      : Array.isArray(registrationsPayload?.data)
+        ? registrationsPayload.data
+        : [];
+  }, [myRegistrationsQuery.data]);
   const competitionFormFields = Array.isArray(formFieldsQuery.data?.fields)
     ? formFieldsQuery.data.fields
     : [];
@@ -177,17 +184,43 @@ export default function CompetitionRegistration({
     }
   }, []);
 
-  const alreadyRegistered = useMemo(() => {
-    return registrations.some((entry: any) => {
-      const directCompetitionId = entry?.competitionId;
-      const nestedCompetitionId =
-        entry?.competition?.id || entry?.competition?._id;
-      return (
-        String(directCompetitionId || nestedCompetitionId || "") ===
-        competitionId
-      );
-    });
+  const matchedRegistration = useMemo(() => {
+    return (
+      registrations.find((entry: any) => {
+        const directCompetitionId = entry?.competitionId;
+        const nestedRegistrationCompetitionId =
+          entry?.registration?.competitionId;
+        const nestedCompetitionId =
+          entry?.competition?.id || entry?.competition?._id;
+
+        return (
+          String(
+            directCompetitionId ||
+              nestedRegistrationCompetitionId ||
+              nestedCompetitionId ||
+              "",
+          ) === competitionId
+        );
+      }) || null
+    );
   }, [registrations, competitionId]);
+
+  const alreadyRegistered = Boolean(matchedRegistration);
+  const registrationPaymentStatus = String(
+    matchedRegistration?.registration?.paymentStatus ||
+      matchedRegistration?.payment?.status ||
+      "",
+  ).toUpperCase();
+  const isRegistrationPaid =
+    registrationPaymentStatus === "PAID" ||
+    registrationPaymentStatus === "VERIFIED" ||
+    Boolean(matchedRegistration?.registration?.paymentVerifiedAt) ||
+    Boolean(matchedRegistration?.team?.paymentVerified);
+  const pendingPaymentCheckoutUrl =
+    matchedRegistration?.paymentSession?.checkoutUrl ||
+    matchedRegistration?.payment?.session?.checkoutUrl ||
+    matchedRegistration?.payment?.checkoutUrl ||
+    null;
 
   useEffect(() => {
     if (isMemberMode && step === "start") {
@@ -462,14 +495,43 @@ export default function CompetitionRegistration({
   }
 
   if (alreadyRegistered && !isMemberMode) {
+    if (isRegistrationPaid) {
+      return (
+        <div className="bg-emerald-500/10 border border-emerald-400/30 rounded-2xl p-8 md:p-12 text-center max-w-lg mx-auto">
+          <h3 className="text-2xl font-semibold mb-3 text-white">
+            Already Registered
+          </h3>
+          <p className="text-white/70">
+            Your registration for {competitionTitle} is already on record.
+          </p>
+        </div>
+      );
+    }
+
     return (
-      <div className="bg-emerald-500/10 border border-emerald-400/30 rounded-2xl p-8 md:p-12 text-center max-w-lg mx-auto">
-        <h3 className="text-2xl font-semibold mb-3 text-white">
-          Already Registered
-        </h3>
-        <p className="text-white/70">
-          Your registration for {competitionTitle} is already on record.
+      <div className="bg-amber-500/10 border border-amber-300/30 rounded-2xl p-8 md:p-12 text-center max-w-lg mx-auto">
+        <h3 className="text-2xl font-semibold mb-3 text-white">Complete Payment</h3>
+        <p className="text-white/70 mb-6">
+          You are registered for {competitionTitle}, but payment is still pending.
         </p>
+        <button
+          type="button"
+          disabled={!pendingPaymentCheckoutUrl || pendingPaymentRedirecting}
+          onClick={() => {
+            if (!pendingPaymentCheckoutUrl || typeof window === "undefined") {
+              return;
+            }
+            setPendingPaymentRedirecting(true);
+            window.location.assign(pendingPaymentCheckoutUrl);
+          }}
+          className="bg-white text-black px-8 py-3 rounded-full font-semibold hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+        >
+          {pendingPaymentRedirecting
+            ? "Redirecting To Secure Payment..."
+            : pendingPaymentCheckoutUrl
+              ? "Pay Now"
+              : "Payment Link Unavailable"}
+        </button>
       </div>
     );
   }
