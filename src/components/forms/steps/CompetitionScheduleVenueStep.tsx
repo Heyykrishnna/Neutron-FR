@@ -86,6 +86,10 @@ export default function CompetitionScheduleVenueStep({
   }, [selectedVenue, selectedVenueRoom, subVenueMetaMap]);
 
   useEffect(() => {
+    if (selectedVenueName && !venueNameOptions.includes(selectedVenueName)) {
+      setValue("venueName", "", { shouldDirty: true, shouldValidate: true });
+    }
+
     if (!selectedVenue) {
       if (selectedVenueRoom) {
         setValue("venueRoom", "", { shouldDirty: true, shouldValidate: true });
@@ -105,10 +109,12 @@ export default function CompetitionScheduleVenueStep({
     }
   }, [
     selectedVenue,
+    selectedVenueName,
     selectedVenueRoom,
     selectedVenueFloor,
     setValue,
     subVenueMetaMap,
+    venueNameOptions,
     venueFloorOptions,
   ]);
 

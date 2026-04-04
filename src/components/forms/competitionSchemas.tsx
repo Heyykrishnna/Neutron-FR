@@ -645,6 +645,15 @@ export function validateVenueScopeOnClient(values: any, venueCatalog: any) {
   const venueRoom = normalize(values?.venueRoom);
   const venueFloor = normalize(values?.venueFloor);
   const subVenues = Array.isArray(values?.subVenues) ? values.subVenues : [];
+  const scopedSubVenues = subVenues.filter((subVenue: any) => {
+    return (
+      Boolean(normalize(subVenue?.name)) ||
+      Boolean(normalize(subVenue?.room)) ||
+      Boolean(normalize(subVenue?.floor)) ||
+      Boolean(normalize(subVenue?.capacity)) ||
+      Boolean(normalize(subVenue?.notes))
+    );
+  });
 
   const venueEntries: Array<[string, CatalogVenue]> = venueCatalog.venues
     .filter((venue: any) => normalize(venue?.venueName))
@@ -676,7 +685,7 @@ export function validateVenueScopeOnClient(values: any, venueCatalog: any) {
   const errors: Array<{ field: string; message: string }> = [];
 
   if (!venueName) {
-    if (venueRoom || venueFloor || subVenues.length > 0) {
+    if (venueRoom || venueFloor || scopedSubVenues.length > 0) {
       errors.push({
         field: "venueName",
         message: "Select a venue before choosing room, floor, or sub venues.",
@@ -687,6 +696,18 @@ export function validateVenueScopeOnClient(values: any, venueCatalog: any) {
 
   const selectedVenue = venueMap.get(venueName);
   if (!selectedVenue) {
+    if (!venueRoom && !venueFloor && scopedSubVenues.length === 0) {
+      // If the venue no longer exists in catalog, treat it as intentionally empty.
+      // This keeps create/edit flows from failing when user leaves venue blank.
+      if (values && typeof values === "object") {
+        values.venueName = "";
+        values.venueRoom = "";
+        values.venueFloor = "";
+        values.subVenues = [];
+      }
+      return errors;
+    }
+
     errors.push({
       field: "venueName",
       message: "Selected venue is not in the allowed venue catalog.",
