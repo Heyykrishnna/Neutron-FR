@@ -240,6 +240,12 @@ const toIsoOrNull = (value: any) => toIsoFromDateTimeLocal(value);
 
 const getFormId = (form: any) => form?.id || form?._id || null;
 
+const getErrorMessage = (error: any, fallback: string) =>
+  error?.response?.data?.message ||
+  error?.response?.data?.error ||
+  error?.message ||
+  fallback;
+
 const createEmptyField = (index = 0): any => ({
   tempId: `new-${Date.now()}-${index}`,
   id: null,
@@ -823,7 +829,17 @@ function FormBuilderDialog({
           closesAt: toIsoOrNull(closesAt),
           status: "PUBLISHED",
         } as any);
-        currentFormId = (created as any)?.id;
+        currentFormId =
+          (created as any)?.data?.id ||
+          (created as any)?.id ||
+          (created as any)?._id ||
+          null;
+      }
+
+      if (!currentFormId) {
+        throw new Error(
+          "Form was created but its ID could not be resolved. Please reopen and edit the existing form.",
+        );
       }
 
       for (const deletedFieldId of deletedFieldIds) {
@@ -865,7 +881,9 @@ function FormBuilderDialog({
 
       onClose();
     } catch (error: any) {
-      setErrorText(error?.response?.data?.message || "Failed to save form");
+      const message = getErrorMessage(error, "Failed to save form");
+      setErrorText(message);
+      enqueueSnackbar(message, { variant: "error" });
     }
   };
 
@@ -933,13 +951,20 @@ function FormBuilderDialog({
             </Typography>
           </Box>
         </Box>
-        <DialogContent>
+        <DialogContent
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            overscrollBehavior: "contain",
+          }}
+        >
           {loadingForm && isEdit ? (
             <Box sx={{ py: 5, display: "flex", justifyContent: "center" }}>
               <CircularProgress size={24} sx={{ color: "#a855f7" }} />
             </Box>
           ) : (
-            <Box sx={{ display: "grid", gap: 2, mt: 1 }}>
+            <Box sx={{ display: "grid", gap: 2, mt: 1, pb: 1 }}>
               <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
                 <Chip
                   label="Step 1 · Link + Window"
